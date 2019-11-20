@@ -1,4 +1,4 @@
-import npeg, strutils
+import npeg, ksyast
 
 #[XXX
   doc-ref Section
@@ -68,7 +68,6 @@ let p = peg "ksy":
   Size <- Key("size") * Any
   Title <- Key("title") * Any
   Type <- Key("type") * Identifier
-  Value <- Key("value") * Any
 
   #XXX
   Enum <- Key("enum") * Any
@@ -82,5 +81,6 @@ let p = peg "ksy":
   RepeatUntil <- Key("repeat-until") * Any # Expression
   SizeEos <- Key("size-eos") * Any
   Terminator <- Key("terminator") * Any
+  Value <- Key("value") * Any # Expression
 
 doAssert p.matchFile("test.ksy").ok

@@ -1,23 +1,83 @@
 type
   Type* = ref object
     sections: seq[Section]
-  SectionKind: enum
+  SectionKind = enum
     skMeta
     skDoc
     skSeq
     skTypes
-    skInst
+    skInsts
     skEnums
   Section* = ref object
     case kind*: SectionKind
-    of skMeta: attrs: seq[Attr]
-    of skDoc: string
-    of skSeq: seq[Attr]
-    of skTypes: seq[Type]
-    of skInsts: seq[Inst]
-    of skEnums: seq[Enum]
+    of skMeta, skSeq: attrs: seq[Attr]
+    of skDoc: doc: string
+    of skTypes: types: seq[Type]
+    of skInsts: insts: seq[Inst]
+    of skEnums: enums: seq[Enum]
   Inst* = ref object
     attrs: seq[Attr]
   Enum* = ref object
     key: int
     value: string
+  AttrKind* = enum
+    akApp
+    akConsume
+    akContents
+    akEncoding
+    akEndian
+    #akEnum
+    #akEosError
+    akExts
+    akId
+    #akIf
+    akImports
+    #akInclude
+    #akIo
+    akLicence
+    #akProcess
+    #akPos
+    akRepeat
+    #akRepeatExpr
+    #akRepeatUntil
+    akSize
+    #akSizeEos
+    #akTerminator
+    akTitle
+    akType
+    #akValue
+  Attr* = ref object
+    case kind*: AttrKind
+    of akConsume:
+      consume: bool
+    of akContents:
+      contents: seq[byte]
+    of akEndian:
+      endian: Endian
+    #of akEnum
+    #of akEosError
+    of akExts, akImports:
+      list: seq[string]
+    of akApp, akEncoding, akId, akLicence, akTitle, akType:
+      strval: string
+    #of akIf
+    #of akInclude
+    #of akIo
+    #of akProcess
+    #of akPos
+    of akRepeat:
+      repeat: Repeat
+    #of akRepeatExpr
+    #of akRepeatUntil
+    of akSize:
+      size: int64
+    #of akSizeEos
+    #of akTerminator
+    #of akValue:
+  Endian* = enum
+    le
+    be
+  Repeat* = enum
+    expr
+    eos
+    until
