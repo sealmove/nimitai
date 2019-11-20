@@ -6,8 +6,6 @@ import npeg, strutils
 ]#
 
 let p = peg "ksy":
-  ksy <- +(Section0 * +'\n') * !1
-
   # Templates
   Key(item) <- item * Colon
   ArrayInline(item) <- '[' * B * item * B * *(',' * B * item * B) * ']'
@@ -30,32 +28,30 @@ let p = peg "ksy":
   Import <- +{'A'..'Z','a'..'z','0'..'9','_','-','/'}
   ArrayItem <- String | "0x" * +Xdigit | +Digit
 
-  Section0 <- >(Meta0 | Doc0 | Seq0 | Types0 | Instances0 | Enums0)
-
+  # Main grammar
+  ksy <- +(Section0 * +'\n') * !1
+  Section0 <- >(Meta0 | Doc0 | Seq0 | Types | Instances0 | Enums0)
   Section4 <- ' '[4] * (Meta4 | Doc4 | Seq4 | Instances4 | Enums4)
-
-  # Sections
-  Meta0 <- Key("meta") * Array2(MetaAttrs2)
+  Types <- Key("types") * Array2(Key(Identifier) * +(+'\n' * Section4))
+  Meta0 <- Key("meta") * Array2(MetaAttrs)
+  Meta4 <- Key("meta") * Array6(MetaAttrs)
   Doc0 <- Key("doc") * (('|' * B * *(+'\n' * ' '[2] * Any)) | Any)
+  Doc4 <- Key("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)
   Seq0 <- Key("seq") * YamlArray2(Key("id") * Identifier * Array4(Attr))
+  Seq4 <- Key("seq") * YamlArray6(Key("id") * Identifier * Array8(Attr))
   Instances0 <- Key("instances") * Array2(Key(Identifier) * Array4(Attr))
-  Types0 <- Key("types") * Array2(Key(Identifier) * +(+'\n' * Section4))
+  Instances4 <- Key("instances") * Array6(Key(Identifier) * Array8(Attr))
   Enums0 <- Key("enums") * Array2(Key(Identifier) *
             Array4(Key(+Digit) * Identifier))
-
-  Meta4 <- Key("meta") * +'\n' * +(' '[6] * MetaAttrs2 * +'\n')
-  Doc4 <- Key("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)
-  Seq4 <- Key("seq") * YamlArray6(Key("id") * Identifier * Array8(Attr))
-  Instances4 <- Key("instances") * Array6(Key(Identifier) * Array8(Attr))
   Enums4 <- Key("enums") * Array6(Key(Identifier) *
             Array8(Key(+Digit) * Identifier))
-
-  # Section Attributes
-  MetaAttrs2 <- Id | Title | Application | Ext2 | License | Imports2 | Encoding |
-                Endian
   Attr <- Consume | Contents | Encoding | Endian | Enum | Enum | EosError | If |
           Include | Io | Process | Pos | Repeat | RepeatExpr | RepeatUntil |
           Size | SizeEos | Terminator | Type | Value
+
+  # Section Attributes
+  MetaAttrs <- Id | Title | Application | Ext2 | License | Imports2 | Encoding |
+                Endian
 
   # Attributes
   Application <- Key("application") * Any
