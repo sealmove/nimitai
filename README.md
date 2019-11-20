@@ -21,6 +21,9 @@ let x = myFileFormat.fromFile("/path/to/my/bin/file")
 ### What does it bring to the table?
 Up until now there is no library in any programming language for parsing an arbitary file. If a library for your specific format does not exist in your language, you have to create it. This can either be done **by hand** or by using a **file parser generator** like [Kaitai Struct](https://kaitai.io/) or if your format is relatively simple, serialization programs like [Protocol Buffers](https://developers.google.com/protocol-buffers) can work too.
 
-Nimitai does away with all this machinary. You don't need to hand-write anything, nor do you need any external compiler tools and auto-generated parsers. The parser is created in-memory at compile-time; no files are generated!
+Nimitai does away with all this machinary! The advantages are several:
+- Zero dependance on external compiler tools
+- Each time you change the `.ksy` file, the parser is automatically recompiled along with your project
+- Better quality of generated code since it's done on AST level
 
 This allows for better and easier integration of parsers into your project.
