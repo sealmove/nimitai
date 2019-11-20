@@ -27,3 +27,8 @@ Nimitai does away with all this machinary! The advantages are several:
 - Better quality of generated code since it's done on AST level
 
 This allows for better and easier integration of parsers into your project.
+
+### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
+In general yes. There are small exceptions though:
+- nimitai does more strict parsing of the `.ksy` file (exactly 2-space indentation etc)
+- nimitai uses Nim expressions instead of Kaitai Struct expressions
