@@ -1,5 +1,7 @@
 import npeg, ksyast
 
+var stack = newSeq[KsyNode]()
+
 #[XXX
   doc-ref Section
   KsyExpression <-
@@ -29,11 +31,12 @@ let p = peg "ksy":
   ArrayItem <- String | "0x" * +Xdigit | +Digit
 
   # Main grammar
-  ksy <- +(Section0 * +'\n') * !1
-  Section0 <- >(Meta0 | Doc0 | Seq0 | Types | Instances0 | Enums0)
+  ksy <- +(>Section0 * +'\n') * !1
+  Section0 <- Meta0 | Doc0 | Seq0 | Types | Instances0 | Enums0
   Section4 <- ' '[4] * (Meta4 | Doc4 | Seq4 | Instances4 | Enums4)
   Types <- Key("types") * Array2(Key(Identifier) * +(+'\n' * Section4))
-  Meta0 <- Key("meta") * Array2(MetaAttrs)
+  Meta0 <- Key("meta") * Array2(MetaAttrs):
+    stack.add KsyNode(kind: knkSection, sectionNode: Section(kind: skMeta))
   Meta4 <- Key("meta") * Array6(MetaAttrs)
   Doc0 <- Key("doc") * (('|' * B * *(+'\n' * ' '[2] * Any)) | Any)
   Doc4 <- Key("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)

@@ -1,7 +1,25 @@
 type
+  KsyNodeKind* = enum
+    knkType
+    knkSection
+    knkInst
+    knkEnum
+    knkAttr
+  KsyNode* = ref object
+    case kind*: KsyNodeKind
+    of knkType:
+      typeNode*: Type
+    of knkSection:
+      sectionNode*: Section
+    of knkInst:
+      instNode*: Inst
+    of knkEnum:
+      enumNode*: Enum
+    of knkAttr:
+      attrNode*: Attr
   Type* = ref object
     sections: seq[Section]
-  SectionKind = enum
+  SectionKind* = enum
     skMeta
     skDoc
     skSeq
@@ -10,11 +28,16 @@ type
     skEnums
   Section* = ref object
     case kind*: SectionKind
-    of skMeta, skSeq: attrs: seq[Attr]
-    of skDoc: doc: string
-    of skTypes: types: seq[Type]
-    of skInsts: insts: seq[Inst]
-    of skEnums: enums: seq[Enum]
+    of skMeta, skSeq:
+      attrs*: seq[Attr]
+    of skDoc:
+      doc*: string
+    of skTypes:
+      types*: seq[Type]
+    of skInsts:
+      insts*: seq[Inst]
+    of skEnums:
+      enums*: seq[Enum]
   Inst* = ref object
     attrs: seq[Attr]
   Enum* = ref object
@@ -49,28 +72,28 @@ type
   Attr* = ref object
     case kind*: AttrKind
     of akConsume:
-      consume: bool
+      consume*: bool
     of akContents:
-      contents: seq[byte]
+      contents*: seq[byte]
     of akEndian:
-      endian: Endian
+      endian*: Endian
     #of akEnum
     #of akEosError
     of akExts, akImports:
-      list: seq[string]
+      list*: seq[string]
     of akApp, akEncoding, akId, akLicence, akTitle, akType:
-      strval: string
+      strval*: string
     #of akIf
     #of akInclude
     #of akIo
     #of akProcess
     #of akPos
     of akRepeat:
-      repeat: Repeat
+      repeat*: Repeat
     #of akRepeatExpr
     #of akRepeatUntil
     of akSize:
-      size: int64
+      size*: int64
     #of akSizeEos
     #of akTerminator
     #of akValue:
