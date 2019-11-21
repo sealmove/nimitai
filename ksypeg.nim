@@ -9,7 +9,7 @@ proc newKey(kind: KeyKind, s: string): KsyNode =
     result.keyNode = Key(kind: kind, consume: parseBool(s))
   else:
     discard
-  #of kkContents:
+  of kkContents:
   #  result.contents =
   #of kkEndian:
   #  result.endian =
@@ -82,7 +82,7 @@ let p = peg "ksy":
   Enums4 <- K("enums") * Array6(K(Identifier) *
             Array8(K(+Digit) * Identifier))
   Key <- App | Consume | Contents | Encoding | Endian | Enum | Enum | EosError |
-         Ext | Id | If | Include | Imports | Io | License | Process | Pos |
+         Exts | Id | If | Include | Imports | Io | License | Process | Pos |
          Repeat | RepeatExpr | RepeatUntil | Size | SizeEos | Terminator |
          Title | Type | Value
 
@@ -92,17 +92,28 @@ let p = peg "ksy":
   Consume <- K("consume") * >Bool * B:
     stack.add newKey(kkConsume, $1)
   Contents <- K("contents") *
-              (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem))
+              >(ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem)):
+    stack.add newKey(kkContents, $1)
   Encoding <- K("encoding") * Any
+    #stack.add newKey(kkEncoding, $1)
   Endian <- K("endian") * ("le" | "be")
-  Ext <- K("file-extension") * (YamlArray4(Any) | Any)
+    #stack.add newKey(kkEndian, $1)
+  Exts <- K("file-extension") * (YamlArray4(Any) | Any)
+    #stack.add newKey(kkExts, $1)
   Id <- K("id") * Identifier
+    #stack.add newKey(kkId, $1)
   Imports <- K("imports") * (YamlArray4(Import) | Import)
+    #stack.add newKey(kkImports, $1)
   License <- K("license") * Any
+    #stack.add newKey(kkLicense, $1)
   Repeat <- K("repeat") * ("expr" | "eos" | "until")
+    #stack.add newKey(kkRepeat, $1)
   Size <- K("size") * Any
+    #stack.add newKey(kkSize, $1)
   Title <- K("title") * Any
+    #stack.add newKey(kkTitle, $1)
   Type <- K("type") * Identifier
+    #stack.add newKey(kkType, $1)
 
   #XXX
   Enum <- K("enum") * Any
