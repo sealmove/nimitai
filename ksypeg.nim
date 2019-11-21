@@ -1,6 +1,39 @@
-import npeg, ksyast
+import npeg, ksyast, strutils
 
 var stack = newSeq[KsyNode]()
+
+proc newKey(kind: KeyKind, s: string): KsyNode =
+  result = KsyNode(kind: knkKey)
+  case kind:
+  of kkConsume:
+    result.keyNode = Key(kind: kind, consume: parseBool(s))
+  else:
+    discard
+  #of kkContents:
+  #  result.contents =
+  #of kkEndian:
+  #  result.endian =
+  ##of kkEnum
+  ##of kkEosError
+  #of kkExts, kkImports:
+  #  result.list =
+  #of kkApp, kkEncoding, kkId, kkLicence, kkTitle, kkType:
+  #  result.strval = s
+  ##of kkIf
+  ##of kkInclude
+  ##of kkIo
+  ##of kkProcess
+  ##of kkPos
+  #of kkRepeat:
+  #  result.repeat =
+  ##of kkRepeatExpr
+  ##of kkRepeatUntil
+  #of kkSize:
+  #  result.size =
+  ##of kkSizeEos
+  ##of kkTerminator
+  ##of kkValue:
+
 
 #[XXX
   doc-ref Section
@@ -54,9 +87,10 @@ let p = peg "ksy":
          Title | Type | Value
 
   # Keys
-  App <- K("application") * >Any:
-    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: akApp, strval: $1))
-  Consume <- K("consume") * Bool
+  App <- K("application") * >Any#:
+    #stack.add KsyNode(kind: knkKey, keyNode: Key(kind: akApp, strval: $1))
+  Consume <- K("consume") * >Bool * B:
+    stack.add newKey(kkConsume, $1)
   Contents <- K("contents") *
               (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem))
   Encoding <- K("encoding") * Any

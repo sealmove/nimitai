@@ -52,59 +52,59 @@ type
     key: int
     value: string
   KeyKind* = enum
-    akApp
-    akConsume
-    akContents
-    akEncoding
-    akEndian
-    #akEnum
-    #akEosError
-    akExts
-    akId
-    #akIf
-    akImports
-    #akInclude
-    #akIo
-    akLicence
-    #akProcess
-    #akPos
-    akRepeat
-    #akRepeatExpr
-    #akRepeatUntil
-    akSize
-    #akSizeEos
-    #akTerminator
-    akTitle
-    akType
-    #akValue
+    kkApp
+    kkConsume
+    kkContents
+    kkEncoding
+    kkEndian
+    #kkEnum
+    #kkEosError
+    kkExts
+    kkId
+    #kkIf
+    kkImports
+    #kkInclude
+    #kkIo
+    kkLicence
+    #kkProcess
+    #kkPos
+    kkRepeat
+    #kkRepeatExpr
+    #kkRepeatUntil
+    kkSize
+    #kkSizeEos
+    #kkTerminator
+    kkTitle
+    kkType
+    #kkValue
   Key* = ref object
     case kind*: KeyKind
-    of akConsume:
+    of kkConsume:
       consume*: bool
-    of akContents:
+    of kkContents:
       contents*: seq[byte]
-    of akEndian:
+    of kkEndian:
       endian*: Endian
-    #of akEnum
-    #of akEosError
-    of akExts, akImports:
+    #of kkEnum
+    #of kkEosError
+    of kkExts, kkImports:
       list*: seq[string]
-    of akApp, akEncoding, akId, akLicence, akTitle, akType:
+    of kkApp, kkEncoding, kkId, kkLicence, kkTitle, kkType:
       strval*: string
-    #of akIf
-    #of akInclude
-    #of akIo
-    #of akProcess
-    #of akPos
-    of akRepeat:
+    #of kkIf
+    #of kkInclude
+    #of kkIo
+    #of kkProcess
+    #of kkPos
+    of kkRepeat:
       repeat*: Repeat
-    #of akRepeatExpr
-    #of akRepeatUntil
-    of akSize:
+    #of kkRepeatExpr
+    #of kkRepeatUntil
+    of kkSize:
       size*: int64
-    #of akSizeEos
-    #of akTerminator
-    #of akValue:
+    #of kkSizeEos
+    #of kkTerminator
+    #of kkValue:
   Endian* = enum
     le
     be
