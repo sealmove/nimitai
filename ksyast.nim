@@ -5,6 +5,7 @@ type
     knkInst
     knkEnum
     knkAttr
+    knkKey
   KsyNode* = ref object
     case kind*: KsyNodeKind
     of knkType:
@@ -17,6 +18,8 @@ type
       enumNode*: Enum
     of knkAttr:
       attrNode*: Attr
+    of knkKey:
+      keyNode*: Key
   Type* = ref object
     sections: seq[Section]
   SectionKind* = enum
@@ -28,10 +31,12 @@ type
     skEnums
   Section* = ref object
     case kind*: SectionKind
-    of skMeta, skSeq:
-      attrs*: seq[Attr]
+    of skMeta:
+      keys*: seq[Key]
     of skDoc:
       doc*: string
+    of skSeq:
+      attrs: seq[Attr]
     of skTypes:
       types*: seq[Type]
     of skInsts:
@@ -40,10 +45,13 @@ type
       enums*: seq[Enum]
   Inst* = ref object
     attrs: seq[Attr]
+  Attr* = ref object
+    id: string
+    keys: seq[Key]
   Enum* = ref object
     key: int
     value: string
-  AttrKind* = enum
+  KeyKind* = enum
     akApp
     akConsume
     akContents
@@ -69,8 +77,8 @@ type
     akTitle
     akType
     #akValue
-  Attr* = ref object
-    case kind*: AttrKind
+  Key* = ref object
+    case kind*: KeyKind
     of akConsume:
       consume*: bool
     of akContents:

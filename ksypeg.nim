@@ -9,7 +9,7 @@ var stack = newSeq[KsyNode]()
 
 let p = peg "ksy":
   # Templates
-  Key(item) <- item * Colon
+  K(item) <- item * Colon
   ArrayInline(item) <- '[' * B * item * B * *(',' * B * item * B) * ']'
   Array2(item) <- +(+'\n' * ' '[2] * item * B)
   Array4(item) <- +(+'\n' * ' '[4] * item * B)
@@ -34,56 +34,54 @@ let p = peg "ksy":
   ksy <- +(>Section0 * +'\n') * !1
   Section0 <- Meta0 | Doc0 | Seq0 | Types | Instances0 | Enums0
   Section4 <- ' '[4] * (Meta4 | Doc4 | Seq4 | Instances4 | Enums4)
-  Types <- Key("types") * Array2(Key(Identifier) * +(+'\n' * Section4))
-  Meta0 <- Key("meta") * Array2(MetaAttrs):
-    stack.add KsyNode(kind: knkSection, sectionNode: Section(kind: skMeta))
-  Meta4 <- Key("meta") * Array6(MetaAttrs)
-  Doc0 <- Key("doc") * (('|' * B * *(+'\n' * ' '[2] * Any)) | Any)
-  Doc4 <- Key("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)
-  Seq0 <- Key("seq") * YamlArray2(Key("id") * Identifier * Array4(Attr))
-  Seq4 <- Key("seq") * YamlArray6(Key("id") * Identifier * Array8(Attr))
-  Instances0 <- Key("instances") * Array2(Key(Identifier) * Array4(Attr))
-  Instances4 <- Key("instances") * Array6(Key(Identifier) * Array8(Attr))
-  Enums0 <- Key("enums") * Array2(Key(Identifier) *
-            Array4(Key(+Digit) * Identifier))
-  Enums4 <- Key("enums") * Array6(Key(Identifier) *
-            Array8(Key(+Digit) * Identifier))
-  Attr <- Consume | Contents | Encoding | Endian | Enum | Enum | EosError | If |
-          Include | Io | Process | Pos | Repeat | RepeatExpr | RepeatUntil |
-          Size | SizeEos | Terminator | Type | Value
+  Types <- K("types") * Array2(K(Identifier) * +(+'\n' * Section4))
+  Meta0 <- K("meta") * Array2(>Key)
+    #stack.add KsyNode(kind: knkSection, sectionNode: Section(kind: skMeta))
+  Meta4 <- K("meta") * Array6(Key)
+  Doc0 <- K("doc") * (('|' * B * *(+'\n' * ' '[2] * Any)) | Any)
+  Doc4 <- K("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)
+  Seq0 <- K("seq") * YamlArray2(K("id") * Identifier * Array4(Key))
+  Seq4 <- K("seq") * YamlArray6(K("id") * Identifier * Array8(Key))
+  Instances0 <- K("instances") * Array2(K(Identifier) * Array4(Key))
+  Instances4 <- K("instances") * Array6(K(Identifier) * Array8(Key))
+  Enums0 <- K("enums") * Array2(K(Identifier) *
+            Array4(K(+Digit) * Identifier))
+  Enums4 <- K("enums") * Array6(K(Identifier) *
+            Array8(K(+Digit) * Identifier))
+  Key <- App | Consume | Contents | Encoding | Endian | Enum | Enum | EosError |
+         Ext | Id | If | Include | Imports | Io | License | Process | Pos |
+         Repeat | RepeatExpr | RepeatUntil | Size | SizeEos | Terminator |
+         Title | Type | Value
 
-  # Section Attributes
-  MetaAttrs <- Id | Title | Application | Ext2 | License | Imports2 | Encoding |
-                Endian
-
-  # Attributes
-  Application <- Key("application") * Any
-  Consume <- Key("consume") * Bool
-  Contents <- Key("contents") *
+  # Keys
+  App <- K("application") * >Any:
+    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: akApp, strval: $1))
+  Consume <- K("consume") * Bool
+  Contents <- K("contents") *
               (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem))
-  Encoding <- Key("encoding") * Any
-  Endian <- Key("endian") * ("le" | "be")
-  Ext2 <- Key("file-extension") * (YamlArray4(Any) | Any)
-  Id <- Key("id") * Identifier
-  Imports2 <- Key("imports") * (YamlArray4(Import) | Import)
-  License <- Key("license") * Any
-  Repeat <- Key("repeat") * ("expr" | "eos" | "until")
-  Size <- Key("size") * Any
-  Title <- Key("title") * Any
-  Type <- Key("type") * Identifier
+  Encoding <- K("encoding") * Any
+  Endian <- K("endian") * ("le" | "be")
+  Ext <- K("file-extension") * (YamlArray4(Any) | Any)
+  Id <- K("id") * Identifier
+  Imports <- K("imports") * (YamlArray4(Import) | Import)
+  License <- K("license") * Any
+  Repeat <- K("repeat") * ("expr" | "eos" | "until")
+  Size <- K("size") * Any
+  Title <- K("title") * Any
+  Type <- K("type") * Identifier
 
   #XXX
-  Enum <- Key("enum") * Any
-  EosError <- Key("eos-error") * Any
-  If <- Key("if") * Any # Expression
-  Include <- Key("include") * Any
-  Io <- Key("io") * Any
-  Process <- Key("process") * Any
-  Pos <- Key("pos") * Any
-  RepeatExpr <- Key("repeat-expr") * Any # Expression
-  RepeatUntil <- Key("repeat-until") * Any # Expression
-  SizeEos <- Key("size-eos") * Any
-  Terminator <- Key("terminator") * Any
-  Value <- Key("value") * Any # Expression
+  Enum <- K("enum") * Any
+  EosError <- K("eos-error") * Any
+  If <- K("if") * Any # Expression
+  Include <- K("include") * Any
+  Io <- K("io") * Any
+  Process <- K("process") * Any
+  Pos <- K("pos") * Any
+  RepeatExpr <- K("repeat-expr") * Any # Expression
+  RepeatUntil <- K("repeat-until") * Any # Expression
+  SizeEos <- K("size-eos") * Any
+  Terminator <- K("terminator") * Any
+  Value <- K("value") * Any # Expression
 
 doAssert p.matchFile("test.ksy").ok
