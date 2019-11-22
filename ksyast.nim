@@ -1,3 +1,5 @@
+import strformat, strutils
+
 type
   KsyNodeKind* = enum
     knkType
@@ -6,6 +8,7 @@ type
     knkEnum
     knkAttr
     knkKey
+    knkItem
   KsyNode* = ref object
     case kind*: KsyNodeKind
     of knkType:
@@ -20,6 +23,8 @@ type
       attrNode*: Attr
     of knkKey:
       keyNode*: Key
+    of knkItem:
+      itemNode*: string
   Type* = ref object
     sections: seq[Section]
   SectionKind* = enum
@@ -112,3 +117,41 @@ type
     expr
     eos
     until
+
+proc stackBytes*(stack: var seq[byte], s: string) =
+  if s.startsWith("\""):
+    for i in countdown(s.len - 2, 1):
+      stack.add(s[i].byte)
+  elif s.startsWith "0x":
+    let x = parseHexInt(s)
+    if x > 255:
+      echo "Hex number out of byte range"
+      quit QuitFailure
+    stack.add(x.byte)
+  else:
+    let x = parseInt(s)
+    if x > 255:
+      echo "Hex number out of byte range"
+      quit QuitFailure
+    stack.add(x.byte)
+
+# Debug proc
+proc `$`*(n: KsyNode): string =
+  case n.kind
+  #of knkType:
+  #of knkSection:
+  #of knkInst:
+  #of knkEnum:
+  #of knkAttr:
+  of knkKey:
+    case n.keyNode.kind
+    of kkContents:
+      fmt"Contents({n.keyNode.contents})"
+    of kkImports:
+      fmt"Imports({n.keyNode.list})"
+    else:
+      "UNKNOWN" #XXX
+  of knkItem:
+    n.itemNode
+  else:
+    "UNKNOWN" #XXX

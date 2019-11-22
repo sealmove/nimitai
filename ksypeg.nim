@@ -1,39 +1,9 @@
 import npeg, ksyast, strutils
 
-var stack = newSeq[KsyNode]()
-
-proc newKey(kind: KeyKind, s: string): KsyNode =
-  result = KsyNode(kind: knkKey)
-  case kind:
-  of kkConsume:
-    result.keyNode = Key(kind: kind, consume: parseBool(s))
-  else:
-    discard
-  of kkContents:
-  #  result.contents =
-  #of kkEndian:
-  #  result.endian =
-  ##of kkEnum
-  ##of kkEosError
-  #of kkExts, kkImports:
-  #  result.list =
-  #of kkApp, kkEncoding, kkId, kkLicence, kkTitle, kkType:
-  #  result.strval = s
-  ##of kkIf
-  ##of kkInclude
-  ##of kkIo
-  ##of kkProcess
-  ##of kkPos
-  #of kkRepeat:
-  #  result.repeat =
-  ##of kkRepeatExpr
-  ##of kkRepeatUntil
-  #of kkSize:
-  #  result.size =
-  ##of kkSizeEos
-  ##of kkTerminator
-  ##of kkValue:
-
+var
+  stack = newSeq[KsyNode]()
+  contentsCnt: int
+  importsCnt: int
 
 #[XXX
   doc-ref Section
@@ -60,8 +30,12 @@ let p = peg "ksy":
   Bool <- "true" | "false"
   String <- '"' * *(1 - {'"', '\n'}) * '"'
   Identifier <- {'a'..'z'} * *{'a'..'z','0'..'9','_'}
-  Import <- +{'A'..'Z','a'..'z','0'..'9','_','-','/'}
-  ArrayItem <- String | "0x" * +Xdigit | +Digit
+  Import <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
+    stack.add KsyNode(kind: knkItem, itemNode: $1)
+    inc importsCnt
+  ArrayItem <- >(String | "0x" * +Xdigit | +Digit):
+    stack.add KsyNode(kind: knkItem, itemNode: $1)
+    inc contentsCnt
 
   # Main grammar
   ksy <- +(>Section0 * +'\n') * !1
@@ -69,7 +43,6 @@ let p = peg "ksy":
   Section4 <- ' '[4] * (Meta4 | Doc4 | Seq4 | Instances4 | Enums4)
   Types <- K("types") * Array2(K(Identifier) * +(+'\n' * Section4))
   Meta0 <- K("meta") * Array2(>Key)
-    #stack.add KsyNode(kind: knkSection, sectionNode: Section(kind: skMeta))
   Meta4 <- K("meta") * Array6(Key)
   Doc0 <- K("doc") * (('|' * B * *(+'\n' * ' '[2] * Any)) | Any)
   Doc4 <- K("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)
@@ -87,33 +60,28 @@ let p = peg "ksy":
          Title | Type | Value
 
   # Keys
-  App <- K("application") * >Any#:
-    #stack.add KsyNode(kind: knkKey, keyNode: Key(kind: akApp, strval: $1))
-  Consume <- K("consume") * >Bool * B:
-    stack.add newKey(kkConsume, $1)
+  App <- K("application") * >Any
+  Consume <- K("consume") * >Bool * B
   Contents <- K("contents") *
-              >(ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem)):
-    stack.add newKey(kkContents, $1)
+              (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem)):
+    let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkContents))
+    var reverseStack: seq[byte]
+    while contentsCnt > 0:
+      reverseStack.stackBytes(stack.pop.itemNode)
+      dec contentsCnt
+    while reverseStack.len > 0:
+      k.keyNode.contents.add(reverseStack.pop)
+    stack.add k
   Encoding <- K("encoding") * Any
-    #stack.add newKey(kkEncoding, $1)
   Endian <- K("endian") * ("le" | "be")
-    #stack.add newKey(kkEndian, $1)
   Exts <- K("file-extension") * (YamlArray4(Any) | Any)
-    #stack.add newKey(kkExts, $1)
   Id <- K("id") * Identifier
-    #stack.add newKey(kkId, $1)
   Imports <- K("imports") * (YamlArray4(Import) | Import)
-    #stack.add newKey(kkImports, $1)
   License <- K("license") * Any
-    #stack.add newKey(kkLicense, $1)
   Repeat <- K("repeat") * ("expr" | "eos" | "until")
-    #stack.add newKey(kkRepeat, $1)
   Size <- K("size") * Any
-    #stack.add newKey(kkSize, $1)
   Title <- K("title") * Any
-    #stack.add newKey(kkTitle, $1)
   Type <- K("type") * Identifier
-    #stack.add newKey(kkType, $1)
 
   #XXX
   Enum <- K("enum") * Any
