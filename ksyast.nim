@@ -26,7 +26,9 @@ type
     of knkItem:
       itemNode*: string
   Type* = ref object
-    sections: seq[Section]
+    meta: seq[Key]
+    doc: string
+    attrs: seq[Attr]
   SectionKind* = enum
     skMeta
     skDoc
@@ -70,7 +72,7 @@ type
     kkImports
     #kkInclude
     #kkIo
-    kkLicence
+    kkLicense
     #kkProcess
     #kkPos
     kkRepeat
@@ -94,7 +96,7 @@ type
     #of kkEosError
     of kkExts, kkImports:
       list*: seq[string]
-    of kkApp, kkEncoding, kkId, kkLicence, kkTitle, kkType:
+    of kkApp, kkEncoding, kkId, kkLicense, kkTitle, kkType:
       strval*: string
     #of kkIf
     #of kkInclude
@@ -118,22 +120,43 @@ type
     eos
     until
 
+# Helper procs
+proc newKey*(kind: KeyKind, s: string = "",
+            blist: seq[byte] = @[], slist: seq[string] = @[]): KsyNode =
+  var k = Key(kind: kind)
+  case kind
+  of kkApp, kkEncoding, kkId, kkLicense, kkTitle, kkType:
+    k.strval = s
+  of kkConsume:
+    k.consume = parseBool(s)
+  of kkContents:
+    k.contents.add blist
+  of kkEndian:
+    k.endian = if s == "le": le else: be
+  of kkExts, kkImports:
+    k.list.add slist
+  of kkRepeat:
+    k.repeat = if s == "expr": expr elif s == "eos": eos else: until
+  of kkSize:
+    discard
+  result = KsyNode(kind: knkKey, keyNode: k)
+
 proc stackBytes*(stack: var seq[byte], s: string) =
   if s.startsWith("\""):
     for i in countdown(s.len - 2, 1):
-      stack.add(s[i].byte)
+      stack.insert(s[i].byte, 0)
   elif s.startsWith "0x":
     let x = parseHexInt(s)
     if x > 255:
       echo "Hex number out of byte range"
       quit QuitFailure
-    stack.add(x.byte)
+    stack.insert(x.byte, 0)
   else:
     let x = parseInt(s)
     if x > 255:
       echo "Hex number out of byte range"
       quit QuitFailure
-    stack.add(x.byte)
+    stack.insert(x.byte, 0)
 
 # Debug proc
 proc `$`*(n: KsyNode): string =
@@ -161,8 +184,8 @@ proc `$`*(n: KsyNode): string =
       &"Id: {n.keyNode.strval}"
     of kkImports:
       &"Imports: {n.keyNode.list}"
-    of kkLicence:
-      &"Licence: {n.keyNode.strval}"
+    of kkLicense:
+      &"License: {n.keyNode.strval}"
     of kkRepeat:
       &"Repeat: {n.keyNode.repeat}"
     of kkSize:

@@ -61,50 +61,44 @@ let p = peg "ksy":
 
   # Keys
   App <- K("application") * >Any:
-    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: kkApp, strval: $1))
+    stack.add newKey(kkApp, $1)
   Consume <- K("consume") * >Bool * B:
-    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: kkConsume,
-                                                 consume: parseBool($1)))
+    stack.add newKey(kkConsume, $1)
   Contents <- K("contents") *
               (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem)):
-    let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkContents))
-    var revStack: seq[byte]
+    var list: seq[byte]
     while itemCnt > 0:
-      revStack.stackBytes(stack.pop.itemNode)
+      list.stackBytes(stack.pop.itemNode)
       dec itemCnt
-    while revStack.len > 0:
-      k.keyNode.contents.add(revStack.pop)
-    stack.add k
+    stack.add newKey(kkContents, blist = list)
   Encoding <- K("encoding") * >Any:
-    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: kkEncoding, strval: $1))
+    stack.add newKey(kkEncoding, $1)
   Endian <- K("endian") * >("le" | "be"):
-    stack.add KsyNode(kind: knkKey,
-                      keyNode: Key(kind: kkEndian,
-                                   endian: if $1 == "le": le else: be))
+    stack.add newKey(kkEndian, $1)
   Exts <- K("file-extension") * (YamlArray4(FileName) | FileName):
-    let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkExts))
-    var revStack: seq[string]
+    var list: seq[string]
     while itemCnt > 0:
-      revStack.add(stack.pop.itemNode)
+      list.insert(stack.pop.itemNode, 0)
       dec itemCnt
-    while revStack.len > 0:
-      k.keyNode.list.add(revStack.pop)
-    stack.add k
-  Id <- K("id") * Identifier
+    stack.add newKey(kkExts, slist = list)
+  Id <- K("id") * >Identifier:
+    stack.add newKey(kkId, $1)
   Imports <- K("imports") * (YamlArray4(FileName) | FileName):
-    let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkImports))
-    var revStack: seq[string]
+    var list: seq[string]
     while itemCnt > 0:
-      revStack.add(stack.pop.itemNode)
+      list.insert(stack.pop.itemNode, 0)
       dec itemCnt
-    while revStack.len > 0:
-      k.keyNode.list.add(revStack.pop)
-    stack.add k
-  License <- K("license") * Any
-  Repeat <- K("repeat") * ("expr" | "eos" | "until")
-  Size <- K("size") * Any
-  Title <- K("title") * Any
-  Type <- K("type") * Identifier
+    stack.add newKey(kkImports, slist = list)
+  License <- K("license") * >Any:
+    stack.add newKey(kkLicense, $1)
+  Repeat <- K("repeat") * >("expr" | "eos" | "until"):
+    stack.add newKey(kkRepeat, $1)
+  Size <- K("size") * >Any:
+    stack.add newKey(kkRepeat, $1)
+  Title <- K("title") * >Any:
+    stack.add newKey(kkTitle, $1)
+  Type <- K("type") * >Identifier:
+    stack.add newKey(kkType, $1)
 
   #XXX
   Enum <- K("enum") * Any
