@@ -1,5 +1,5 @@
 # nimitai [WIP]
-## Implementation of [Kaitai Struct](https://kaitai.io/) as a compile-time library
+## Implementation of [Kaitai Struct](https://kaitai.io/) as a macro
 
 ### How will it look like?
 A vague usage demo:
