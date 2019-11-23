@@ -1,11 +1,52 @@
-import npeg, ksyast, strutils
+import npeg, ksyast, strutils, strformat
 
 var
-  stack = newSeq[KsyNode]()
-  itemCnt: int
+  typestk = newSeq[Type]()
+  sectstk = newSeq[Sect]()
+  inststk = newSeq[Inst]()
+  enumstk = newSeq[Enum]()
+  attrstk = newSeq[Attr]()
+  keystk  = newSeq[Key]()
+  itemstk = newSeq[string]()
+
+proc pushKey(kind: KeyKind, s: string = "",
+            blist: seq[byte] = @[], slist: seq[string] = @[]) =
+  var k = Key(kind: kind)
+  case kind
+  of kkApp, kkEncoding, kkId, kkLicense, kkTitle, kkType:
+    k.strval = s
+  of kkConsume:
+    k.consume = parseBool(s)
+  of kkContents:
+    k.contents.add blist
+  of kkEndian:
+    k.endian = if s == "le": le else: be
+  of kkExts, kkImports:
+    k.list.add slist
+  of kkRepeat:
+    k.repeat = if s == "expr": expr elif s == "eos": eos else: until
+  of kkSize:
+    discard
+  keystk.add k
+
+proc debug() =
+  echo "TYPE STACK"
+  for e in typestk: echo e
+  echo "\nSECT STACK"
+  for e in sectstk: echo e
+  echo "\nINST STACK"
+  for e in inststk: echo e
+  echo "\nENUM STACK"
+  for e in enumstk: echo e
+  echo "\nATTR STACK"
+  for e in attrstk: echo e
+  echo "\nKEY STACK"
+  for e in keystk: echo e
+  echo "\nITEM STACK"
+  for e in itemstk: echo e
 
 #[XXX
-  doc-ref Section
+  doc-ref Sect
   KsyExpression <-
 ]#
 
@@ -29,76 +70,94 @@ let p = peg "ksy":
   Bool <- "true" | "false"
   String <- '"' * *(1 - {'"', '\n'}) * '"'
   Identifier <- {'a'..'z'} * *{'a'..'z','0'..'9','_'}
-  FileName <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
-    stack.add KsyNode(kind: knkItem, itemNode: $1)
-    inc itemCnt
+  FileName <- >(+{'A'..'Z','a'..'z','0'..'9','_','-','/'}):
+    itemstk.add $1
   ArrayItem <- >(String | "0x" * +Xdigit | +Digit):
-    stack.add KsyNode(kind: knkItem, itemNode: $1)
-    inc itemCnt
+    itemstk.add $1
 
   # Main grammar
-  ksy <- +(>Section0 * +'\n') * !1:
-    for e in stack: echo e
-  Section0 <- Meta0 | Doc0 | Seq0 | Types | Instances0 | Enums0
-  Section4 <- ' '[4] * (Meta4 | Doc4 | Seq4 | Instances4 | Enums4)
-  Types <- K("types") * Array2(K(Identifier) * +(+'\n' * Section4))
-  Meta0 <- K("meta") * Array2(>Key)
-  Meta4 <- K("meta") * Array6(Key)
-  Doc0 <- K("doc") * (('|' * B * *(+'\n' * ' '[2] * Any)) | Any)
-  Doc4 <- K("doc") * (('|' * B * *(+'\n' * ' '[6] * Any)) | Any)
-  Seq0 <- K("seq") * YamlArray2(K("id") * Identifier * Array4(Key))
-  Seq4 <- K("seq") * YamlArray6(K("id") * Identifier * Array8(Key))
-  Instances0 <- K("instances") * Array2(K(Identifier) * Array4(Key))
-  Instances4 <- K("instances") * Array6(K(Identifier) * Array8(Key))
-  Enums0 <- K("enums") * Array2(K(Identifier) *
-            Array4(K(+Digit) * Identifier))
-  Enums4 <- K("enums") * Array6(K(Identifier) *
-            Array8(K(+Digit) * Identifier))
+  ksy <- +(>Sect * +'\n') * !1: debug()
+  Sect <- ?' '[4] * (Meta | Doc | Seq | Types | Insts | Enums)
+  Types <- K("types") * Array2(TypesType)
+  Meta <- K("meta") * (Array2(Key) | Array6(Key))
+  Doc <- K("doc") * (('|' * B * *(+'\n' * (' '[2] | ' '[6]) * Any)) | Any)
+  Seq <- K("seq") * (YamlArray2(Attr) | YamlArray6(Attr)):
+    var sect = Sect(kind: skSeq)
+    while attrstk.len > 0:
+      sect.attrs.add(attrstk.pop)
+    sectstk.add sect
+  Insts <- K("instances") * (Array2(K(Identifier) * Array4(Key)) |
+                                 Array6(K(Identifier) * Array8(Key)))
+  Enums <- K("enums") *
+    (Array2(K(Identifier) * Array4(K(+Digit) * Identifier)) |
+     Array6(K(Identifier) * Array8(K(+Digit) * Identifier)))
   Key <- App | Consume | Contents | Encoding | Endian | Enum | Enum | EosError |
          Exts | Id | If | Include | Imports | Io | License | Process | Pos |
          Repeat | RepeatExpr | RepeatUntil | Size | SizeEos | Terminator |
          Title | Type | Value
+  Attr <- K("id") * >Identifier * (Array4(Key) | Array8(Key)):
+    var attr = Attr(id: $1)
+    while keystk.len > 0:
+      attr.keys.add(keystk.pop)
+    attrstk.add attr
+  TypesType <- K(>Identifier) * +(+'\n' * Sect):
+    var
+      t = Type(name: $1)
+      flags: set[SectKind]
+    while sectstk.len > 0:
+      let n = sectstk.pop
+      #if flags.contains(n.kind):
+      #  echo &"{n.kind} field for {$1} declared more than once"
+      #  quit QuitFailure
+      flags.incl(n.kind)
+      case n.kind
+      of skMeta:
+        t.meta = n.keys
+      of skDoc:
+        t.doc = n.doc
+      of skSeq:
+        t.attrs = n.attrs
+      else:
+        discard # If this is reached, something went wrong
+    typestk.add t
 
   # Keys
   App <- K("application") * >Any:
-    stack.add newKey(kkApp, $1)
+    pushKey(kkApp, $1)
   Consume <- K("consume") * >Bool * B:
-    stack.add newKey(kkConsume, $1)
+    pushKey(kkConsume, $1)
   Contents <- K("contents") *
               (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem)):
     var list: seq[byte]
-    while itemCnt > 0:
-      list.stackBytes(stack.pop.itemNode)
-      dec itemCnt
-    stack.add newKey(kkContents, blist = list)
+    while itemstk.len > 0:
+      list.stackBytes(itemstk.pop)
+    pushKey(kkContents, blist = list)
   Encoding <- K("encoding") * >Any:
-    stack.add newKey(kkEncoding, $1)
+    pushKey(kkEncoding, $1)
   Endian <- K("endian") * >("le" | "be"):
-    stack.add newKey(kkEndian, $1)
+    pushKey(kkEndian, $1)
   Exts <- K("file-extension") * (YamlArray4(FileName) | FileName):
     var list: seq[string]
-    while itemCnt > 0:
-      list.insert(stack.pop.itemNode, 0)
-      dec itemCnt
-    stack.add newKey(kkExts, slist = list)
+    while itemstk.len > 0:
+      list.insert(itemstk.pop, 0)
+    pushKey(kkExts, slist = list)
   Id <- K("id") * >Identifier:
-    stack.add newKey(kkId, $1)
+    pushKey(kkId, $1)
   Imports <- K("imports") * (YamlArray4(FileName) | FileName):
     var list: seq[string]
-    while itemCnt > 0:
-      list.insert(stack.pop.itemNode, 0)
-      dec itemCnt
-    stack.add newKey(kkImports, slist = list)
+    while itemstk.len > 0:
+      list.insert(itemstk.pop, 0)
+    pushKey(kkImports, slist = list)
   License <- K("license") * >Any:
-    stack.add newKey(kkLicense, $1)
+    pushKey(kkLicense, $1)
   Repeat <- K("repeat") * >("expr" | "eos" | "until"):
-    stack.add newKey(kkRepeat, $1)
+    pushKey(kkRepeat, $1)
   Size <- K("size") * >Any:
-    stack.add newKey(kkRepeat, $1)
+    pushKey(kkRepeat, $1)
   Title <- K("title") * >Any:
-    stack.add newKey(kkTitle, $1)
+    pushKey(kkTitle, $1)
   Type <- K("type") * >Identifier:
-    stack.add newKey(kkType, $1)
+    pushKey(kkType, $1)
 
   #XXX
   Enum <- K("enum") * Any
