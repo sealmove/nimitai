@@ -29,8 +29,5 @@ Nimitai does away with all this machinary! The advantages are several:
 *this allows for better and easier integration of parsers into your project*
 
 ### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
-In general yes. There are small exceptions though:
-- nimitai does more strict parsing of the `.ksy` file (exactly 2-space indentation etc)
-- nimitai uses Nim expressions instead of Kaitai Struct expressions
-
-*this decision is for the greater good*
+Mostly yes. The original `.ksy` syntax will be supported 100%. However, nimitai might have different defaults; for example:
+- Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
