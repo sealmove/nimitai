@@ -116,7 +116,7 @@ proc stackBytes*(stack: var seq[byte], s: string) =
       quit QuitFailure
     stack.insert(x.byte, 0)
 
-# Debug proc
+# Debug procs
 proc `$`*(k: Key): string =
   case k.kind
   of kkApp:

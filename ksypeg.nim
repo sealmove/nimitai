@@ -103,12 +103,13 @@ let p = peg "ksy":
   TypesType <- K(>Identifier) * +(+'\n' * Sect):
     var
       t = Type(name: $1)
-      flags: set[SectKind]
-    while sectstk.len > 0:
+      flags: set[SectKind] = {}
+      s = $1
+    while sectstk.len > 1:
       let n = sectstk.pop
-      #if flags.contains(n.kind):
-      #  echo &"{n.kind} field for {$1} declared more than once"
-      #  quit QuitFailure
+      if flags.contains(n.kind):
+        echo &"{n.kind} field for {s} declared more than once"
+        quit QuitFailure
       flags.incl(n.kind)
       case n.kind
       of skMeta:
