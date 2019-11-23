@@ -2,8 +2,7 @@ import npeg, ksyast, strutils
 
 var
   stack = newSeq[KsyNode]()
-  contentsCnt: int
-  importsCnt: int
+  itemCnt: int
 
 #[XXX
   doc-ref Section
@@ -30,15 +29,16 @@ let p = peg "ksy":
   Bool <- "true" | "false"
   String <- '"' * *(1 - {'"', '\n'}) * '"'
   Identifier <- {'a'..'z'} * *{'a'..'z','0'..'9','_'}
-  Import <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
+  FileName <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
     stack.add KsyNode(kind: knkItem, itemNode: $1)
-    inc importsCnt
+    inc itemCnt
   ArrayItem <- >(String | "0x" * +Xdigit | +Digit):
     stack.add KsyNode(kind: knkItem, itemNode: $1)
-    inc contentsCnt
+    inc itemCnt
 
   # Main grammar
-  ksy <- +(>Section0 * +'\n') * !1
+  ksy <- +(>Section0 * +'\n') * !1:
+    for e in stack: echo e
   Section0 <- Meta0 | Doc0 | Seq0 | Types | Instances0 | Enums0
   Section4 <- ' '[4] * (Meta4 | Doc4 | Seq4 | Instances4 | Enums4)
   Types <- K("types") * Array2(K(Identifier) * +(+'\n' * Section4))
@@ -60,23 +60,46 @@ let p = peg "ksy":
          Title | Type | Value
 
   # Keys
-  App <- K("application") * >Any
-  Consume <- K("consume") * >Bool * B
+  App <- K("application") * >Any:
+    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: kkApp, strval: $1))
+  Consume <- K("consume") * >Bool * B:
+    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: kkConsume,
+                                                 consume: parseBool($1)))
   Contents <- K("contents") *
               (ArrayItem | ArrayInline(ArrayItem) | YamlArray6(ArrayItem)):
     let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkContents))
-    var reverseStack: seq[byte]
-    while contentsCnt > 0:
-      reverseStack.stackBytes(stack.pop.itemNode)
-      dec contentsCnt
-    while reverseStack.len > 0:
-      k.keyNode.contents.add(reverseStack.pop)
+    var revStack: seq[byte]
+    while itemCnt > 0:
+      revStack.stackBytes(stack.pop.itemNode)
+      dec itemCnt
+    while revStack.len > 0:
+      k.keyNode.contents.add(revStack.pop)
     stack.add k
-  Encoding <- K("encoding") * Any
-  Endian <- K("endian") * ("le" | "be")
-  Exts <- K("file-extension") * (YamlArray4(Any) | Any)
+  Encoding <- K("encoding") * >Any:
+    stack.add KsyNode(kind: knkKey, keyNode: Key(kind: kkEncoding, strval: $1))
+  Endian <- K("endian") * >("le" | "be"):
+    stack.add KsyNode(kind: knkKey,
+                      keyNode: Key(kind: kkEndian,
+                                   endian: if $1 == "le": le else: be))
+  Exts <- K("file-extension") * (YamlArray4(FileName) | FileName):
+    let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkExts))
+    var revStack: seq[string]
+    while itemCnt > 0:
+      revStack.add(stack.pop.itemNode)
+      dec itemCnt
+    while revStack.len > 0:
+      k.keyNode.list.add(revStack.pop)
+    stack.add k
   Id <- K("id") * Identifier
-  Imports <- K("imports") * (YamlArray4(Import) | Import)
+  Imports <- K("imports") * (YamlArray4(FileName) | FileName):
+    let k = KsyNode(kind: knkKey, keyNode: Key(kind: kkImports))
+    var revStack: seq[string]
+    while itemCnt > 0:
+      revStack.add(stack.pop.itemNode)
+      dec itemCnt
+    while revStack.len > 0:
+      k.keyNode.list.add(revStack.pop)
+    stack.add k
   License <- K("license") * Any
   Repeat <- K("repeat") * ("expr" | "eos" | "until")
   Size <- K("size") * Any

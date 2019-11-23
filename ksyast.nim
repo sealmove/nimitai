@@ -145,12 +145,32 @@ proc `$`*(n: KsyNode): string =
   #of knkAttr:
   of knkKey:
     case n.keyNode.kind
+    of kkApp:
+      &"App: \"{n.keyNode.strval}\""
+    of kkConsume:
+      &"Consume: {n.keyNode.consume}"
     of kkContents:
-      fmt"Contents({n.keyNode.contents})"
+      &"Contents: {n.keyNode.contents}"
+    of kkEncoding:
+      &"Encoding: {n.keyNode.strval}"
+    of kkEndian:
+      &"Endian: {n.keyNode.endian}"
+    of kkExts:
+      &"Exts: {n.keyNode.list}"
+    of kkId:
+      &"Id: {n.keyNode.strval}"
     of kkImports:
-      fmt"Imports({n.keyNode.list})"
-    else:
-      "UNKNOWN" #XXX
+      &"Imports: {n.keyNode.list}"
+    of kkLicence:
+      &"Licence: {n.keyNode.strval}"
+    of kkRepeat:
+      &"Repeat: {n.keyNode.repeat}"
+    of kkSize:
+      &"Size: {n.keyNode.size}"
+    of kkTitle:
+      &"Title: \"{n.keyNode.strval}\""
+    of kkType:
+      &"Type: {n.keyNode.strval}"
   of knkItem:
     n.itemNode
   else:
