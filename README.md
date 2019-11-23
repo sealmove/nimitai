@@ -16,7 +16,7 @@ let x = myFileFormat.fromFile("/path/to/my/bin/file")
 - [npeg](https://github.com/zevv/npeg) is used to parse a `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library <3).
 - The ksy AST is used to generate procedures for parsing a file into a structured Nim object.
 
-*everything is done at CT*
+*everything is done at compile-time*
 
 ### What does it bring to the table?
 Up until now there is no library in any programming language for parsing an arbitary file. If a library for your specific format does not exist in your language, you have to create it. This can either be done **by hand** or by using a **file parser generator** like [Kaitai Struct](https://kaitai.io/) or if your format is relatively simple, serialization programs like [Protocol Buffers](https://developers.google.com/protocol-buffers) can work too.
