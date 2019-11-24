@@ -29,13 +29,13 @@ type
       enums*: seq[Enum]
   Inst* = ref object
     name*: string
-    attrs*: seq[Attr]
+    keys*: seq[Key]
   Attr* = ref object
     id*: string
     keys*: seq[Key]
   Enum* = ref object
-    key*: int
-    value*: string
+    name*: string
+    pairs*: seq[tuple[key: int, value: string]]
   KeyKind* = enum
     kkApp
     kkConsume
@@ -168,7 +168,7 @@ proc `$`*(i: Inst): string =
   &"{i.name}"
 
 proc `$`*(e: Enum): string =
-  &"{e.key}: {e.value}"
+  &"{e.name}"
 
 proc `$`*(a: Attr): string =
   &"{a.id}: {a.keys}"
