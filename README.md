@@ -1,5 +1,5 @@
-# nimitai [WIP]
-## Implementation of [Kaitai Struct](https://kaitai.io/) as a macro
+# nimitai
+## `.ksy` metaparser ([Kaitai Struct](https://kaitai.io/) as a macro)
 
 ### How will it look like?
 A vague usage demo:
@@ -31,3 +31,9 @@ Nimitai does away with all this machinary! The advantages are several:
 ### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
 Mostly yes. The original `.ksy` syntax will be supported 100%. However, nimitai might have different defaults; for example:
 - Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
+
+### Progress
+The project has hit the limitations of what is possible in metaparsing today. Specifically it stretches Nim VM too much leading to a crash.
+
+Nim VM uses 16bit adressing which is not enough for a relatively hefty metaparser.
+For this project to progress any further, the VM's addressing mode has be extended to 32bit.
