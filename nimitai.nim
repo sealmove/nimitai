@@ -1,5 +1,8 @@
-import nimitai/private/[ksyast, ksypeg, runtime]
+import nimitai/private/[ksyast, ksypeg], macros
 
-proc generateParser*(path: static[string]) =
+macro generateParser*(path: static[string]) =
   let ksy = parseKsy(path)
-  echo ksy.maintype.name
+  result = newStmtList()
+
+  # Generate import statement
+  result.add newNimNode(nnkImportStmt).add(newIdentNode("nimitai"))

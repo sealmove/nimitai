@@ -13,15 +13,15 @@ type Ksy = ref object
   enums*: seq[Enum]
 
 var
-  maintype = Type()
-  types: seq[Type]
-  insts: seq[Inst]
-  enums: seq[Enum]
-  sects: seq[Sect]
-  attrs: seq[Attr]
-  keys:  seq[Key]
-  elems: seq[string]
-  pairs: seq[tuple[key: int, value: string]]
+  maintype {.compileTime.} = Type()
+  types {.compileTime.}: seq[Type]
+  insts {.compileTime.}: seq[Inst]
+  enums {.compileTime.}: seq[Enum]
+  sects {.compileTime.}: seq[Sect]
+  attrs {.compileTime.}: seq[Attr]
+  keys  {.compileTime.}: seq[Key]
+  elems {.compileTime.}: seq[string]
+  pairs {.compileTime.}: seq[tuple[key: int, value: string]]
 
 proc push(stack: var seq[Key], kind: KeyKind, s: string = "",
           blist: seq[byte] = @[], slist: seq[string] = @[]) =
@@ -210,6 +210,7 @@ proc parseKsy*(path: string): Ksy =
     Terminator <- K("terminator") * Any
     Value <- K("value") * Any # Expression
 
-  doAssert p.matchFile(path).ok
+  let file = readFile(path)
+  doAssert p.match(file).ok
 
   Ksy(maintype: maintype, types: types, insts: insts, enums: enums)
