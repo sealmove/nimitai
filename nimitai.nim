@@ -1,5 +1,5 @@
 import nimitai/private/[ksyast, ksypeg, runtime]
 
 proc generateParser*(path: static[string]) =
-  let mt = parseKsy(path)
-  echo mt.name
+  let ksy = parseKsy(path)
+  echo ksy.maintype.name
