@@ -1,13 +1,19 @@
 import npeg, ksyast, strutils, strformat
 
+#[XXX
+  doc-ref Sect
+  KsyExpression <-
+  error handling for enums
+]#
+
 type Ksy = ref object
-  maintype: Type
-  types: seq[Type]
-  insts: seq[Inst]
-  enums: seq[Enum]
+  maintype*: Type
+  types*: seq[Type]
+  insts*: seq[Inst]
+  enums*: seq[Enum]
 
 var
-  maintype: Type
+  maintype = Type()
   types: seq[Type]
   insts: seq[Inst]
   enums: seq[Enum]
@@ -37,13 +43,8 @@ proc push(stack: var seq[Key], kind: KeyKind, s: string = "",
     discard
   stack.add k
 
-  #[XXX
-    doc-ref Sect
-    KsyExpression <-
-    error handling for enums
-  ]#
-proc parseKsy*(path: static[string]): Ksy =
-  let p = peg("ksy"):
+proc parseKsy*(path: string): Ksy =
+  let p = peg "ksy":
     # Templates
     K(item) <- item * Colon
     ArrayInline(item) <- '[' * B * item * B * *(',' * B * item * B) * ']'
