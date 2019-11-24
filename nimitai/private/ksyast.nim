@@ -2,6 +2,7 @@ import strformat, strutils
 
 type
   Ksy* = ref object
+    maintype*: Type
     types*: seq[Type]
     insts*: seq[Inst]
     enums*: seq[Enum]

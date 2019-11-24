@@ -6,12 +6,6 @@ import npeg, ksyast, strutils, strformat
   error handling for enums
 ]#
 
-type Ksy = ref object
-  maintype*: Type
-  types*: seq[Type]
-  insts*: seq[Inst]
-  enums*: seq[Enum]
-
 var
   maintype {.compileTime.} = Type()
   types {.compileTime.}: seq[Type]
