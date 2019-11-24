@@ -1,6 +1,10 @@
 import strformat, strutils
 
 type
+  Ksy* = ref object
+    types*: seq[Type]
+    insts*: seq[Inst]
+    enums*: seq[Enum]
   Type* = ref object
     name*: string
     meta*: seq[Key]
