@@ -33,7 +33,25 @@ Mostly yes. The original `.ksy` syntax will be supported 100%. However, nimitai 
 - Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
 
 ### Progress
-The project has hit the limitations of what is possible in metaparsing today. Specifically it stretches Nim VM too much leading to a crash.
+The project has hit the limitations of what is possible in metaparsing today.  
+Specifically it stretches Nim VM too much leading to a crash.
 
-Nim VM uses 16bit adressing which is not enough for a relatively hefty metaparser.
+Nim VM uses 16bit adressing which is not enough for a relatively hefty metaparser.  
 For this project to progress any further, the VM's addressing mode has be extended to 32bit.
+
+This is demonstrated as follows (credits to zevv):
+```nim
+import macros
+
+macro foo(): untyped =
+  let s = newStmtList()
+  for i in 1..16384:
+    s.add nnkCommand.newTree(
+      newIdentNode("echo"),
+      newLit(i)
+    )
+  newTree(nnkWhileStmt, ident "true", s)
+
+static:
+  foo()
+```
