@@ -46,10 +46,7 @@ import macros
 macro foo(): untyped =
   let s = newStmtList()
   for i in 1..16384:
-    s.add nnkCommand.newTree(
-      newIdentNode("echo"),
-      newLit(i)
-    )
+    s.add nnkCommand.newTree(newIdentNode("echo"), newLit(i))
   newTree(nnkWhileStmt, ident "true", s)
 
 static:
