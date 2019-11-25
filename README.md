@@ -1,5 +1,5 @@
 # nimitai
-## `.ksy` metaparser ([Kaitai Struct](https://kaitai.io/) as a macro)
+## [KSY grammar](https://doc.kaitai.io/ksy_reference.html) metaparser ([Kaitai Struct](https://kaitai.io/) as a macro)
 
 ### How will it look like?
 A vague usage demo:
@@ -14,7 +14,7 @@ let x = myFileFormat.fromFile("/path/to/my/bin/file")
 ```
 ### How does it work?
 - [npeg](https://github.com/zevv/npeg) is used to parse a `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library <3).
-- The ksy AST is used to generate procedures for parsing a file into a structured Nim object.
+- The KSY AST is used to generate procedures for parsing a file into a structured Nim object.
 
 *everything is done at compile-time*
 
@@ -29,7 +29,7 @@ Nimitai does away with all this machinary! The advantages are several:
 *this allows for better and easier integration of parsers into your project*
 
 ### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
-Mostly yes. The original `.ksy` syntax will be supported 100%. However, nimitai might have different defaults; for example:
+Mostly yes. The official KSY grammar will be supported 100%. However, nimitai might have different defaults; for example:
 - Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
 
 ### Progress
