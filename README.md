@@ -33,7 +33,7 @@ Mostly yes. The official KSY grammar will be supported 100%. However, nimitai mi
 - Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
 
 ### Progress
-The project has hit a wall because of a limitation of NimVM.
+The project has hit a wall because of a limitation of NimVM.  
 NimVM uses 16bit adresses which are not enough for some procs in npeg.
 
 This is demonstrated as follows (credits to zevv):
