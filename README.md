@@ -49,7 +49,3 @@ macro foo(): untyped =
 static:
   foo()
 ```
-
-There are 3 solutions for this:
-- Hand-write the `.ksy` parser so that it's lighter (no guarantees it will work)
-- change NimVM architecture
