@@ -52,5 +52,5 @@ static:
 
 There are 3 solutions for this:
 - Hand-write the `.ksy` parser
-- Fix npeg so that it's functionality is split up in smaller procs
-- extend NimVM addressing mode to 32bit
+- Fix npeg so that its functionality is split up in smaller procs
+- change NimVM architecture
