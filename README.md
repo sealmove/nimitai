@@ -32,20 +32,7 @@ Nimitai does away with all this machinary! The advantages are several:
 Mostly yes. The official KSY grammar will be supported 100%. However, nimitai might have different defaults; for example:
 - Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
 
-### Progress
-The project has hit a wall because of a limitation of NimVM.  
-NimVM has a 16bit address space which doesn't suffice for hefty metaparsing.
-
-This is demonstrated as follows (credits to zevv):
-```nim
-import macros
-
-macro foo(): untyped =
-  let s = newStmtList()
-  for i in 1..16384:
-    s.add nnkCommand.newTree(newIdentNode("echo"), newLit(i))
-  newTree(nnkWhileStmt, ident "true", s)
-
-static:
-  foo()
-```
+### Notes
+NimVM on [devel](https://github.com/nim-lang/Nim/tree/devel) uses a 16bit address space which doesn't suffice for this project.  
+Zevv tweaked NimVM so that its registers' size can change easily.  
+Using his fork I am able to run this project without any issues. Hopefully his changes will be merged.
