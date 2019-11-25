@@ -34,7 +34,7 @@ Mostly yes. The official KSY grammar will be supported 100%. However, nimitai mi
 
 ### Progress
 The project has hit a wall because of a limitation of NimVM.  
-NimVM uses 16bit adresses which are not enough for some procs in npeg.
+NimVM has a 16bit address space which doesn't suffice for hefty metaparsing.
 
 This is demonstrated as follows (credits to zevv):
 ```nim
@@ -51,6 +51,5 @@ static:
 ```
 
 There are 3 solutions for this:
-- Hand-write the `.ksy` parser
-- Fix npeg so that its functionality is split up in smaller procs
+- Hand-write the `.ksy` parser so that it's lighter (no guarantees it will work)
 - change NimVM architecture
