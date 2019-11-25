@@ -33,11 +33,8 @@ Mostly yes. The official KSY grammar will be supported 100%. However, nimitai mi
 - Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
 
 ### Progress
-The project has hit the limitations of what is possible in metaparsing today.  
-Specifically it stretches Nim VM too much leading to a crash.
-
-Nim VM uses 16bit adressing which is not enough for a relatively hefty parser.  
-For this project to progress any further, the VM's addressing mode has be extended to 32bit.
+The project has hit a wall because of a limitation of NimVM.
+NimVM uses 16bit adresses which are not enough for some procs in npeg.
 
 This is demonstrated as follows (credits to zevv):
 ```nim
@@ -52,3 +49,8 @@ macro foo(): untyped =
 static:
   foo()
 ```
+
+There are 3 solutions for this:
+- Hand-write the `.ksy` parser
+- Fix npeg so that it's functionality is split up in smaller procs
+- extend NimVM addressing mode to 32bit
