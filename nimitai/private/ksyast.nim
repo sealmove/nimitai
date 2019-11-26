@@ -8,6 +8,8 @@ type
     enums*: seq[Enum]
   Type* = ref object
     name*: string
+    parent*: string
+    root*: string
     meta*: seq[Key]
     doc*: string
     attrs*: seq[Attr]
