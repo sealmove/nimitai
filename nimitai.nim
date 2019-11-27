@@ -8,6 +8,7 @@ proc newType(t: Type): seq[NimNode] =
   let
     objName = t.name & "Obj"
 
+  result = newSeq[NimNode](2)
   result[0] = nnkTypeDef.newTree(
     ident(t.name),
     newEmptyNode(),

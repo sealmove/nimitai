@@ -1,4 +1,4 @@
-import npeg, ksyast, strutils, strformat
+import npeg, ksyast, strutils, sequtils, strformat
 
 #[XXX
   doc-ref Sect
@@ -11,13 +11,15 @@ var
   types {.compileTime.}: seq[Type]
   insts {.compileTime.}: seq[Inst]
   enums {.compileTime.}: seq[Enum]
-  sects {.compileTime.}: seq[Sect]
+  sects {.compileTime.}: seq[seq[Sect]]
   attrs {.compileTime.}: seq[Attr]
   keys  {.compileTime.}: seq[Key]
   elems {.compileTime.}: seq[string]
   pairs {.compileTime.}: seq[tuple[key: int, value: string]]
   level {.compileTime.}: int
   inds {.compileTime.}: seq[int]
+  root {.compileTime.}: string
+  parents {.compileTime.}: seq[string]
 
 proc push(stack: var seq[Key], kind: KeyKind, s: string = "",
           blist: seq[byte] = @[], slist: seq[string] = @[]) =
@@ -68,10 +70,16 @@ proc parseKsy*(path: string): Ksy =
     Bool <- "true" | "false"
     String <- '"' * *(1 - {'"', '\n'}) * '"'
     Identifier <- {'a'..'z'} * *{'a'..'z','0'..'9','_'}
+    Parent <- >Identifier:
+      parents.add(capitalizeAscii($1))
+    ResetParent <- 0:
+      discard parents.pop
     FileName <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
       elems.add $1
     Item <- >(String | "0x" * +Xdigit | +Digit):
       elems.add $1
+    AddSectionContainer <- 0:
+      sects.add(newSeq[Sect]())
 
     # Main grammar
     ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1:
@@ -89,7 +97,10 @@ proc parseKsy*(path: string): Ksy =
         var isId: bool
         for k in sect.keys:
           if k.kind == kkId:
-            maintype.name = k.strval
+            root = k.strval.capitalizeAscii
+            maintype.root = root
+            maintype.name = root
+            parents.add(root)
             isId = true
             maintype.meta = sect.keys
             break
@@ -97,12 +108,12 @@ proc parseKsy*(path: string): Ksy =
           echo "Missing id in meta section"
           quit QuitFailure
       else:
-        sects.add sect
+        sects[^1].add sect
     Doc <- K("doc") * >(('|' * B * Array(Line)) | Line):
       if level == 0:
         maintype.doc = $1
       else:
-        sects.add Sect(kind: skDoc, doc: $1)
+        sects[^1].add Sect(kind: skDoc, doc: $1)
     Seq <- K("seq") * Array(Attr):
       var sect = Sect(kind: skSeq)
       while attrs.len > 0:
@@ -110,7 +121,7 @@ proc parseKsy*(path: string): Ksy =
       if level == 0:
         maintype.attrs = sect.attrs
       else:
-        sects.add sect
+        sects[^1].add sect
     Insts <- K("instances") * Array(Inst)
     Enums <- K("enums") * Array(Enum)
     Key <- App | Consume | Contents | Encoding | Endian | EnumKey |
@@ -125,29 +136,29 @@ proc parseKsy*(path: string): Ksy =
       while keys.len > 0:
         attr.keys.add(keys.pop)
       attrs.add attr
-    Type <- K(>Identifier) * Array(Sect):
+    Type <- K(>Parent) * AddSectionContainer * Array(Sect) * ResetParent:
       var
-        t = Type(name: $1)
+        t = Type(name: capitalizeAscii($1), root: root, parent: parents[^1])
         flags: set[SectKind]
         s = $1
-      while sects.len > 0:
-        let n = sects.pop
-        if flags.contains(n.kind):
-          echo &"{n.kind} field for {s} declared more than once"
+      let sections = sects.pop
+      for sect in sections:
+        if flags.contains(sect.kind):
+          echo &"{sect.kind} field for {s} declared more than once"
           quit QuitFailure
-        flags.incl(n.kind)
-        case n.kind
+        flags.incl(sect.kind)
+        case sect.kind
         of skMeta:
-          t.meta = n.keys
+          t.meta = sect.keys
         of skDoc:
-          t.doc = n.doc
+          t.doc = sect.doc
         of skSeq:
-          t.attrs = n.attrs
+          t.attrs = sect.attrs
         else:
           discard # If this is reached, something went wrong
       types.add t
     Inst <- K(>Identifier) * Array(Key):
-      var i = Inst(name: $1)
+      var i = Inst(name: capitalizeAscii($1))
       while keys.len > 0:
         i.keys.add(keys.pop)
       insts.add i
@@ -211,7 +222,11 @@ proc parseKsy*(path: string): Ksy =
     Terminator <- K("terminator") * Line
     Value <- K("value") * Line # Expression
 
-  let file = readFile(path)
+  # Initializations
+  let file = readFile(path).splitLines
+                           .filterIt(not it.startsWith('#'))
+                           .join("\n")
+
   doAssert p.match(file).ok
 
   Ksy(maintype: maintype, types: types, insts: insts, enums: enums)
