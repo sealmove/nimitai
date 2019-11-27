@@ -29,6 +29,12 @@ let x = HelloWorld.fromFile("file.bin")
 
 echo x.one
 ```
+
+output:
+```
+1
+```
+
 ### How does it work?
 - [npeg](https://github.com/zevv/npeg) is used to parse a `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library <3).
 - The KSY AST is used to generate procedures for parsing a file into a structured Nim object.
