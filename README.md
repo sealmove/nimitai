@@ -2,7 +2,7 @@
 ## A native file format metaparser
 
 ### What is it?
-Nimitai exposes a single proc which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates a parser for the described file format:
+Nimitai exposes a single proc which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates a parser for the described file format. Essentially it's [Kaitai Struct](https://kaitai.io/) implemented as a Nim macro:
 ```nim
 import nimitai
 
