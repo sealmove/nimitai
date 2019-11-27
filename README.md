@@ -36,7 +36,7 @@ output:
 ```
 
 ### How does it work?
-- [npeg](https://github.com/zevv/npeg) is used to parse a `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library ❤️).
+- [npeg](https://github.com/zevv/npeg) is used to parse the `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library ❤️).
 - The KSY AST is used to generate procedures for parsing a file into a structured Nim object.
 
 *everything is done at compile-time*
@@ -52,10 +52,13 @@ Nimitai does away with all this machinary! The advantages are several:
 *this allows for better and easier integration of parsers into your project*
 
 ### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
-Mostly yes. The official KSY grammar will be supported 100%. However, nimitai might have different defaults; for example:
-- Nim expressions instead of Kaitai Struct expressions (you will be able to toggle this)
+Mostly yes. The official KSY grammar will be supported 100%. However, nimitai might have different defaults for using Nim constructs; for example:
+- Nim expressions instead of Kaitai Struct expressions
+- Nim types instead of Kaitai Struct types
+
+*you will be able to toggle these*
 
 ### Notes
 NimVM on [devel](https://github.com/nim-lang/Nim/tree/devel) uses a 16bit address space which doesn't suffice for this project.  
 Zevv tweaked NimVM so that its registers' size can change easily.  
-Using his fork I am able to run this project without any issues. Hopefully his changes will be merged.
+Using [zevv's fork](https://github.com/zevv/Nim/tree/zevv-vmrework) you can run this project already. Hopefully his changes will be merged.
