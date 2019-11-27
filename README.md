@@ -1,8 +1,8 @@
 # nimitai
-## [KSY grammar](https://doc.kaitai.io/ksy_reference.html) metaparser ([Kaitai Struct](https://kaitai.io/) as a macro)
+## A native file format metaparser
 
-### How will it look like?
-A vague usage demo:
+### What is it?
+Nimitai exposes a single proc which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates a parser for the described file format:
 ```nim
 import nimitai
 
