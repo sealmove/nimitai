@@ -1,7 +1,21 @@
-import nimitai/private/[ksyast, ksypeg], macros, strutils
+import nimitai/private/[ksyast, ksypeg], macros, strutils, strformat
 
 proc newImport(i: string): NimNode =
   newNimNode(nnkImportStmt).add(newIdentNode(i))
+
+proc attrType(a: Attr): string =
+  for k in a.keys:
+    if k.kind == kkType:
+      result = case k.strval
+        of "u4": "uint32"
+        of "str":"string"
+        of "s4":"int32"
+        else: k.strval.capitalizeAscii
+    else:
+      echo &"Attribute {a.id} has no type"
+      echo "This should work after implementing typeless attributes"
+      echo "https://doc.kaitai.io/ksy_reference.html#attribute-type"
+      quit QuitFailure
 
 proc newType(t: Type): seq[NimNode] =
   #XXX: doc
@@ -34,17 +48,18 @@ proc newType(t: Type): seq[NimNode] =
       ident("parent"),
       nnkRefTy.newTree(ident(t.parent)),
       newEmptyNode()
-    ),
-    nnkIdentDefs.newTree(
-      ident("hello"),
-      ident("uint8"),
-      newEmptyNode()
     )
   )
   
-  #XXX: attrs
-  #for a in t.attrs:
-  
+  for a in t.attrs:
+    fields.add(
+      nnkIdentDefs.newTree(
+        ident(a.id),
+        ident(attrType(a)),
+        newEmptyNode()
+      )
+    )
+
   obj.add(fields)
   result[1].add((obj))
 
