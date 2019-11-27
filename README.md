@@ -25,7 +25,7 @@ import nimitai
 
 generateParser("hello_world.ksy")
 
-let x = myFileFormat.fromFile("file.bin")
+let x = HelloWorld.fromFile("file.bin")
 
 echo x.one
 ```
