@@ -61,4 +61,4 @@ Mostly yes. The official KSY grammar will be supported 100%. However, nimitai mi
 ### Notes
 NimVM on [devel](https://github.com/nim-lang/Nim/tree/devel) uses a 16bit address space which doesn't suffice for this project.  
 Zevv tweaked NimVM so that its registers' size can change easily.  
-Using [zevv's fork](https://github.com/zevv/Nim/tree/zevv-vmrework) you can run this project already. Hopefully his changes will be merged.
+Using [zevv's fork](https://github.com/zevv/Nim/tree/zevv-vmrework) you can run this project already. Hopefully his changes will be merged soon.
