@@ -3,14 +3,31 @@
 
 ### What is it?
 Nimitai exposes a single proc which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates a parser for the described file format. Essentially it's [Kaitai Struct](https://kaitai.io/) implemented as a Nim macro:
+
+hello_world.ksy
+```yaml
+
+meta:
+  id: hello_world
+seq:
+  - id: one
+    type: u1
+```
+
+file.bin
+```bin
+1\n
+```
+
+test_nimitai.nim
 ```nim
 import nimitai
 
-generateParser("/path/to/my/ksy/file")
+generateParser("hello_world.ksy")
 
-let x = myFileFormat.fromFile("/path/to/my/bin/file")
+let x = myFileFormat.fromFile("file.bin")
 
-# Access x's structured data (fields) here.
+echo x.one
 ```
 ### How does it work?
 - [npeg](https://github.com/zevv/npeg) is used to parse a `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library <3).

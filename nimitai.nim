@@ -8,6 +8,7 @@ proc attrType(a: Attr): string =
     if k.kind == kkType:
       result = case k.strval
         of "u4": "uint32"
+        of "u1": "uint8"
         of "str":"string"
         of "s4":"int32"
         else: k.strval.capitalizeAscii
