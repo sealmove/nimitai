@@ -57,10 +57,6 @@ proc parseKsy*(path: string): Ksy =
       level = len($1)
     D <- 0:
       dec(level, inds.pop)
-    AttrTag <- '-' * >*' ':
-      let indent = 1 + len($1)
-      inds.add(indent)
-      inc(level, indent)
 
     # Atoms
     B <- *Blank
@@ -78,9 +74,9 @@ proc parseKsy*(path: string): Ksy =
     # Main grammar
     ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1:
       types.add maintype
-    Sect <- (Meta | Doc | Seq | Types | Insts | Enums) * D
+    Sect <- Meta | Doc | Seq | Types | Insts | Enums
     Types <- K("types") * Array(Type)
-    Meta <- K("meta") * Array(Key):
+    Meta <- K("meta") * Array(Key) * D:
       var sect = Sect(kind: skMeta)
       while keys.len > 0:
         sect.keys.add(keys.pop)
@@ -100,7 +96,7 @@ proc parseKsy*(path: string): Ksy =
           quit QuitFailure
       else:
         sects.add sect
-    Doc <- K("doc") * >(('|' * B * '\n' * I * Line * +(+'\n' * C * Line)) | Line):
+    Doc <- K("doc") * >(('|' * B * '\n' * I * Line * +(+'\n' * C * Line) * D) | Line):
       if level == 0:
         maintype.doc = $1
       else:
@@ -122,7 +118,7 @@ proc parseKsy*(path: string): Ksy =
     SeqKey <- Consume | Contents | Encoding | Endian | EnumKey |
               EosError | Include | Io | Process | Repeat | RepeatExpr |
               RepeatUntil | Size | SizeEos | Terminator | TypeKey
-    Attr <- AttrTag * K("id") * >Identifier * Array(SeqKey) * D:
+    Attr <- Tag * K("id") * >Identifier * Array(SeqKey) * D:
       var attr = Attr(id: $1)
       while keys.len > 0:
         attr.keys.add(keys.pop)
