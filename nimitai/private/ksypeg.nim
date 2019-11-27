@@ -44,18 +44,18 @@ proc parseKsy*(path: string): Ksy =
     # Templates
     K(item) <- item * Colon
     ArrayInline(item) <- '[' * B * item * B * *(',' * B * item * B) * ']'
-    Array(item) <- +(C * item * B * +'\n')
-    YamlArray(item) <- +(C * Tag * item * B * +'\n')
+    Array(item) <- +'\n' * I * item * *(+'\n' * C * item * B)
+    YamlArray(item) <- +'\n' * I * Tag * item * *(+'\n' * C * Tag * item * B)
 
     # Indentation control
     C <- >*' ':
-      doAssert len($1) == level
-    I <- +'\n' * >*&' ':
+      validate len($1) == level
+    I <- >*' ':
       let indent = len($1) - level
       doAssert indent > 0
       inds.add(indent)
       level = len($1)
-    D <- &1:
+    D <- 0:
       dec(level, inds.pop)
     AttrTag <- '-' * >*' ':
       let indent = 1 + len($1)
@@ -76,11 +76,11 @@ proc parseKsy*(path: string): Ksy =
       elems.add $1
 
     # Main grammar
-    ksy <- +Sect * !1:
+    ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1:
       types.add maintype
     Sect <- (Meta | Doc | Seq | Types | Insts | Enums) * D
-    Types <- K("types") * Array(Type) * D
-    Meta <- K("meta") * I * Array(Key):
+    Types <- K("types") * Array(Type)
+    Meta <- K("meta") * Array(Key):
       var sect = Sect(kind: skMeta)
       while keys.len > 0:
         sect.keys.add(keys.pop)
@@ -100,12 +100,12 @@ proc parseKsy*(path: string): Ksy =
           quit QuitFailure
       else:
         sects.add sect
-    Doc <- K("doc") * >(('|' * B * I * +(C * Line) * D) | Line):
+    Doc <- K("doc") * >(('|' * B * '\n' * I * Line * +(+'\n' * C * Line)) | Line):
       if level == 0:
         maintype.doc = $1
       else:
         sects.add Sect(kind: skDoc, doc: $1)
-    Seq <- K("seq") * I * Array(Attr):
+    Seq <- K("seq") * Array(Attr):
       var sect = Sect(kind: skSeq)
       while attrs.len > 0:
         sect.attrs.add(attrs.pop)
@@ -113,8 +113,8 @@ proc parseKsy*(path: string): Ksy =
         maintype.attrs = sect.attrs
       else:
         sects.add sect
-    Insts <- K("instances") * I * Array(Inst) * D
-    Enums <- K("enums") * I * Array(Enum) * D
+    Insts <- K("instances") * Array(Inst)
+    Enums <- K("enums") * Array(Enum)
     Key <- App | Consume | Contents | Encoding | Endian | EnumKey |
            EosError | Exts | Id | If | Include | Imports | Io | License |
            Process | Pos | Repeat | RepeatExpr | RepeatUntil | Size | SizeEos |
@@ -122,12 +122,12 @@ proc parseKsy*(path: string): Ksy =
     SeqKey <- Consume | Contents | Encoding | Endian | EnumKey |
               EosError | Include | Io | Process | Repeat | RepeatExpr |
               RepeatUntil | Size | SizeEos | Terminator | TypeKey
-    Attr <- AttrTag * K("id") * >Identifier * +'\n' * Array(SeqKey) * D:
+    Attr <- AttrTag * K("id") * >Identifier * Array(SeqKey) * D:
       var attr = Attr(id: $1)
       while keys.len > 0:
         attr.keys.add(keys.pop)
       attrs.add attr
-    Type <- K(>Identifier) * I * +(Sect * +'\n') * D:
+    Type <- K(>Identifier) * +'\n' * I * +(Sect * +'\n'):
       var
         t = Type(name: $1)
         flags: set[SectKind]
@@ -148,12 +148,12 @@ proc parseKsy*(path: string): Ksy =
         else:
           discard # If this is reached, something went wrong
       types.add t
-    Inst <- K(>Identifier) * I * Array(Key) * D:
+    Inst <- K(>Identifier) * Array(Key) * D:
       var i = Inst(name: $1)
       while keys.len > 0:
         i.keys.add(keys.pop)
       insts.add i
-    Enum <- K(>Identifier) * I * Array(Pair) * D:
+    Enum <- K(>Identifier) * Array(Pair) * D:
       let e = Enum(name: $1)
       while pairs.len > 0:
         e.pairs.add(pairs.pop)
@@ -168,7 +168,7 @@ proc parseKsy*(path: string): Ksy =
       keys.push(kkConsume, $1)
     Contents <- K("contents") * (ArrayElem |
                                  ArrayInline(ArrayElem) |
-                                 I * YamlArray(ArrayElem) * D):
+                                 YamlArray(ArrayElem) * D):
       var list: seq[byte]
       while elems.len > 0:
         list.stackBytes(elems.pop)
@@ -178,7 +178,7 @@ proc parseKsy*(path: string): Ksy =
     Endian <- K("endian") * >("le" | "be"):
       keys.push(kkEndian, $1)
     Exts <- K("file-extension") *
-            (I * YamlArray(FileName) * D | FileName):
+            (YamlArray(FileName) * D | FileName):
       var list: seq[string]
       while elems.len > 0:
         list.insert(elems.pop, 0)
@@ -186,7 +186,7 @@ proc parseKsy*(path: string): Ksy =
     Id <- K("id") * >Identifier:
       keys.push(kkId, $1)
     Imports <- K("imports") *
-               (I * YamlArray(FileName) * D | FileName):
+               (YamlArray(FileName) * D | FileName):
       var list: seq[string]
       while elems.len > 0:
         list.insert(elems.pop, 0)
