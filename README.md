@@ -52,7 +52,8 @@ Nimitai does away with all this machinary! The advantages are several:
 *this allows for better and easier integration of parsers into your project*
 
 ### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
-Mostly yes. The official KSY grammar will be supported 100%. However, nimitai might have different defaults for using Nim constructs; for example:
+Mostly yes. The official KSY grammar will be supported 100%.  
+However, nimitai might have different defaults for using Nim constructs; for example:
 - Nim expressions instead of Kaitai Struct expressions
 - Nim types instead of Kaitai Struct types
 
