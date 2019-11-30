@@ -4,8 +4,6 @@ type
   Ksy* = ref object
     maintype*: Type
     types*: seq[Type]
-    insts*: seq[Inst]
-    enums*: seq[Enum]
   Type* = ref object
     name*: string
     parent*: string
@@ -13,6 +11,8 @@ type
     meta*: seq[Key]
     doc*: string
     attrs*: seq[Attr]
+    insts*: seq[Inst]
+    enums*: seq[Enum]
   SectKind* = enum
     skMeta
     skDoc

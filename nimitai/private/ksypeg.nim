@@ -121,8 +121,22 @@ proc parseKsy*(path: string): Ksy =
         state.maintype.attrs = sect.attrs
       else:
         state.sects[^1].add sect
-    Insts <- K("instances") * Array(Inst)
-    Enums <- K("enums") * Array(Enum)
+    Insts <- K("instances") * Array(Inst):
+      var sect = Sect(kind: skInsts)
+      while state.insts.len > 0:
+        sect.insts.add(state.insts.pop)
+      if state.level == 0:
+        state.maintype.insts = sect.insts
+      else:
+        state.sects[^1].add sect
+    Enums <- K("enums") * Array(Enum):
+      var sect = Sect(kind: skEnums)
+      while state.enums.len > 0:
+        sect.enums.add(state.enums.pop)
+      if state.level == 0:
+        state.maintype.enums = sect.enums
+      else:
+        state.sects[^1].add sect
     Key <- App | Consume | Contents | Encoding | Endian | EnumKey |
            EosError | Exts | Id | If | Include | Imports | Io | License |
            Process | Pos | Repeat | RepeatExpr | RepeatUntil | Size | SizeEos |
@@ -155,6 +169,8 @@ proc parseKsy*(path: string): Ksy =
           t.doc = sect.doc
         of skSeq:
           t.attrs = sect.attrs
+        of skInsts:
+          t.insts = sect.insts
         else:
           discard # If this is reached, something went wrong
       state.types.add t
@@ -232,7 +248,4 @@ proc parseKsy*(path: string): Ksy =
 
   doAssert p.match(file, state).ok
 
-  Ksy(maintype: state.maintype,
-      types: state.types,
-      insts: state.insts,
-      enums: state.enums)
+  Ksy(maintype: state.maintype, types: state.types)
