@@ -1,17 +1,15 @@
-import strformat, strutils
+import strformat, strutils, tables
 
 type
-  Ksy* = ref object
-    maintype*: Type
-    types*: seq[Type]
   Type* = ref object
     name*: string
     parent*: string
     root*: string
-    meta*: seq[Key]
+    meta*: Table[KeyKind, Key]
     doc*: string
     attrs*: seq[Attr]
     insts*: seq[Inst]
+    types*: seq[Type]
     enums*: seq[Enum]
   SectKind* = enum
     skMeta
@@ -23,7 +21,7 @@ type
   Sect* = ref object
     case kind*: SectKind
     of skMeta:
-      keys*: seq[Key]
+      keys*: Table[KeyKind, Key]
     of skDoc:
       doc*: string
     of skSeq:
@@ -36,10 +34,10 @@ type
       enums*: seq[Enum]
   Inst* = ref object
     name*: string
-    keys*: seq[Key]
+    keys*: Table[KeyKind, Key]
   Attr* = ref object
     id*: string
-    keys*: seq[Key]
+    keys*: Table[KeyKind, Key]
   Enum* = ref object
     name*: string
     pairs*: seq[tuple[key: int, value: string]]
@@ -123,7 +121,31 @@ proc stackBytes*(stack: var seq[byte], s: string) =
       quit QuitFailure
     stack.insert(x.byte, 0)
 
+proc push*(stack: var seq[Key], kind: KeyKind, s: string = "",
+          blist: seq[byte] = @[], slist: seq[string] = @[]) =
+  var k = Key(kind: kind)
+  case kind
+  of kkApp, kkEncoding, kkId, kkLicense, kkTitle, kkType:
+    k.strval = s
+  of kkConsume:
+    k.consume = parseBool(s)
+  of kkContents:
+    k.contents.add blist
+  of kkEndian:
+    k.endian = if s == "le": le else: be
+  of kkExts, kkImports:
+    k.list.add slist
+  of kkRepeat:
+    k.repeat = if s == "expr": expr elif s == "eos": eos else: until
+  of kkSize:
+    discard
+  stack.add k
+
 # Debug procs
+proc ksyError*(msg: string) =
+  echo msg
+  quit QuitFailure
+
 proc `$`*(k: Key): string =
   case k.kind
   of kkApp:

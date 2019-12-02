@@ -1,4 +1,4 @@
-import npeg, ksyast, strutils, sequtils, strformat
+import npeg, ksyast, strutils, sequtils, strformat, tables
 
 #[XXX
   doc-ref Sect
@@ -10,7 +10,7 @@ type State = object
   types: seq[Type]
   insts: seq[Inst]
   enums: seq[Enum]
-  sects: seq[seq[Sect]]
+  sects: seq[TableRef[SectKind, Sect]]
   attrs: seq[Attr]
   keys : seq[Key]
   elems: seq[string]
@@ -20,27 +20,7 @@ type State = object
   root: string
   parents: seq[string]
 
-proc push(stack: var seq[Key], kind: KeyKind, s: string = "",
-          blist: seq[byte] = @[], slist: seq[string] = @[]) =
-  var k = Key(kind: kind)
-  case kind
-  of kkApp, kkEncoding, kkId, kkLicense, kkTitle, kkType:
-    k.strval = s
-  of kkConsume:
-    k.consume = parseBool(s)
-  of kkContents:
-    k.contents.add blist
-  of kkEndian:
-    k.endian = if s == "le": le else: be
-  of kkExts, kkImports:
-    k.list.add slist
-  of kkRepeat:
-    k.repeat = if s == "expr": expr elif s == "eos": eos else: until
-  of kkSize:
-    discard
-  stack.add k
-
-proc parseKsy*(path: string): Ksy =
+proc parseKsy*(path: string): Type =
   let p = peg(ksy, state: State):
     # Templates
     K(item) <- item * Colon
@@ -77,8 +57,8 @@ proc parseKsy*(path: string): Ksy =
       state.elems.add $1
     Item <- >(String | "0x" * +Xdigit | +Digit):
       state.elems.add $1
-    AddSectionContainer <- 0:
-      state.sects.add(newSeq[Sect]())
+    AddSectionTable <- 0:
+      state.sects.add(newTable[SectKind, Sect]())
 
     # Main grammar
     ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1:
@@ -88,31 +68,24 @@ proc parseKsy*(path: string): Ksy =
     Meta <- K("meta") * Array(Key):
       var sect = Sect(kind: skMeta)
       while state.keys.len > 0:
-        sect.keys.add(state.keys.pop)
+        let key = state.keys.pop
+        sect.keys[key.kind] = key
       if state.level == 0:
-        if state.maintype.meta != @[]:
-          echo "Meta section is defined more than once"
-          quit QuitFailure
-        var isId: bool
-        for k in sect.keys:
-          if k.kind == kkId:
-            state.root = k.strval.capitalizeAscii
-            state.maintype.root = state.root
-            state.maintype.name = state.root
-            state.parents.add(state.root)
-            isId = true
-            state.maintype.meta = sect.keys
-            break
-        if not isId:
-          echo "Missing id in meta section"
-          quit QuitFailure
+        if kkId notin sect.keys:
+          ksyError "Missing id in meta section"
+        let id = sect.keys[kkId].strval.capitalizeAscii
+        state.root = id
+        state.maintype.root = id
+        state.maintype.name = id
+        state.parents.add(id)
+        state.maintype.meta = sect.keys
       else:
-        state.sects[^1].add sect
+        state.sects[^1][skMeta] = sect
     Doc <- K("doc") * >(('|' * B * Array(Line)) | Line):
       if state.level == 0:
         state.maintype.doc = $1
       else:
-        state.sects[^1].add Sect(kind: skDoc, doc: $1)
+        state.sects[^1][skDoc] = Sect(kind: skDoc, doc: $1)
     Seq <- K("seq") * Array(Attr):
       var sect = Sect(kind: skSeq)
       while state.attrs.len > 0:
@@ -120,7 +93,9 @@ proc parseKsy*(path: string): Ksy =
       if state.level == 0:
         state.maintype.attrs = sect.attrs
       else:
-        state.sects[^1].add sect
+        if skSeq in state.sects[^1]:
+          ksyError &"Type \"{state.parents[^1]} has multiple \"seq\" sections"
+        state.sects[^1][skSeq] = sect
     Insts <- K("instances") * Array(Inst):
       var sect = Sect(kind: skInsts)
       while state.insts.len > 0:
@@ -128,7 +103,7 @@ proc parseKsy*(path: string): Ksy =
       if state.level == 0:
         state.maintype.insts = sect.insts
       else:
-        state.sects[^1].add sect
+        state.sects[^1][skInsts] = sect
     Enums <- K("enums") * Array(Enum):
       var sect = Sect(kind: skEnums)
       while state.enums.len > 0:
@@ -136,7 +111,7 @@ proc parseKsy*(path: string): Ksy =
       if state.level == 0:
         state.maintype.enums = sect.enums
       else:
-        state.sects[^1].add sect
+        state.sects[^1][skEnums] = sect
     Key <- App | Consume | Contents | Encoding | Endian | EnumKey |
            EosError | Exts | Id | If | Include | Imports | Io | License |
            Process | Pos | Repeat | RepeatExpr | RepeatUntil | Size | SizeEos |
@@ -147,37 +122,24 @@ proc parseKsy*(path: string): Ksy =
     Attr <- Tag * K("id") * >Identifier * Array(SeqKey):
       var attr = Attr(id: $1)
       while state.keys.len > 0:
-        attr.keys.add(state.keys.pop)
+        let key = state.keys.pop
+        attr.keys[key.kind] = key
       state.attrs.add attr
-    Type <- K(>Parent) * AddSectionContainer * Array(Sect) * ResetParent:
-      var
-        t = Type(name: capitalizeAscii($1),
-                 root: state.root,
-                 parent: state.parents[^1])
-        flags: set[SectKind]
-        s = $1
+    Type <- K(>Parent) * AddSectionTable * Array(Sect) * ResetParent:
+      var t = Type(name: capitalizeAscii($1), root: state.root,
+                   parent: state.parents[^1])
       let sections = state.sects.pop
-      for sect in sections:
-        if flags.contains(sect.kind):
-          echo &"{sect.kind} field for {s} declared more than once"
-          quit QuitFailure
-        flags.incl(sect.kind)
-        case sect.kind
-        of skMeta:
-          t.meta = sect.keys
-        of skDoc:
-          t.doc = sect.doc
-        of skSeq:
-          t.attrs = sect.attrs
-        of skInsts:
-          t.insts = sect.insts
-        else:
-          discard # If this is reached, something went wrong
+      t.doc = sections[skDoc].doc
+      t.attrs = sections[skSeq].attrs
+      t.insts = sections[skInsts].insts
       state.types.add t
     Inst <- K(>Identifier) * Array(Key):
       var i = Inst(name: capitalizeAscii($1))
       while state.keys.len > 0:
-        i.keys.add(state.keys.pop)
+        let key = state.keys.pop
+        if key.kind in i.keys:
+          ksyError &"Instance {i.name} has key duplicates"
+        i.keys[key.kind] = key
       state.insts.add i
     Enum <- K(>Identifier) * Array(Pair):
       let e = Enum(name: $1)
@@ -241,11 +203,11 @@ proc parseKsy*(path: string): Ksy =
 
   # Initializations
   let file = readFile(path).splitLines
-                           .filterIt(not it.startsWith('#'))
+                           .filterIt(not it.strip.startsWith('#'))
                            .join("\n")
   var state: State
   state.maintype = Type(parent: "RootObj")
 
   doAssert p.match(file, state).ok
 
-  Ksy(maintype: state.maintype, types: state.types)
+  state.maintype
