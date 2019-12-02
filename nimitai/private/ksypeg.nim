@@ -2,7 +2,7 @@ import npeg, ksyast, strutils, sequtils, strformat, tables
 
 #[XXX
   doc-ref Sect
-  KsyExpression <-
+  support Kaitai Struct expressions
   error handling for enums
 ]#
 type State = object

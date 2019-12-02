@@ -3,7 +3,7 @@ import nimitai/private/[ksyast, ksypeg], macros, strutils, strformat, tables
 proc newImport(i: string): NimNode =
   newNimNode(nnkImportStmt).add(newIdentNode(i))
 
-proc attrType(a: Attr): string =
+proc attrType(a: Attr, hierarchy: string): string =
   if kkType notin a.keys:
     ksyError(&"Attribute {a.id} has no type" &
              "This should work after implementing typeless attributes" &
@@ -12,21 +12,22 @@ proc attrType(a: Attr): string =
   result = case ksType
            of "u4": "uint32"
            of "u1": "uint8"
-           of "str":"string"
-           of "s4":"int32"
-           else: ksType.capitalizeAscii
+           of "str": "string"
+           of "s4": "int32"
+           else: hierarchy & ksType.capitalizeAscii
 
-proc genType(ts: var NimNode, t: Type) =
+proc genType(ts: var NimNode, t: Type, hierarchy: string = "") =
   #XXX: doc
-  if t.types != @[]:
-    for typ in t.types:
-      genType(ts, typ)
-  let
-    objName = t.name & "Obj"
+  let name = hierarchy & t.name
+
+  for typ in t.types:
+    genType(ts, typ, name)
+
+  let objName = name & "Obj"
 
   var res = newSeq[NimNode](2)
   res[0] = nnkTypeDef.newTree(
-    ident(t.name),
+    ident(name),
     newEmptyNode(),
     nnkRefTy.newTree(ident(objName)))
   res[1] = nnkTypeDef.newTree(ident(objName), newEmptyNode())
@@ -35,6 +36,11 @@ proc genType(ts: var NimNode, t: Type) =
     obj = nnkObjectTy.newTree(newEmptyNode(), newEmptyNode())
     fields = newTree(nnkRecList)
 
+
+  let parentType = if t.parent == "RootObj":
+                     nnkRefTy.newTree(ident(t.parent))
+                   else:
+                     ident(t.parent)
   fields.add(
     nnkIdentDefs.newTree(
       ident"io",
@@ -48,7 +54,7 @@ proc genType(ts: var NimNode, t: Type) =
     ),
     nnkIdentDefs.newTree(
       ident"parent",
-      nnkRefTy.newTree(ident(t.parent)),
+      parentType,
       newEmptyNode()
     )
   )
@@ -57,7 +63,7 @@ proc genType(ts: var NimNode, t: Type) =
     fields.add(
       nnkIdentDefs.newTree(
         ident(a.id),
-        ident(attrType(a)),
+        ident(attrType(a, name)),
         newEmptyNode()
       )
     )
