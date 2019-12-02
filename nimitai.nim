@@ -1,4 +1,23 @@
-import nimitai/private/[ksyast, ksypeg], macros, strutils, strformat, tables
+import
+  nimitai/private/[ksyast, ksypeg], macros, sequtils, strutils, strformat,
+  tables
+
+const primitiveTypes = {
+  "u1"   : "uint8"  ,
+  "u2le" : "uint16" ,
+  "u2be" : "uint16" ,
+  "u4le" : "uint32" ,
+  "u4be" : "uint32" ,
+  "u8le" : "uint64" ,
+  "u8be" : "uint64" ,
+  "s1"   : "int8"   ,
+  "s2le" : "int16"  ,
+  "s2be" : "int16"  ,
+  "s4le" : "int32"  ,
+  "s4be" : "int32"  ,
+  "s8le" : "int64"  ,
+  "s8be" : "int64"
+}.toTable
 
 proc newImport(i: string): NimNode =
   newNimNode(nnkImportStmt).add(newIdentNode(i))
@@ -16,16 +35,18 @@ proc attrType(a: Attr): string =
            of "s4": "int32"
            else: ksType.capitalizeAscii
 
-proc genType(ts: var NimNode, t: Type) =
+proc genType(ts: var NimNode, t: Type, hierarchy: seq[string] = @[]) =
   #XXX: doc
-  for typ in t.types:
-    genType(ts, typ)
+  let name = hierarchy.join & t.name
 
-  let objName = t.name & "Obj"
+  for typ in t.types:
+    genType(ts, typ, hierarchy & t.name)
+
+  let objName = name & "Obj"
 
   var res = newSeq[NimNode](2)
   res[0] = nnkTypeDef.newTree(
-    ident(t.name),
+    ident(name),
     newEmptyNode(),
     nnkRefTy.newTree(ident(objName)))
   res[1] = nnkTypeDef.newTree(ident(objName), newEmptyNode())
@@ -38,7 +59,7 @@ proc genType(ts: var NimNode, t: Type) =
   let parentType = if t.parent.name == "RootObj":
                      nnkRefTy.newTree(ident"RootObj")
                    else:
-                     ident(t.parent.name)
+                     ident(hierarchy.join)
   fields.add(
     nnkIdentDefs.newTree(
       ident"io",
@@ -57,17 +78,38 @@ proc genType(ts: var NimNode, t: Type) =
     )
   )
 
-#[
   for a in t.attrs:
-    let typ = resolveAttrType(a)
+    if kkType notin a.keys:
+      ksyError(&"Attribute {a.id} has no type" &
+               "This should work after implementing typeless attributes" &
+               "https://doc.kaitai.io/ksy_reference.html#attribute-type")
+    var resolvedType: string
+    if a.keys[kkType].strval in primitiveTypes:
+      resolvedType = primitiveTypes[a.keys[kkType].strval]
+    else:
+      let ksType = a.keys[kkType].strval.capitalizeAscii
+      var
+        h = hierarchy
+        c = t
+        flag: bool
+      while not flag:
+        if ksType in c.types.mapIt(it.name):
+          resolvedType = h.join & t.name & ksType
+          flag = true
+        elif ksType in c.parent.types.mapIt(it.name):
+          resolvedType = h.join & ksType
+          flag = true
+        else:
+          discard h.pop
+          c = c.parent
+
     fields.add(
       nnkIdentDefs.newTree(
         ident(a.id),
-        ident(t.name),
+        ident(resolvedType),
         newEmptyNode()
       )
     )
-]#
 
   obj.add(fields)
   res[1].add(obj)

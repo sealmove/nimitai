@@ -55,15 +55,15 @@ proc parseKsy*(path: string): Type =
       state.sects.add(newTable[SectKind, Sect]())
 
     # Main grammar
-    ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1:
-      for i in 0 ..< state.maintype.types.len:
-        state.maintype.types[i].parent = state.maintype
+    ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1
     Sect <- Meta | Doc | Seq | Types | Insts | Enums
     Types <- K("types") * Array(Type):
       var sect = Sect(kind: skTypes)
       while state.types.len > 0:
         sect.types.add(state.types.pop)
       if state.level == 0:
+        for i in 0 ..< sect.types.len:
+          sect.types[i].parent = state.maintype
         state.maintype.types = sect.types
       else:
         state.sects[^1][skTypes] = sect
@@ -75,7 +75,7 @@ proc parseKsy*(path: string): Type =
       if state.level == 0:
         if kkId notin sect.keys:
           ksyError "Missing id in meta section"
-        state.maintype.name =sect.keys[kkId].strval.capitalizeAscii
+        state.maintype.name = sect.keys[kkId].strval.capitalizeAscii
         state.maintype.meta = sect.keys
       else:
         state.sects[^1][skMeta] = sect
