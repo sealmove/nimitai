@@ -3,7 +3,7 @@ import nimitai/private/[ksyast, ksypeg], macros, strutils, strformat, tables
 proc newImport(i: string): NimNode =
   newNimNode(nnkImportStmt).add(newIdentNode(i))
 
-proc attrType(a: Attr, hierarchy: string): string =
+proc attrType(a: Attr): string =
   if kkType notin a.keys:
     ksyError(&"Attribute {a.id} has no type" &
              "This should work after implementing typeless attributes" &
@@ -14,20 +14,18 @@ proc attrType(a: Attr, hierarchy: string): string =
            of "u1": "uint8"
            of "str": "string"
            of "s4": "int32"
-           else: hierarchy & ksType.capitalizeAscii
+           else: ksType.capitalizeAscii
 
-proc genType(ts: var NimNode, t: Type, hierarchy: string = "") =
+proc genType(ts: var NimNode, t: Type) =
   #XXX: doc
-  let name = hierarchy & t.name
-
   for typ in t.types:
-    genType(ts, typ, name)
+    genType(ts, typ)
 
-  let objName = name & "Obj"
+  let objName = t.name & "Obj"
 
   var res = newSeq[NimNode](2)
   res[0] = nnkTypeDef.newTree(
-    ident(name),
+    ident(t.name),
     newEmptyNode(),
     nnkRefTy.newTree(ident(objName)))
   res[1] = nnkTypeDef.newTree(ident(objName), newEmptyNode())
@@ -58,15 +56,16 @@ proc genType(ts: var NimNode, t: Type, hierarchy: string = "") =
       newEmptyNode()
     )
   )
-  
+#[ 
   for a in t.attrs:
     fields.add(
       nnkIdentDefs.newTree(
         ident(a.id),
-        ident(attrType(a, name)),
+        ident(t.name),
         newEmptyNode()
       )
     )
+]#
 
   obj.add(fields)
   res[1].add(obj)

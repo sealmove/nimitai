@@ -7,7 +7,7 @@ import npeg, ksyast, strutils, sequtils, strformat, tables
 ]#
 type State = object
   maintype: Type
-  types: seq[seq[Type]]
+  types: seq[Type]
   insts: seq[Inst]
   enums: seq[Enum]
   sects: seq[TableRef[SectKind, Sect]]
@@ -66,13 +66,13 @@ proc parseKsy*(path: string): Type =
     ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1
     Sect <- Meta | Doc | Seq | Types | Insts | Enums
     Types <- K("types") * AddTypesSeq * Array(Type):
-      let types = state.types.pop
+      var sect = Sect(kind: skTypes)
+      while state.types.len > 0:
+        sect.types.add(state.types.pop)
       if state.level == 0:
-        state.maintype.types = types
+        state.maintype.types = sect.types
       else:
-        #XXX
-        state.types[^1][^1].types = types
-
+        state.sects[^1][skTypes] = sect
     Meta <- K("meta") * Array(Key):
       var sect = Sect(kind: skMeta)
       while state.keys.len > 0:
@@ -143,7 +143,9 @@ proc parseKsy*(path: string): Type =
         t.attrs = sections[skSeq].attrs
       if skInsts in sections:
         t.insts = sections[skInsts].insts
-      state.types[^1].add t
+      if skTypes in sections:
+        t.types = sections[skTypes].types
+      state.types.add t
     Inst <- K(>Identifier) * Array(Key):
       var i = Inst(name: capitalizeAscii($1))
       while state.keys.len > 0:
