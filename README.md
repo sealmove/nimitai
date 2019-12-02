@@ -1,8 +1,27 @@
-# nimitai
-## A native file format metaparser
+# nimitai | A native file format parser generator
 
-### What is it?
-Nimitai exposes a single proc which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates a parser for the described file format. Essentially it's [Kaitai Struct](https://kaitai.io/) implemented as a Nim macro:
+## Introduction & advantages over Kaitai Struct
+Nimitai exposes a single procedure which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates parsing procedures for the described file format. Essentially it's [Kaitai Struct](https://kaitai.io/) implemented as a Nim macro!
+
+### Advantages:
+- Native library (no external compiler needed)
+- No file I/O (no modules per parser)
+- Automatic parser update on `.ksy` change.
+
+*This allows for better and easier integration of parsers into your project*
+
+
+## API
+- For each (sub)type described in the `.ksy` file, you get a procedure called `fromFile`
+- The procedures are namespaced under the name of the type (as in the `.ksy` but capitalized).
+- The procedures accept a file path return an object.
+- The objects have one field for each attribute described in the `.ksy` file.
+- The objects have the following additional fields:
+  - `io`: holds the parsing stream
+  - `root`: holds a reference to the root object
+  - `parent`: holds a reference to the parent object
+
+### Example
 
 hello_world.ksy
 ```yaml
@@ -34,32 +53,25 @@ output:
 ```
 1
 ```
+## Internals
+When `generateParser` gets called:
+  - An import statement for the *__runtime library__* is generated.
+  - The `.ksy` file gets parsed into a single object representing the file type (with [npeg)](https://github.com/zevv/npeg) 
+  - For the file type and for each of its subtypes recursively, the following are generated:
+    - a type declaration
+    - a parsing procedure
+    - a destructor
 
-### How does it work?
-- [npeg](https://github.com/zevv/npeg) is used to parse the `.ksy` file (special thanks to [zevv](https://github.com/zevv) for this awesome library ❤️).
-- The KSY AST is used to generate a procedure for parsing a file into a structured Nim object.
+*Everything is done at compile-time*
 
-*everything is done at compile-time*
+## Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
+**YES**. The official KSY grammar is supported 100%.  
+Alternatively, nimitai can be set to accept Nim expressions and types instead of Kaitai Struct ones.
 
-### What does it bring to the table?
-Up until now there is no library in any programming language for parsing an arbitary file. If a library for your specific format does not exist in your language, you have to create it. This can either be done **by hand** or by using a **file parser generator** like [Kaitai Struct](https://kaitai.io/) or if your format is relatively simple, serialization programs like [Protocol Buffers](https://developers.google.com/protocol-buffers) can work too.
+*Toggling this setting will be described in future documentation*
 
-Nimitai does away with all this machinary! The advantages are several:
-- Zero dependence on external compiler tools
-- Each time you change the `.ksy` file, the parser is automatically recompiled along with your project
-- Better quality of generated code since it's done on AST level
-
-*this allows for better and easier integration of parsers into your project*
-
-### Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
-Mostly yes. The official KSY grammar will be supported 100%.  
-However, nimitai might have different defaults for using Nim constructs; for example:
-- Nim expressions instead of Kaitai Struct expressions
-- Nim types instead of Kaitai Struct types
-
-*you will be able to toggle these*
-
-### Notes
+## Notes
 NimVM on [devel](https://github.com/nim-lang/Nim/tree/devel) uses a 16bit address space which doesn't suffice for this project.  
 Zevv tweaked NimVM so that its registers' size can change easily.  
-Using [zevv's fork](https://github.com/zevv/Nim/tree/zevv-vmrework) you can run this project already. Hopefully his changes will be merged soon.
+Using [zevv's fork](https://github.com/zevv/Nim/tree/zevv-vmrework) you can run this project already.  
+[Araq](https://github.com/Araq) likes the idea so I expect his changes to be merged soon.
