@@ -3,8 +3,8 @@ import strformat, strutils, tables
 type
   Type* = ref object
     name*: string
-    parent*: string
-    root*: string
+    parent*: Type
+    root*: Type
     meta*: Table[KeyKind, Key]
     doc*: string
     attrs*: seq[Attr]

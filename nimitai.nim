@@ -35,10 +35,10 @@ proc genType(ts: var NimNode, t: Type) =
     fields = newTree(nnkRecList)
 
 
-  let parentType = if t.parent == "RootObj":
-                     nnkRefTy.newTree(ident(t.parent))
+  let parentType = if t.parent.name == "RootObj":
+                     nnkRefTy.newTree(ident"RootObj")
                    else:
-                     ident(t.parent)
+                     ident(t.parent.name)
   fields.add(
     nnkIdentDefs.newTree(
       ident"io",
@@ -47,7 +47,7 @@ proc genType(ts: var NimNode, t: Type) =
     ),
     nnkIdentDefs.newTree(
       ident"root",
-      ident(t.root),
+      ident(t.root.name),
       newEmptyNode()
     ),
     nnkIdentDefs.newTree(
@@ -56,8 +56,10 @@ proc genType(ts: var NimNode, t: Type) =
       newEmptyNode()
     )
   )
-#[ 
+
+#[
   for a in t.attrs:
+    let typ = resolveAttrType(a)
     fields.add(
       nnkIdentDefs.newTree(
         ident(a.id),
@@ -73,14 +75,14 @@ proc genType(ts: var NimNode, t: Type) =
 
 proc genRead(t: Type): NimNode =
   let
-    parentNode = if t.parent == "RootObj":
-                   nnkRefTy.newTree(ident(t.parent))
+    parentNode = if t.parent.name == "RootObj":
+                   nnkRefTy.newTree(ident"RootObj")
                  else:
-                   ident(t.parent)
+                   ident(t.parent.name)
     typ = ident(t.name)
     desc = newIdentDefs(ident"_", nnkBracketExpr.newTree(ident"typedesc", typ))
     io = newIdentDefs(ident"io", ident"KaitaiStream")
-    root = newIdentDefs(ident"root", ident(t.root))
+    root = newIdentDefs(ident"root", ident(t.root.name))
     parent = newIdentDefs(ident"parent", parentNode)
   var body = newTree(nnkStmtList)
   body.add(

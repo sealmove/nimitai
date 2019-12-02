@@ -17,8 +17,6 @@ type State = object
   pairs: seq[tuple[key: int, value: string]]
   level: int
   inds: seq[int]
-  root: string
-  parents: seq[string]
 
 proc parseKsy*(path: string): Type =
   let p = peg(ksy, state: State):
@@ -49,23 +47,19 @@ proc parseKsy*(path: string): Type =
     Bool <- "true" | "false"
     String <- '"' * *(1 - {'"', '\n'}) * '"'
     Identifier <- {'a'..'z'} * *{'a'..'z','0'..'9','_'}
-    Parent <- >Identifier:
-      state.parents.add(capitalizeAscii($1))
-    ResetParent <- 0:
-      discard state.parents.pop
     FileName <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
       state.elems.add $1
     Item <- >(String | "0x" * +Xdigit | +Digit):
       state.elems.add $1
     AddSectionTable <- 0:
       state.sects.add(newTable[SectKind, Sect]())
-    AddTypesSeq <- 0:
-      state.types.add(newSeq[Type]())
 
     # Main grammar
-    ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1
+    ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1:
+      for i in 0 ..< state.maintype.types.len:
+        state.maintype.types[i].parent = state.maintype
     Sect <- Meta | Doc | Seq | Types | Insts | Enums
-    Types <- K("types") * AddTypesSeq * Array(Type):
+    Types <- K("types") * Array(Type):
       var sect = Sect(kind: skTypes)
       while state.types.len > 0:
         sect.types.add(state.types.pop)
@@ -81,11 +75,7 @@ proc parseKsy*(path: string): Type =
       if state.level == 0:
         if kkId notin sect.keys:
           ksyError "Missing id in meta section"
-        let id = sect.keys[kkId].strval.capitalizeAscii
-        state.root = id
-        state.maintype.root = id
-        state.maintype.name = id
-        state.parents.add(id)
+        state.maintype.name =sect.keys[kkId].strval.capitalizeAscii
         state.maintype.meta = sect.keys
       else:
         state.sects[^1][skMeta] = sect
@@ -102,7 +92,7 @@ proc parseKsy*(path: string): Type =
         state.maintype.attrs = sect.attrs
       else:
         if skSeq in state.sects[^1]:
-          ksyError &"Type \"{state.parents[^1]} has multiple \"seq\" sections"
+          ksyError &"Multiple \"seq\" sections in one type"
         state.sects[^1][skSeq] = sect
     Insts <- K("instances") * Array(Inst):
       var sect = Sect(kind: skInsts)
@@ -133,9 +123,8 @@ proc parseKsy*(path: string): Type =
         let key = state.keys.pop
         attr.keys[key.kind] = key
       state.attrs.add attr
-    Type <- K(>Parent) * AddSectionTable * Array(Sect) * ResetParent:
-      var t = Type(name: capitalizeAscii($1), root: state.root,
-                   parent: state.parents[^1])
+    Type <- K(>Identifier) * AddSectionTable * Array(Sect):
+      var t = Type(name: capitalizeAscii($1), root: state.maintype)
       let sections = state.sects.pop
       if skDoc in sections:
         t.doc = sections[skDoc].doc
@@ -144,6 +133,8 @@ proc parseKsy*(path: string): Type =
       if skInsts in sections:
         t.insts = sections[skInsts].insts
       if skTypes in sections:
+        for i in 0 ..< sections[skTypes].types.len:
+          sections[skTypes].types[i].parent = t
         t.types = sections[skTypes].types
       state.types.add t
     Inst <- K(>Identifier) * Array(Key):
@@ -219,7 +210,8 @@ proc parseKsy*(path: string): Type =
                            .filterIt(not it.strip.startsWith('#'))
                            .join("\n")
   var state: State
-  state.maintype = Type(parent: "RootObj")
+  state.maintype = Type(parent: Type(name: "RootObj"))
+  state.maintype.root = state.maintype
 
   doAssert p.match(file, state).ok
 
