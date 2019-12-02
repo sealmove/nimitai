@@ -1,25 +1,7 @@
 # nimitai | A native file format parser generator
 
-## Introduction & advantages over Kaitai Struct
-Nimitai exposes a single procedure which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates parsing procedures for the described file format. Essentially it's [Kaitai Struct](https://kaitai.io/) implemented as a Nim macro!
-
-### Advantages:
-- Native library (no external compiler needed)
-- No file I/O (no modules per parser)
-- Automatic parser update on `.ksy` change.
-
-*This allows for better and easier integration of parsers into your project*
-
-
-## API
-- For each (sub)type described in the `.ksy` file, you get a procedure called `fromFile`
-- The procedures are namespaced under the name of the type (as in the `.ksy` but capitalized).
-- The procedures accept a file path return an object.
-- The objects have one field for each attribute described in the `.ksy` file.
-- The objects have the following additional fields:
-  - `io`: holds the parsing stream
-  - `root`: holds a reference to the root object
-  - `parent`: holds a reference to the parent object
+## Introduction & advantages over [Kaitai Struct](https://kaitai.io/) 
+Nimitai exposes a single procedure which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates parsing procedures for the described file format. Essentially it's Kaitai Struct implemented as a Nim macro!
 
 ### Example
 
@@ -53,6 +35,26 @@ output:
 ```
 1
 ```
+
+
+### Advantages:
+- Native library (no external compiler needed)
+- No file I/O (no modules per parser)
+- Automatic parser update on `.ksy` change.
+
+*This allows for better and easier integration of parsers into your project*
+
+
+## API
+- For each (sub)type described in the `.ksy` file, you get a procedure called `fromFile`
+- The procedures are namespaced under the name of the type (as in the `.ksy` but capitalized).
+- The procedures accept a file path return an object.
+- The objects have one field for each attribute described in the `.ksy` file.
+- The objects have the following additional fields:
+  - `io`: holds the parsing stream
+  - `root`: holds a reference to the root object
+  - `parent`: holds a reference to the parent object
+
 ## Internals
 When `generateParser` gets called:
   - An import statement for the *__runtime library__* is generated.
