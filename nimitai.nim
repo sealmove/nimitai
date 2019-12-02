@@ -16,17 +16,20 @@ proc attrType(a: Attr): string =
            of "s4":"int32"
            else: ksType.capitalizeAscii
 
-proc genType(t: Type): seq[NimNode] =
+proc genType(ts: var NimNode, t: Type) =
   #XXX: doc
+  if t.types != @[]:
+    for typ in t.types:
+      genType(ts, typ)
   let
     objName = t.name & "Obj"
 
-  result = newSeq[NimNode](2)
-  result[0] = nnkTypeDef.newTree(
+  var res = newSeq[NimNode](2)
+  res[0] = nnkTypeDef.newTree(
     ident(t.name),
     newEmptyNode(),
     nnkRefTy.newTree(ident(objName)))
-  result[1] = nnkTypeDef.newTree(ident(objName), newEmptyNode())
+  res[1] = nnkTypeDef.newTree(ident(objName), newEmptyNode())
 
   var
     obj = nnkObjectTy.newTree(newEmptyNode(), newEmptyNode())
@@ -60,7 +63,8 @@ proc genType(t: Type): seq[NimNode] =
     )
 
   obj.add(fields)
-  result[1].add(obj)
+  res[1].add(obj)
+  ts.add(res)
 
 proc genRead(t: Type): NimNode =
   let
@@ -91,7 +95,7 @@ proc genRead(t: Type): NimNode =
   result.body = body
 
 macro generateParser*(path: static[string]) =
-  let ksy = parseKsy(path)
+  let maintype = parseKsy(path)
   result = newStmtList()
 
   # Import statement
@@ -99,8 +103,5 @@ macro generateParser*(path: static[string]) =
 
   # Type section
   var typesect = newTree(nnkTypeSection)
-  for t in ksy.types:
-    typesect.add genType(t)
+  typesect.genType(maintype)
   result.add(typesect)
-  for t in ksy.types:
-    result.add(genRead(t))
