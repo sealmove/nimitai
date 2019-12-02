@@ -64,7 +64,7 @@ When `generateParser` gets called:
 
 *Everything is done at compile-time*
 
-## Will a `.ksy` file found in [Kaitai Struct Collection Gallery](https://formats.kaitai.io/) work as is?
+## Will a `.ksy` file found in the [official gallery](https://formats.kaitai.io/) work as is?
 **YES**. The official KSY grammar is supported 100%.  
 Alternatively, nimitai can be set to accept Nim expressions and types instead of Kaitai Struct ones.
 
