@@ -41,11 +41,11 @@ output:
 1
 ```
 ## API
-- For each (sub)type described in the `.ksy` file, you get a procedure called `fromFile`
-- The procedures are namespaced under the name of the type (as in the `.ksy` but capitalized).
-- The procedures accept a file path return an object.
-- The objects have one field for each attribute described in the `.ksy` file.
-- The objects have the following additional fields:
+- One procedure per `generateParser` call (called `fromFile`) is generated.
+- The procedure is namespaced under the file format type as written in the top-level meta section.
+- The procedure accepts a file path and returns an object.
+- The object have one field for each attribute described in the `.ksy` file.
+- The object have the following additional fields:
   - `io`: holds the parsing stream
   - `root`: holds a reference to the root object
   - `parent`: holds a reference to the parent object
