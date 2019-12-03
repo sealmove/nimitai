@@ -22,25 +22,31 @@ const primitiveTypes = {
 proc newImport(i: string): NimNode =
   newNimNode(nnkImportStmt).add(newIdentNode(i))
 
-proc attrType(a: Attr): string =
+proc resolveType(a: Attr, tnode: Type, h: seq[string]): string =
   if kkType notin a.keys:
     ksyError(&"Attribute {a.id} has no type" &
              "This should work after implementing typeless attributes" &
              "https://doc.kaitai.io/ksy_reference.html#attribute-type")
-  let ksType = a.keys[kkType].strval
-  result = case ksType
-           of "u4": "uint32"
-           of "u1": "uint8"
-           of "str": "string"
-           of "s4": "int32"
-           else: ksType.capitalizeAscii
+  if a.keys[kkType].strval in primitiveTypes:
+    return primitiveTypes[a.keys[kkType].strval]
+  let ksType = a.keys[kkType].strval.capitalizeAscii
+  var
+    h = h
+    tnode = tnode
+  while true:
+    if ksType in tnode.types.mapIt(it.name):
+      return h.join & tnode.name & ksType
+    if ksType in tnode.parent.types.mapIt(it.name):
+      return h.join & ksType
+    discard h.pop
+    tnode = tnode.parent
 
-proc genType(ts: var NimNode, t: Type, hierarchy: seq[string] = @[]) =
+proc genType(ts: var NimNode, t: Type, h: seq[string] = @[]) =
   #XXX: doc
-  let name = hierarchy.join & t.name
+  let name = h.join & t.name
 
   for typ in t.types:
-    genType(ts, typ, hierarchy & t.name)
+    genType(ts, typ, h & t.name)
 
   let objName = name & "Obj"
 
@@ -59,7 +65,7 @@ proc genType(ts: var NimNode, t: Type, hierarchy: seq[string] = @[]) =
   let parentType = if t.parent.name == "RootObj":
                      nnkRefTy.newTree(ident"RootObj")
                    else:
-                     ident(hierarchy.join)
+                     ident(h.join)
   fields.add(
     nnkIdentDefs.newTree(
       ident"io",
@@ -79,34 +85,11 @@ proc genType(ts: var NimNode, t: Type, hierarchy: seq[string] = @[]) =
   )
 
   for a in t.attrs:
-    if kkType notin a.keys:
-      ksyError(&"Attribute {a.id} has no type" &
-               "This should work after implementing typeless attributes" &
-               "https://doc.kaitai.io/ksy_reference.html#attribute-type")
-    var resolvedType: string
-    if a.keys[kkType].strval in primitiveTypes:
-      resolvedType = primitiveTypes[a.keys[kkType].strval]
-    else:
-      let ksType = a.keys[kkType].strval.capitalizeAscii
-      var
-        h = hierarchy
-        c = t
-        flag: bool
-      while not flag:
-        if ksType in c.types.mapIt(it.name):
-          resolvedType = h.join & t.name & ksType
-          flag = true
-        elif ksType in c.parent.types.mapIt(it.name):
-          resolvedType = h.join & ksType
-          flag = true
-        else:
-          discard h.pop
-          c = c.parent
 
     fields.add(
       nnkIdentDefs.newTree(
         ident(a.id),
-        ident(resolvedType),
+        ident(a.resolveType(t, h)),
         newEmptyNode()
       )
     )
