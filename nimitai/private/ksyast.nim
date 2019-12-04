@@ -107,19 +107,19 @@ type
 proc stackBytes*(stack: var seq[byte], s: string) =
   if s.startsWith("\""):
     for i in countdown(s.len - 2, 1):
-      stack.insert(s[i].byte, 0)
+      stack.insert(s[i].byte)
   elif s.startsWith "0x":
     let x = parseHexInt(s)
     if x > 255:
       echo "Hex number out of byte range"
       quit QuitFailure
-    stack.insert(x.byte, 0)
+    stack.insert(x.byte)
   else:
     let x = parseInt(s)
     if x > 255:
       echo "Hex number out of byte range"
       quit QuitFailure
-    stack.insert(x.byte, 0)
+    stack.insert(x.byte)
 
 proc push*(stack: var seq[Key], kind: KeyKind, s: string = "",
           blist: seq[byte] = @[], slist: seq[string] = @[]) =

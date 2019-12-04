@@ -19,36 +19,45 @@ const primitiveTypes = {
   "s8be" : "int64"
 }.toTable
 
-proc newImport(i: string): NimNode =
-  newNimNode(nnkImportStmt).add(newIdentNode(i))
+# Level 0 - Helper procedures
+proc hierarchy(t: Type): seq[string] =
+  var t = t
+  while t.name != "RootObj":
+    result.insert(t.name)
+    t = t.parent
 
-proc resolveType(a: Attr, tnode: Type, h: seq[string]): string =
+proc parentType(t: Type): NimNode =
+  if t.parent.name == "RootObj":
+    nnkRefTy.newTree(ident"RootObj")
+  else:
+    ident(hierarchy(t.parent).join)
+
+proc resolveAttrType(a: Attr, t: Type): string =
   if kkType notin a.keys:
     ksyError(&"Attribute {a.id} has no type" &
              "This should work after implementing typeless attributes" &
              "https://doc.kaitai.io/ksy_reference.html#attribute-type")
   if a.keys[kkType].strval in primitiveTypes:
     return primitiveTypes[a.keys[kkType].strval]
-  let ksType = a.keys[kkType].strval.capitalizeAscii
-  var
-    h = h
-    tnode = tnode
-  while true:
-    if ksType in tnode.types.mapIt(it.name):
-      return h.join & tnode.name & ksType
-    if ksType in tnode.parent.types.mapIt(it.name):
-      return h.join & ksType
-    discard h.pop
-    tnode = tnode.parent
 
-proc genType(ts: var NimNode, t: Type, h: seq[string] = @[]) =
+  let ksType = a.keys[kkType].strval.capitalizeAscii
+  var t = t
+
+  while true:
+    if ksType in t.types.mapIt(it.name):
+      return hierarchy(t).join & ksType
+    t = t.parent
+
+# Level 1 - Generators
+proc genTypes(stmts: var NimNode, t: Type) =
   #XXX: doc
-  let name = h.join & t.name
 
   for typ in t.types:
-    genType(ts, typ, h & t.name)
+    genTypes(stmts, typ)
 
-  let objName = name & "Obj"
+  let
+    name = hierarchy(t).join
+    objName = name & "Obj"
 
   var res = newSeq[NimNode](2)
   res[0] = nnkTypeDef.newTree(
@@ -61,11 +70,6 @@ proc genType(ts: var NimNode, t: Type, h: seq[string] = @[]) =
     obj = nnkObjectTy.newTree(newEmptyNode(), newEmptyNode())
     fields = newTree(nnkRecList)
 
-
-  let parentType = if t.parent.name == "RootObj":
-                     nnkRefTy.newTree(ident"RootObj")
-                   else:
-                     ident(h.join)
   fields.add(
     nnkIdentDefs.newTree(
       ident"io",
@@ -79,36 +83,35 @@ proc genType(ts: var NimNode, t: Type, h: seq[string] = @[]) =
     ),
     nnkIdentDefs.newTree(
       ident"parent",
-      parentType,
+      parentType(t),
       newEmptyNode()
     )
   )
 
   for a in t.attrs:
-
     fields.add(
       nnkIdentDefs.newTree(
         ident(a.id),
-        ident(a.resolveType(t, h)),
+        ident(resolveAttrType(a, t)),
         newEmptyNode()
       )
     )
 
   obj.add(fields)
   res[1].add(obj)
-  ts.add(res)
+  stmts.add(res)
 
-proc genRead(t: Type): NimNode =
+proc genProcs(stmts: var NimNode, t: Type) =
+  for typ in t.types:
+    genProcs(stmts, typ)
+
   let
-    parentNode = if t.parent.name == "RootObj":
-                   nnkRefTy.newTree(ident"RootObj")
-                 else:
-                   ident(t.parent.name)
-    typ = ident(t.name)
+    typ = ident(hierarchy(t).join)
     desc = newIdentDefs(ident"_", nnkBracketExpr.newTree(ident"typedesc", typ))
     io = newIdentDefs(ident"io", ident"KaitaiStream")
     root = newIdentDefs(ident"root", ident(t.root.name))
-    parent = newIdentDefs(ident"parent", parentNode)
+    parent = newIdentDefs(ident"parent", parentType(t))
+
   var body = newTree(nnkStmtList)
   body.add(
     nnkAsgn.newTree(
@@ -121,19 +124,28 @@ proc genRead(t: Type): NimNode =
       )
     )
   )
-  #for attr in t.attrs:
+  #XXX: for attr in t.attrs:
 
-  result = newProc(ident"read", @[typ, desc, io, root, parent])
-  result.body = body
+  var res = newProc(ident"read", @[typ, desc, io, root, parent])
+  res.body = body
+  stmts.add(res)
+
+# Level 3
+proc imp(i: string): NimNode =
+  newNimNode(nnkImportStmt).add(newIdentNode(i))
+
+proc types(t: Type): NimNode =
+  result = newTree(nnkTypeSection)
+  result.genTypes(t)
+
+proc procs(t: Type): NimNode =
+  result = newStmtList()
+  result.genProcs(t)
 
 macro generateParser*(path: static[string]) =
-  let maintype = parseKsy(path)
-  result = newStmtList()
-
-  # Import statement
-  result.add newImport("nimitai/private/runtime")
-
-  # Type section
-  var typesect = newTree(nnkTypeSection)
-  typesect.genType(maintype)
-  result.add(typesect)
+  var maintype = parseKsy(path)
+  result = newStmtList(
+    imp("nimitai/private/runtime"),
+    types(maintype),
+    procs(maintype)
+  )
