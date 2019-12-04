@@ -64,88 +64,104 @@ proc genTypes(stmts: var NimNode, t: Type) =
     ident(name),
     newEmptyNode(),
     nnkRefTy.newTree(ident(objName)))
-  res[1] = nnkTypeDef.newTree(ident(objName), newEmptyNode())
+  res[1] = nnkTypeDef.newTree(
+    ident(objName),
+    newEmptyNode())
 
   var
     obj = nnkObjectTy.newTree(newEmptyNode(), newEmptyNode())
     fields = newTree(nnkRecList)
 
-  fields.add(
-    nnkIdentDefs.newTree(
-      ident"io",
-      ident"KaitaiStream",
-      newEmptyNode()
-    ),
-    nnkIdentDefs.newTree(
-      ident"root",
-      ident(t.root.name),
-      newEmptyNode()
-    ),
-    nnkIdentDefs.newTree(
-      ident"parent",
-      parentType(t),
-      newEmptyNode()
-    )
-  )
+  fields.add(nnkIdentDefs.newTree(
+    ident"io",
+    ident"KaitaiStream",
+    newEmptyNode()),
+  nnkIdentDefs.newTree(
+    ident"root",
+    ident(t.root.name),
+    newEmptyNode()),
+  nnkIdentDefs.newTree(
+    ident"parent",
+    parentType(t),
+    newEmptyNode()))
 
   for a in t.attrs:
-    fields.add(
-      nnkIdentDefs.newTree(
-        ident(a.id),
-        ident(resolveAttrType(a, t)),
-        newEmptyNode()
-      )
-    )
+    fields.add(nnkIdentDefs.newTree(
+      ident(a.id),
+      ident(resolveAttrType(a, t)),
+      newEmptyNode()))
 
   obj.add(fields)
   res[1].add(obj)
   stmts.add(res)
 
-proc genProcs(stmts: var NimNode, t: Type) =
+proc genReadAndDestroy(stmts: var NimNode, t: Type) =
   for typ in t.types:
-    genProcs(stmts, typ)
+    genReadAndDestroy(stmts, typ)
 
+  # Read
   let
-    typ = ident(hierarchy(t).join)
-    desc = newIdentDefs(ident"_", nnkBracketExpr.newTree(ident"typedesc", typ))
-    io = newIdentDefs(ident"io", ident"KaitaiStream")
-    root = newIdentDefs(ident"root", ident(t.root.name))
-    parent = newIdentDefs(ident"parent", parentType(t))
+    tIo = newIdentDefs(
+      ident"io",
+      ident"KaitaiStream")
+    tRoot = newIdentDefs(
+      ident"root",
+      ident(t.root.name))
+    tParent = newIdentDefs(
+      ident"parent",
+      parentType(t))
+    tThis = ident(hierarchy(t).join)
+    tObj = newIdentDefs(
+      ident"x",
+      nnkVarTy.newTree(ident(hierarchy(t).join & "Obj")))
+    tDesc = newIdentDefs(
+      ident"_",
+      nnkBracketExpr.newTree(
+        ident"typedesc",
+        tThis))
 
-  var body = newTree(nnkStmtList)
-  body.add(
-    nnkAsgn.newTree(
-      ident"result",
-      nnkObjConstr.newTree(
-        typ,
-        newColonExpr(ident"io", ident"io"),
-        newColonExpr(ident"root", ident"root"),
-        newColonExpr(ident"parent", ident"parent")
-      )
-    )
-  )
   #XXX: for attr in t.attrs:
 
-  var res = newProc(ident"read", @[typ, desc, io, root, parent])
-  res.body = body
-  stmts.add(res)
+  var read = newProc(ident"read", @[tThis, tDesc, tIo, tRoot, tParent])
+  read.body = nnkAsgn.newTree(
+    ident"result",
+    nnkObjConstr.newTree(
+      tThis,
+      newColonExpr(
+        ident"io",
+        ident"io"),
+      newColonExpr(
+        ident"root",
+        ident"root"),
+      newColonExpr(
+        ident"parent",
+        ident"parent")))
+
+  # Destroy
+  var destroy = newProc(ident"destroy=", @[newEmptyNode(), tObj])
+  destroy.body = newCall(
+    ident"close",
+    newDotExpr(
+      ident"x",
+      ident"io"))
+
+  stmts.add(read, destroy)
 
 # Level 3
 proc imp(i: string): NimNode =
-  newNimNode(nnkImportStmt).add(newIdentNode(i))
+  newNimNode(nnkImportStmt).add(ident(i))
 
 proc types(t: Type): NimNode =
   result = newTree(nnkTypeSection)
   result.genTypes(t)
 
-proc procs(t: Type): NimNode =
+proc readAndDestroy(t: Type): NimNode =
   result = newStmtList()
-  result.genProcs(t)
+  result.genReadAndDestroy(t)
 
 macro generateParser*(path: static[string]) =
   var maintype = parseKsy(path)
   result = newStmtList(
     imp("nimitai/private/runtime"),
     types(maintype),
-    procs(maintype)
-  )
+    readAndDestroy(maintype))
