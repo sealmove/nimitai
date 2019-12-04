@@ -2,53 +2,48 @@ import
   nimitai/private/[ksyast, ksypeg], macros, sequtils, strutils, strformat,
   tables
 
-const primitiveTypes = {
-  "u1"   : "uint8"  ,
-  "u2le" : "uint16" ,
-  "u2be" : "uint16" ,
-  "u4le" : "uint32" ,
-  "u4be" : "uint32" ,
-  "u8le" : "uint64" ,
-  "u8be" : "uint64" ,
-  "s1"   : "int8"   ,
-  "s2le" : "int16"  ,
-  "s2be" : "int16"  ,
-  "s4le" : "int32"  ,
-  "s4be" : "int32"  ,
-  "s8le" : "int64"  ,
-  "s8be" : "int64"
-}.toTable
+proc primative(ksType: string): string =
+  case ksType
+  of "u1": "uint8"
+  of "u2", "u2le", "u2be": "uint16"
+  of "u4", "u4le", "u4be": "uint32"
+  of "u8", "u8le", "u8be": "uint64"
+  of "s1": "int8"
+  of "s2", "s2le", "s2be": "int16"
+  of "s4", "s4le", "s4be": "int32"
+  of "s8", "s8le", "s8be": "int64"
+  else: ""
 
-# Level 0 - Helper procedures
+# Level 0 - String helpers
 proc hierarchy(t: Type): seq[string] =
   var t = t
   while t.name != "RootObj":
     result.insert(t.name)
     t = t.parent
 
+# Level 1 - Node helpers
 proc parentType(t: Type): NimNode =
   if t.parent.name == "RootObj":
     nnkRefTy.newTree(ident"RootObj")
   else:
     ident(hierarchy(t.parent).join)
 
-proc resolveAttrType(a: Attr, t: Type): string =
+proc attrType(a: Attr, t: Type): NimNode =
   if kkType notin a.keys:
-    ksyError(&"Attribute {a.id} has no type" &
-             "This should work after implementing typeless attributes" &
-             "https://doc.kaitai.io/ksy_reference.html#attribute-type")
-  if a.keys[kkType].strval in primitiveTypes:
-    return primitiveTypes[a.keys[kkType].strval]
+    return nnkBracketExpr.newTree(
+      newIdentNode("seq"),
+      newIdentNode("byte"))
 
-  let ksType = a.keys[kkType].strval.capitalizeAscii
+  let prim = primative(a.keys[kkType].strval)
+  if prim != "": return ident(prim)
+
   var t = t
-
-  while true:
-    if ksType in t.types.mapIt(it.name):
-      return hierarchy(t).join & ksType
+  let typ = a.keys[kkType].strval.capitalizeAscii
+  while typ notin t.types.mapIt(it.name):
     t = t.parent
+  return ident(hierarchy(t).join & typ)
 
-# Level 1 - Generators
+# Level 2 - Generators
 proc genTypes(stmts: var NimNode, t: Type) =
   #XXX: doc
 
@@ -88,7 +83,7 @@ proc genTypes(stmts: var NimNode, t: Type) =
   for a in t.attrs:
     fields.add(nnkIdentDefs.newTree(
       ident(a.id),
-      ident(resolveAttrType(a, t)),
+      attrType(a, t),
       newEmptyNode()))
 
   obj.add(fields)
@@ -147,7 +142,7 @@ proc genReadAndDestroy(stmts: var NimNode, t: Type) =
 
   stmts.add(read, destroy)
 
-# Level 3
+# Level 3 - codegen ordering
 proc imp(i: string): NimNode =
   newNimNode(nnkImportStmt).add(ident(i))
 

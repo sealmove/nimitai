@@ -55,7 +55,7 @@ proc parseKsy*(path: string): Type =
       state.sects.add(newTable[SectKind, Sect]())
 
     # Main grammar
-    ksy <- Sect * +(+'\n' * Sect) * +'\n' * !1
+    ksy <- +'\n' * Sect * +(+'\n' * Sect) * +'\n' * !1
     Sect <- Meta | Doc | Seq | Types | Insts | Enums
     Types <- K("types") * Array(Type):
       var sect = Sect(kind: skTypes)
