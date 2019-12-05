@@ -2,6 +2,7 @@ import
   nimitai/private/[ksyast, ksypeg], macros, sequtils, strutils, strformat,
   tables
 
+# Level 0 - String helpers
 proc primative(ksType: string): string =
   case ksType
   of "u1": "uint8"
@@ -14,7 +15,6 @@ proc primative(ksType: string): string =
   of "s8", "s8le", "s8be": "int64"
   else: ""
 
-# Level 0 - String helpers
 proc hierarchy(t: Type): seq[string] =
   var t = t
   while t.name != "RootObj":
@@ -94,7 +94,6 @@ proc genReadAndDestroy(stmts: var NimNode, t: Type) =
   for typ in t.types:
     genReadAndDestroy(stmts, typ)
 
-  # Read
   let
     tIo = newIdentDefs(
       ident"io",
@@ -117,7 +116,14 @@ proc genReadAndDestroy(stmts: var NimNode, t: Type) =
 
   #XXX: for attr in t.attrs:
 
-  var read = newProc(ident"read", @[tThis, tDesc, tIo, tRoot, tParent])
+  # Read
+  var read = newProc(
+    ident"read",
+    @[tThis,
+      tDesc,
+      tIo,
+      tRoot,
+      tParent])
   read.body = nnkAsgn.newTree(
     ident"result",
     nnkObjConstr.newTree(
@@ -133,7 +139,10 @@ proc genReadAndDestroy(stmts: var NimNode, t: Type) =
         ident"parent")))
 
   # Destroy
-  var destroy = newProc(ident"destroy=", @[newEmptyNode(), tObj])
+  var destroy = newProc(
+    ident"destroy=",
+    @[newEmptyNode(),
+      tObj])
   destroy.body = newCall(
     ident"close",
     newDotExpr(
@@ -154,9 +163,36 @@ proc readAndDestroy(t: Type): NimNode =
   result = newStmtList()
   result.genReadAndDestroy(t)
 
+proc fromFile(t: Type): NimNode =
+  let
+    tThis = ident(hierarchy(t).join)
+    tDesc = newIdentDefs(
+      ident"_",
+      nnkBracketExpr.newTree(
+        ident"typedesc",
+        tThis))
+    tFilename = newIdentDefs(
+      ident"filename",
+      ident"string")
+
+  result = newProc(
+    ident"fromFile",
+    @[tThis,
+      tDesc,
+      tFilename])
+  result.body = newCall(
+    ident"read",
+    tThis,
+    newCall(
+      ident"newKaitaiStream",
+      ident"filename"),
+    newNilLit(),
+    newNilLit())
+
 macro generateParser*(path: static[string]) =
   var maintype = parseKsy(path)
   result = newStmtList(
     imp("nimitai/private/runtime"),
     types(maintype),
-    readAndDestroy(maintype))
+    readAndDestroy(maintype),
+    fromFile(maintype))
