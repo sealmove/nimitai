@@ -64,7 +64,9 @@ proc genTypes(stmts: var NimNode, t: Type) =
     newEmptyNode())
 
   var
-    obj = nnkObjectTy.newTree(newEmptyNode(), newEmptyNode())
+    obj = nnkObjectTy.newTree(
+      newEmptyNode(),
+      newEmptyNode())
     fields = newTree(nnkRecList)
 
   fields.add(nnkIdentDefs.newTree(
@@ -124,19 +126,33 @@ proc genReadAndDestroy(stmts: var NimNode, t: Type) =
       tIo,
       tRoot,
       tParent])
-  read.body = nnkAsgn.newTree(
-    ident"result",
-    nnkObjConstr.newTree(
-      tThis,
-      newColonExpr(
-        ident"io",
-        ident"io"),
-      newColonExpr(
-        ident"root",
+  read.body = newStmtList(
+    newAssignment(
+      ident"result",
+      nnkObjConstr.newTree(
+        tThis,
+        newColonExpr(
+          ident"io",
+          ident"io"),
+        newColonExpr(
+          ident"parent",
+          ident"parent"))),
+    newLetStmt(
+      ident"root",
+      nnkIfExpr.newTree(
+        nnkElifExpr.newTree(
+          infix(
+            ident"root",
+            "==",
+            newNilLit()),
+          ident"result"),
+        nnkElseExpr.newTree(
+          ident"root"))),
+    newAssignment(
+      newDotExpr(
+        ident"result",
         ident"root"),
-      newColonExpr(
-        ident"parent",
-        ident"parent")))
+      ident"root"))
 
   # Destroy
   var destroy = newProc(

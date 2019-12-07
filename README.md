@@ -12,17 +12,17 @@ Nimitai exposes a single procedure which accepts a [KSY grammar](https://doc.kai
 
 hello_world.ksy
 ```yaml
-
 meta:
   id: hello_world
+  file-extension: hw
 seq:
   - id: one
     type: u1
 ```
 
-file.bin
+file.hw (hex view)
 ```bin
-1\n
+49
 ```
 
 test_nimitai.nim
@@ -31,7 +31,7 @@ import nimitai
 
 generateParser("hello_world.ksy")
 
-let x = HelloWorld.fromFile("file.bin")
+let x = HelloWorld.fromFile("file.hw")
 
 echo x.one
 ```
