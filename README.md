@@ -31,7 +31,7 @@ file.hw (hex view)
 
 test_nimitai.nim
 ```nim
-import nimitai
+import nimitai, nimitai/runtime
 
 generateParser("hello_world.ksy")
 
