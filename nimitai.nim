@@ -25,8 +25,13 @@ proc parentType(t: Nimitype): NimNode =
 proc readField(f: Field): NimNode =
   let
     call = case f.typ
-    of "u1", "u2", "u2le", "u2be", "u4", "u4le", "u4be", "u8", "u8le", "u8be",
-       "s1", "s2", "s2le", "s2be", "s4", "s4le", "s4be", "s8", "s8le", "s8be":
+    of "u2", "u4", "u8", "s2", "s4", "s8":
+      #XXX default endianess
+      newCall(
+        "read" & f.typ & "be",
+        ident"io")
+    of "u1", "s1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be", "s2le",
+       "s2be", "s4le", "s4be", "s8le", "s8be":
       newCall(
         "read" & f.typ,
         ident"io")
@@ -134,7 +139,9 @@ proc readProc(t: Nimitype): NimNode =
             ident"root",
             "==",
             newNilLit()),
-          ident"result"),
+          nnkCast.newTree(
+            ident(t.root),
+            ident"result")),
         nnkElseExpr.newTree(
           ident"root"))),
     newAssignment(
@@ -195,7 +202,7 @@ proc importSection(imports: varargs[string]): NimNode =
 macro generateParser*(path: static[string]) =
   var types = parseKsyAst(path)
   result = newStmtList()
-  result.add importSection("nimitai/private/runtime")
+  #result.add importSection("nimitai/private/runtime")
   var typeSection = newTree(nnkTypeSection)
   for t in types:
     typeSection.add(typeDecl(t))
@@ -203,4 +210,4 @@ macro generateParser*(path: static[string]) =
   for t in types:
     result.add readProc(t)
     result.add destroyProc(t)
-  result.add fromFileProc(types[0])
+  result.add fromFileProc(types[^1])

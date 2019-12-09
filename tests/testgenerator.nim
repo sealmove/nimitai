@@ -30,6 +30,12 @@ proc parseKst(path: string): Kst =
   doAssert p.match(file, test).ok
   test
 
+proc parseKsExpr(expr: string): NimNode =
+  if expr.startsWith("\'"):
+    result = parseExpr(expr[1 .. ^2])
+  else:
+    result = parseExpr(expr)
+
 proc test(kst: Kst): NimNode =
   var asserts = newStmtList()
 
@@ -42,7 +48,7 @@ proc test(kst: Kst): NimNode =
             ident"r",
             ident(a.actual)),
           "==",
-          newLit(a.expected))))
+          parseKsExpr(a.expected))))
 
   nnkCommand.newTree(
     ident"test",
@@ -61,13 +67,14 @@ proc test(kst: Kst): NimNode =
 
 proc suite(): NimNode =
   var tests = newStmtList()
-  for k, p in walkDir("nimitai_tests/kst"):
+  for k, p in walkDir("kst_for_now"):
     if k == pcFile:
       tests.add(p.parseKst.test)
 
   newStmtList(
     nnkImportStmt.newTree(
-      ident"nimitai",
+      ident"../nimitai",
+      ident"../nimitai/private/runtime",
       ident"unittest"),
     nnkCommand.newTree(
         ident"suite",
