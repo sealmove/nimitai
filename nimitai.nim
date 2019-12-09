@@ -202,7 +202,7 @@ proc importSection(imports: varargs[string]): NimNode =
 macro generateParser*(path: static[string]) =
   var types = parseKsyAst(path)
   result = newStmtList()
-  #result.add importSection("nimitai/private/runtime")
+  #result.add importSection("nimitai/runtime")
   var typeSection = newTree(nnkTypeSection)
   for t in types:
     typeSection.add(typeDecl(t))

@@ -5,7 +5,6 @@ author        = "Stefanos Mandalas"
 description   = "Implementation of Kaitai Struct as a macro"
 license       = "MIT"
 
-
 # Dependencies
 
 requires "nim >= 1.1.1"
