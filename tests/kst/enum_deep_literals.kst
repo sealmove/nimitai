@@ -1,7 +1,0 @@
-id: enum_deep_literals
-data: enum_0.bin
-asserts:
-  - actual: is_pet_1_ok
-    expected: true
-  - actual: is_pet_2_ok
-    expected: true

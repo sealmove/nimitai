@@ -1,3 +1,0 @@
-id: valid_fail_eq_int
-data: fixed_struct.bin
-exception: ValidationNotEqualError
