@@ -50,18 +50,18 @@ proc test(kst: Kst): NimNode =
     newStmtList(
       newCall(
         ident"generateParser",
-        newLit("ksy/" & kst.id & ".ksy")),
+        newLit("nimitai_tests/ksy/" & kst.id & ".ksy")),
       newLetStmt(
         ident"r",
         newCall(
           ident"fromFile",
           ident(kst.id.capitalizeAscii),
-          newLit("bin/" & kst.data))),
+          newLit("nimitai_tests/bin/" & kst.data))),
       asserts))
 
 proc suite(): NimNode =
   var tests = newStmtList()
-  for k, p in walkDir("kst"):
+  for k, p in walkDir("nimitai_tests/kst"):
     if k == pcFile:
       tests.add(p.parseKst.test)
 
