@@ -1,12 +1,16 @@
-# nimitai | A native file format parser generator
+# <p align="center">nimitai</p>
 
-## Introduction & advantages over [Kaitai Struct](https://kaitai.io/) 
-Nimitai exposes a single procedure which accepts a [KSY grammar](https://doc.kaitai.io/ksy_reference.html) file and generates parsing procedures for the described file format. Essentially it's Kaitai Struct implemented as a Nim macro! This means:
-- No need for external compiler
-- No parser modules to manage
-- Automatic parser update on `.ksy` change
+## Introduction
+Nimitai is a generic parser generator implemented as a native Nim library.  
+It accepts [KSY grammar](https://doc.kaitai.io/ksy_reference.html) which works best for describing *binary* formats.  
 
-*This allows for better and easier integration of parsers into your project*
+*The word binary in this context means hard-for-human-to-read*
+
+| Exported symbol | Production |
+|-----------------|------------|
+| `proc writeModule(ksy, module: string)` | nim module (source code) |
+| `proc writeDll(ksy, dll: string)` | dynamic library |
+| `macro emitParser(ksy: static[string])` | static library (compile time code embedding) |
 
 ## Example
 
@@ -51,19 +55,18 @@ output:
   - `parent`: holds a reference to the parent object
 
 ## Internals
-When `generateParser` gets called:
-  - An import statement for the *__runtime library__* is generated.
-  - The `.ksy` file gets parsed into a nim object hierarchy (with [npeg)](https://github.com/zevv/npeg)
-  - The object hierarchy is transformed into a sequence of nodes -each one representing a concrete type-
-  - For each concrete type the following are generated:
-    - a type declaration
-    - a parsing procedure
-    - a destructor
-  - Lastly, `fromFile` proc is generated
+- An import statement for the *__runtime library__* is generated.
+- The `.ksy` file gets parsed into a nim object hierarchy (with [npeg)](https://github.com/zevv/npeg)
+- The object hierarchy is transformed into a sequence of nodes -each one representing a concrete type-
+- For each concrete type the following are generated:
+  - a type declaration
+  - a parsing procedure
+  - a destructor
+- Lastly, `fromFile` proc is generated
 
 *Everything is done at compile-time*
 
-## Will a `.ksy` file found in the [official gallery](https://formats.kaitai.io/) work as is?
+## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?
 **YES**. The official KSY grammar is supported 100%.  
 Alternatively, nimitai can be set to accept Nim expressions and types instead of Kaitai Struct ones.
 
