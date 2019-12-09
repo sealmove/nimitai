@@ -1,0 +1,3 @@
+[submodule "tests/nimitai_tests"]
+	path = tests/nimitai_tests
+	url = https://github.com/sealmove/nimitai_tests
