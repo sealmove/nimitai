@@ -22,7 +22,7 @@ seq:
 
 file.hw (hex view)
 ```bin
-49
+01
 ```
 
 test_nimitai.nim
@@ -53,11 +53,13 @@ output:
 ## Internals
 When `generateParser` gets called:
   - An import statement for the *__runtime library__* is generated.
-  - The `.ksy` file gets parsed into a single object representing the file type (with [npeg)](https://github.com/zevv/npeg) 
-  - For the file type and for each of its subtypes recursively, the following are generated:
+  - The `.ksy` file gets parsed into a nim object hierarchy (with [npeg)](https://github.com/zevv/npeg)
+  - The object hierarchy is transformed into a sequence of nodes -each one representing a concrete type-
+  - For each concrete type the following are generated:
     - a type declaration
     - a parsing procedure
     - a destructor
+  - Lastly, `fromFile` proc is generated
 
 *Everything is done at compile-time*
 
