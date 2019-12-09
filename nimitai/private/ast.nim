@@ -1,4 +1,5 @@
 import ksyast, specs/[fieldspec, enumspec], tables, strutils, sequtils
+export fieldspec.Field
 
 type
   Nimitype* = ref object
