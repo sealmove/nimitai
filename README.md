@@ -2,7 +2,7 @@
 
 ## Introduction
 Nimitai is a parser generator implemented as a native Nim library.  
-It accepts [KSY grammar](https://doc.kaitai.io/ksy_reference.html) which works best for describing binary data structures.  
+It accepts [KSY grammars](https://doc.kaitai.io/ksy_reference.html) which work best for describing binary data structures.  
 
 ###### The word *binary* in this context means hard-for-human-to-read
 
