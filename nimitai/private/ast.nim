@@ -56,7 +56,7 @@ type
     case isLazy*: bool
     of true:
       pos*: int64
-      io: KaitaiStream
+      io: string
       value: int
     of false: discard
   Expression* = ref object

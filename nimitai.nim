@@ -194,15 +194,9 @@ proc fromFileProc(t: Nimitype): NimNode =
     newNilLit(),
     newNilLit())
 
-proc importSection(imports: varargs[string]): NimNode =
-  result = newNimNode(nnkImportStmt)
-  for i in imports:
-    result.add(ident(i))
-
 macro generateParser*(path: static[string]) =
   var types = parseKsyAst(path)
   result = newStmtList()
-  #result.add importSection("nimitai/runtime")
   var typeSection = newTree(nnkTypeSection)
   for t in types:
     typeSection.add(typeDecl(t))
