@@ -1,9 +1,7 @@
-import ksyast, specs/[fieldspec, enumspec], tables, strutils, sequtils
-export fieldspec.Field
+import ksyast, tables, strutils, sequtils
 
 type
   Nimitype* = ref object
-    # Meta spec
     id*: string
     parent*: string
     root*: string
@@ -14,16 +12,63 @@ type
     endian*: Endian
     license*: string
     exts*: seq[string]
-
-    # Doc spec
     doc*: string
     docRef*: string
-
-    # Attribute & instance spec
     fields*: seq[Field]
-
-    # Enum spec
     enums*: seq[Enum]
+  FieldKind* = enum
+    fkNone
+    fkInteger
+    fkArray
+    fkStrz
+  ArrayKind* = enum
+    akNone
+    akByte
+    akString
+  Field* = ref object
+    id*: string
+    doc*: string
+    docRef*: string
+    contents*: seq[byte]
+    typ*: string
+    repeat*: Repeat
+    repeatExpr*: Expression
+    repeatUntil*: Expression
+    ifExpr*: Expression
+    case kind*: FieldKind
+    of fkInteger:
+      label*: string
+    of fkArray:
+      size*: int64
+      sizeEos*: bool
+      case arrayKind*: ArrayKind
+      of akByte:
+        process*: Process
+      of akString:
+        encoding*: string # might change to a big fat enum
+      of akNone: discard
+    of fkStrz:
+      terminator*: byte
+      consume*: bool
+      includeTerminator*: bool
+      eosError*: bool
+    of fkNone: discard
+    case isLazy*: bool
+    of true:
+      pos*: int64
+      io: KaitaiStream
+      value: int
+    of false: discard
+  Expression* = ref object
+  Repeat* = enum
+    rExpr
+    rEos
+    rUntil
+  Process* = enum
+    pXor
+  Enum* = ref object
+    name*: string
+    pairs*: Table[string, int]
   Endian* = enum
     eLe
     eBe
