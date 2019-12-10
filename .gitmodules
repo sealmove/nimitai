@@ -1,3 +1,6 @@
 [submodule "tests/nimitai_tests"]
 	path = tests/nimitai_tests
 	url = https://github.com/sealmove/nimitai_tests
+[submodule "nimitai/kaitai_struct_nim_runtime"]
+	path = nimitai/kaitai_struct_nim_runtime
+	url = https://github.com/kaitai-io/kaitai_struct_nim_runtime
