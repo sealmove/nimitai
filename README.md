@@ -1,10 +1,10 @@
 # <p align="center">nimitai</p>
 
 ## Introduction
-Nimitai is a generic parser generator implemented as a native Nim library.  
-It accepts [KSY grammar](https://doc.kaitai.io/ksy_reference.html) which works best for describing *binary* formats.  
+Nimitai is a parser generator implemented as a native Nim library.  
+It accepts [KSY grammar](https://doc.kaitai.io/ksy_reference.html) which works best for describing binary data structures.  
 
-*The word binary in this context means hard-for-human-to-read*
+###### The word *binary* in this context means hard-for-human-to-read
 
 | Exported symbol | Production |
 |-----------------|------------|
