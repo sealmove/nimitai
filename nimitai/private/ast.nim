@@ -66,9 +66,6 @@ type
     rUntil
   Process* = enum
     pXor
-  Enum* = ref object
-    name*: string
-    pairs*: Table[string, int]
   Endian* = enum
     eLe
     eBe

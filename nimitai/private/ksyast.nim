@@ -1,4 +1,4 @@
-import npeg, strutils, sequtils, strformat, tables, specs/enumspec
+import npeg, strutils, sequtils, strformat, tables
 
 type
   State = object
@@ -44,12 +44,15 @@ type
       insts*: seq[Inst]
     of skEnums:
       enums*: seq[Enum]
-  Inst* = ref object
-    name*: string
-    keys*: Table[KeyKind, Key]
   Attr* = ref object
     id*: string
     keys*: Table[KeyKind, Key]
+  Inst* = ref object
+    name*: string
+    keys*: Table[KeyKind, Key]
+  Enum* = ref object
+    name*: string
+    pairs*: Table[string, int]
   KeyKind* = enum
     kkApp
     kkConsume
