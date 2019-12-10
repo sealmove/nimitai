@@ -74,7 +74,7 @@ proc suite(): NimNode =
   newStmtList(
     nnkImportStmt.newTree(
       ident"nimitai",
-      ident"nimitai/runtime",
+      ident"kaitai_struct_nim_runtime",
       ident"unittest"),
     nnkCommand.newTree(
         ident"suite",
