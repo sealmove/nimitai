@@ -1,4 +1,4 @@
-import ksyast, tables, strutils, sequtils
+import ksyast, tables, strutils, sequtils, ksexpr
 
 type
   Nimitype* = ref object
@@ -32,14 +32,14 @@ type
     contents*: seq[byte]
     typ*: string
     repeat*: Repeat
-    repeatExpr*: Expression
-    repeatUntil*: Expression
-    ifExpr*: Expression
+    repeatExpr*: string
+    repeatUntil*: string
+    ifExpr*: string
     case kind*: FieldKind
     of fkInteger:
       label*: string
     of fkArray:
-      size*: int64
+      size*: string
       sizeEos*: bool
       case arrayKind*: ArrayKind
       of akByte:
@@ -59,7 +59,6 @@ type
       io: string
       value: int
     of false: discard
-  Expression* = ref object
   Repeat* = enum
     rExpr
     rEos
@@ -150,7 +149,7 @@ proc parseAttr(a: Attr, currentType: Type): Field =
         echo "Attribute has \"repeat: expr\" key but not \"repeat-expr\""
         quit QuitFailure
       result.repeat = rExpr
-      result.repeatExpr = new(Expression) #XXX
+      result.repeatExpr = "" #XXX
     of "eos":
       result.repeat = rEos
     of "until":
@@ -158,16 +157,16 @@ proc parseAttr(a: Attr, currentType: Type): Field =
         echo "Attribute has \"repeat: until\" key but not \"repeat-until\""
         quit QuitFailure
       result.repeat = rUntil
-      result.repeatUntil = new(Expression) #XXX
+      result.repeatUntil = "" #XXX
   if kkIf in a.keys:
-    result.ifExpr = new(Expression) #XXX
+    result.ifExpr = "" #XXX
   case result.kind
   of fkInteger:
     result.label = a.keys[kkEnum].strval
   of fkArray:
     if kkSize in a.keys:
       a.ensureMissing(kkSizeEos)
-      result.size = parseInt(a.keys[kkSize].strval)
+      result.size = a.keys[kkSize].strval
     elif kkSizeEos in a.keys:
       result.sizeEos = true
     result.arrayKind = determineArrayKind(a)

@@ -1,4 +1,4 @@
-import nimitai/private/ast, macros
+import nimitai/private/ast, macros, nimitai/private/ksexpr
 
 proc ksToNim(ksType: string): NimNode =
   case ksType
@@ -31,7 +31,7 @@ proc readField(f: Field): NimNode =
       newLetStmt(
         name,
         newCall(
-          "read" & f.typ & "be",
+          "read" & f.typ & "le",
           ident"io")),
       newAssignment(
         newDotExpr(
@@ -66,6 +66,19 @@ proc readField(f: Field): NimNode =
           ident"result",
           name),
         name))
+    if f.kind == fkArray and f.size != "":
+      result.add(
+        newCall(
+          "skip",
+          ident"io",
+          infix(
+            newCall(
+              ident"int",
+              parseKsExpr(f.size)),
+            "-",
+            newCall(
+              ident"sizeof",
+              name))))
 
 proc typeDecl(t: Nimitype): seq[NimNode] =
   result = newSeq[NimNode](2)

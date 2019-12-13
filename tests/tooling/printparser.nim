@@ -8,4 +8,4 @@ expandMacros:
   generateParser(""" & "\"" & path & "\")")
 
 discard execShellCmd("nim c --hints:off -r temp")
-discard execShellCmd("rm temp temp.nim")
+discard execShellCmd("rm -f temp temp.nim")

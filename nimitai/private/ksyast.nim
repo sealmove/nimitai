@@ -245,7 +245,7 @@ proc parseKsy*(path: string): Type =
     Repeat <- K("repeat") * >("expr" | "eos" | "until"):
       state.keys[kkRepeat] = Key(kind: kkRepeat, strval: $1)
     Size <- K("size") * >Line:
-      state.keys[kkRepeat] = Key(kind: kkRepeat, strval: $1)
+      state.keys[kkSize] = Key(kind: kkSize, strval: $1)
     Title <- K("title") * >Line:
       state.keys[kkTitle] = Key(kind: kkTitle, strval: $1)
     TypeKey <- K("type") * >Identifier:
