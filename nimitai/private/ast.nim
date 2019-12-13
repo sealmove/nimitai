@@ -66,6 +66,7 @@ type
   Process* = enum
     pXor
   Endian* = enum
+    eNone
     eLe
     eBe
 
@@ -74,6 +75,12 @@ proc hierarchy(t: Type): seq[string] =
   while t.name != "RootObj":
     result.insert(t.name.capitalizeAscii)
     t = t.parent
+
+proc endian(t: Type): Endian =
+  if kkEndian in t.meta:
+    if t.meta[kkEndian].strval == "le": eLe else: eBe
+  else:
+    eNone
 
 proc attrType(a: Attr, t: Type): string =
   case a.keys[kkType].strval
@@ -206,8 +213,10 @@ proc parseType(ntlist: var seq[Nimitype], t: Type) =
   if kkEncoding in t.meta:
     nt.encoding = t.meta[kkEncoding].strval
   if kkEndian in t.meta:
-    let endian = t.meta[kkEndian].strval
-    nt.endian = if endian == "le": eLe else: eBe
+    nt.endian = endian(t)
+  else:
+    if t.name != "RootObj":
+      nt.endian = endian(t.parent)
   if kkLicense in t.meta:
     nt.license = t.meta[kkLicense].strval
   if kkExts in t.meta:

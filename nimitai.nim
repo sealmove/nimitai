@@ -22,16 +22,22 @@ proc parentType(t: Nimitype): NimNode =
   else:
     ident(t.parent)
 
-proc readField(f: Field): NimNode =
+proc readField(f: Field, e: Endian): NimNode =
   let name = ident(f.id)
   case f.typ
   of "u2", "u4", "u8", "s2", "s4", "s8":
+    let fn = case e
+             of eLe: "read" & f.typ & "le"
+             of eBe: "read" & f.typ & "be"
+             of eNone:
+               echo "No endian specified"
+               quit QuitFailure
     #XXX default endianess
     result = newStmtList(
       newLetStmt(
         name,
         newCall(
-          "read" & f.typ & "le",
+          fn,
           ident"io")),
       newAssignment(
         newDotExpr(
@@ -177,7 +183,7 @@ proc readProc(t: Nimitype): NimNode =
       ident"root"))
 
   for f in t.fields:
-    result.body.add(readField(f))
+    result.body.add(readField(f, t.endian))
 
 proc destroyProc(t: Nimitype): NimNode =
   let tObj = newIdentDefs(
