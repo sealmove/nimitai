@@ -1,4 +1,4 @@
-import npeg, strutils, sequtils, macros, oswalkdir
+import npeg, strutils, sequtils, macros, oswalkdir, ../nimitai/private/ksexpr
 
 type Kst = object
   id: string
@@ -29,10 +29,6 @@ proc parseKst(path: string): Kst =
   var test: Kst
   doAssert p.match(file, test).ok
   test
-
-proc parseKsExpr(expr: string): NimNode =
-  #XXX
-  parseExpr(expr)
 
 proc test(kst: Kst): NimNode =
   var asserts = newStmtList()
@@ -71,7 +67,7 @@ proc suite(): NimNode =
 
   newStmtList(
     nnkImportStmt.newTree(
-      ident"nimitai",
+      ident"../nimitai",
       ident"kaitai_struct_nim_runtime",
       ident"unittest"),
     nnkCommand.newTree(

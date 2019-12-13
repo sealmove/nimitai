@@ -9,3 +9,4 @@ license       = "MIT"
 
 requires "nim >= 1.1.1"
 requires "kaitai_struct_nim_runtime"
+requires "npeg"
