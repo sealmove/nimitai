@@ -23,36 +23,49 @@ proc parentType(t: Nimitype): NimNode =
     ident(t.parent)
 
 proc readField(f: Field): NimNode =
-  let
-    call = case f.typ
-    of "u2", "u4", "u8", "s2", "s4", "s8":
-      #XXX default endianess
-      newCall(
-        "read" & f.typ & "be",
-        ident"io")
-    of "u1", "s1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be", "s2le",
-       "s2be", "s4le", "s4be", "s8le", "s8be":
-      newCall(
-        "read" & f.typ,
-        ident"io")
-    else:
-      newCall(
-        "read",
-        ident(f.typ),
-        ident"io",
-        ident"root",
-        ident"result")
-    name = ident(f.id)
-
-  result = newStmtList(
-    newLetStmt(
-      name,
-      call),
-    newAssignment(
-      newDotExpr(
-        ident"result",
-        name),
-      name))
+  let name = ident(f.id)
+  case f.typ
+  of "u2", "u4", "u8", "s2", "s4", "s8":
+    #XXX default endianess
+    result = newStmtList(
+      newLetStmt(
+        name,
+        newCall(
+          "read" & f.typ & "be",
+          ident"io")),
+      newAssignment(
+        newDotExpr(
+          ident"result",
+          name),
+        name))
+  of "u1", "s1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be", "s2le",
+     "s2be", "s4le", "s4be", "s8le", "s8be":
+    result = newStmtList(
+      newLetStmt(
+        name,
+        newCall(
+          "read" & f.typ,
+          ident"io")),
+      newAssignment(
+        newDotExpr(
+          ident"result",
+          name),
+        name))
+  else:
+    result = newStmtList(
+      newLetStmt(
+        name,
+        newCall(
+          "read",
+          ident(f.typ),
+          ident"io",
+          ident"root",
+          ident"result")),
+      newAssignment(
+        newDotExpr(
+          ident"result",
+          name),
+        name))
 
 proc typeDecl(t: Nimitype): seq[NimNode] =
   result = newSeq[NimNode](2)
