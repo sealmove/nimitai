@@ -17,32 +17,52 @@ It accepts [KSY grammars](https://doc.kaitai.io/ksy_reference.html) which work b
 hello_world.ksy
 ```yaml
 meta:
-  id: hello_world
-  file-extension: hw
+  id: buffered_struct
+  endian: le
 seq:
-  - id: one
-    type: u1
+  - id: len1
+    type: u4
+  - id: block1
+    type: block
+    size: len1
+  - id: len2
+    type: u4
+  - id: block2
+    type: block
+    size: len2
+  - id: finisher
+    type: u4
+types:
+  block:
+    seq:
+      - id: number1
+        type: u4
+      - id: number2
+        type: u4
 ```
-
-file.hw (hex view)
+buffered_struct.bin (hex view)
 ```bin
-01
+10 00 00 00 42 00 00 00 43 00 00 00 ff ff ff ff
+ff ff ff ff 08 00 00 00 44 00 00 00 45 00 00 00
+ee 00 00 00
 ```
-
 test_nimitai.nim
 ```nim
-import nimitai, nimitai/runtime
+import ../../nimitai, kaitai_struct_nim_runtime
+generateParser("buffered_struct.ksy")
+let x = BufferedStruct.fromFile("buffered_struct.bin")
 
-generateParser("hello_world.ksy")
-
-let x = HelloWorld.fromFile("file.hw")
-
-echo x.one
+echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
+echo "Block1, number2: " & toHex(x.block1.number2.int64, 2)
+echo "Block2, number1: " & toHex(x.block2.number1.int64, 2)
+echo "Block1, number2: " & toHex(x.block2.number2.int64, 2)
 ```
-
 output:
 ```
-1
+Block1, number1: 42
+Block1, number2: 43
+Block2, number1: 44
+Block1, number2: 45
 ```
 ## API
 - One procedure per `generateParser` call (called `fromFile`) is generated.
