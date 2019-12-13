@@ -31,10 +31,8 @@ proc parseKst(path: string): Kst =
   test
 
 proc parseKsExpr(expr: string): NimNode =
-  if expr.startsWith("\'"):
-    result = parseExpr(expr[1 .. ^2])
-  else:
-    result = parseExpr(expr)
+  #XXX
+  parseExpr(expr)
 
 proc test(kst: Kst): NimNode =
   var asserts = newStmtList()
@@ -56,18 +54,18 @@ proc test(kst: Kst): NimNode =
     newStmtList(
       newCall(
         ident"generateParser",
-        newLit("nimitai_tests/ksy/" & kst.id & ".ksy")),
+        newLit("material/ksy/" & kst.id & ".ksy")),
       newLetStmt(
         ident"r",
         newCall(
           ident"fromFile",
           ident(kst.id.capitalizeAscii),
-          newLit("nimitai_tests/bin/" & kst.data))),
+          newLit("material/bin/" & kst.data))),
       asserts))
 
 proc suite(): NimNode =
   var tests = newStmtList()
-  for k, p in walkDir("kst_for_now"):
+  for k, p in walkDir("material/kst"):
     if k == pcFile:
       tests.add(p.parseKst.test)
 
