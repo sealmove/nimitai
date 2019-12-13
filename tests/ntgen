@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd tooling
+nim c -r testgenerator
+rm -f testgenerator
+cd ..

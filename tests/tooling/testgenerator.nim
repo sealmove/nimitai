@@ -1,4 +1,5 @@
-import npeg, strutils, sequtils, macros, oswalkdir, ../nimitai/private/ksexpr
+import
+  npeg, strutils, sequtils, macros, oswalkdir, ../../nimitai/private/ksexpr
 
 type Kst = object
   id: string
@@ -50,24 +51,24 @@ proc test(kst: Kst): NimNode =
     newStmtList(
       newCall(
         ident"generateParser",
-        newLit("material/ksy/" & kst.id & ".ksy")),
+        newLit("../material/ksy/" & kst.id & ".ksy")),
       newLetStmt(
         ident"r",
         newCall(
           ident"fromFile",
           ident(kst.id.capitalizeAscii),
-          newLit("material/bin/" & kst.data))),
+          newLit("../material/bin/" & kst.data))),
       asserts))
 
 proc suite(): NimNode =
   var tests = newStmtList()
-  for k, p in walkDir("material/kst"):
+  for k, p in walkDir("../../local/kst"):
     if k == pcFile:
       tests.add(p.parseKst.test)
 
   newStmtList(
     nnkImportStmt.newTree(
-      ident"../nimitai",
+      ident"../../nimitai",
       ident"kaitai_struct_nim_runtime",
       ident"unittest"),
     nnkCommand.newTree(
