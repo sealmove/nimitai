@@ -102,29 +102,29 @@ type
   ArithOp* = enum
     aoAdd
     aoSub
-    aoMult
+    aoMul
     aoDiv
     aoMod
   BitOp* = enum
     boLShift
     boRShift
-    boBitOr
-    boBitXor
-    boBitAnd
+    boAnd
+    boOr
+    boXor
   CmpOp* = enum
-    coEq
-    coNotEq
-    coLt
-    coLtE
-    coGt
     coGtE
+    coGt
+    coLtE
+    coLt
+    coEq
+    coNEq
   RelOp* = enum
     roAnd
     roOr
   UnaryOp* = enum
+    uoMinus
     uoInvert
     uoNot
-    uoMinus
   KsNodeKind* = enum
     knkIdentifier
     knkLiteral
@@ -141,47 +141,120 @@ type
       typ*: KsType
       val*: string
     of knkArithOp:
+      aoL*: KsNode
       ao*: ArithOp
+      aoR*: KsNode
     of knkBitOp:
+      boL*: KsNode
       bo*: BitOp
+      boR*: KsNode
     of knkCmpOp:
+      coL*: KsNode
       co*: CmpOp
+      coR*: KsNode
     of knkRelOp:
+      roL*: KsNode
       ro*: RelOp
+      roR*: KsNode
     of knkUnaryOp:
+      uoO*: KsNode
       uo*: UnaryOp
 
-var nimitypeTable* {.compileTime.}: seq[Nimitype]
+var symbolTable* {.compileTime.}: Table[string, Field]
 
 proc parseKsExpr*(expr: string): KsNode =
-  let p = peg(kse, e: KsNode):
-    kse      <- Lexeme *(B * BinaryOp * B * Lexeme):
+  let p = peg(kse, stack: seq[KsNode]):
+    kse      <- L * *(BinaryOp * R)
 
-    Lexeme   <- >?UnaryOp * >(Id | Literal):
-    Id       <- Lower * *(Alnum | '_'):
-    Literal  <- Float | Int | Bool | String:
+    L        <- *Blank * Lexeme
+    R        <- Lexeme * *Blank
+    Lexeme   <- >?UnaryOp * >(Id | Literal)
+    Id       <- Lower * *(Alnum | '_')
+    Literal  <- Float | Int | Bool | String
 
     String   <- '\'' * *(Print - '\'') | '\"' * *(Print - '\"'):
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkString), val: $0)
     Bool     <- "true" | "false":
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkBool), val: $0)
     Float    <- Int * '.' * Int * ?('e' * Int):
-    Int      <- Hex | Bin | Dec:
+      stack.add KsNode(kind: knkLiteral,
+                       typ: KsType(kind: ktkFloat, precision: 8),
+                       val: $0)
+    Int      <- "0x" * +Xdigit | "0b" * +{'0', '1'} | +Digit:
+      stack.add KsNode(kind: knkLiteral,
+                       typ: KsType(kind: ktkInt, size: 8, isSigned: true),
+                       val: $0)
 
-    Hex      <- "0x" * +Xdigit:
-    Bin      <- "0b" * +{'0', '1'}:
-    Dec      <- +Digit:
-
-    UnaryOp  <- >("+"|"-"|"not")
+    UnaryOp  <- >("-"|"~"|"not"):
+      var op: UnaryOp
+      case $0
+      of "-"  : op = uoMinus
+      of "~"  : op = uoInvert
+      of "not": op = uoNot
+      let l = pop(stack)
+      stack.add KsNode(kind:knkUnaryOp, uoO: l, uo: op)
     BinaryOp <- ArithOp | BitOp | CmpOp | RelOp
 
-    ArithOp  <- "+" | "-" | "*" | "/" | "%"
-    BitOp    <- "<<" | ">>"| "&" | "|" | "^"
-    CmpOp    <- "<=" | "<" | ">=" | ">" | "==" | "!="
-    RelOp    <- "and" | "or"
+    ArithOp  <- >("+" | "-" | "*" | "/" | "%") * R:
+      var op: ArithOp
+      case $0
+      of "+": op = aoAdd
+      of "-": op = aoSub
+      of "*": op = aoMul
+      of "/": op = aoDiv
+      of "%": op = aoMod
+      let
+        l = pop(stack)
+        r = pop(stack)
+      stack.add KsNode(kind: knkArithOp, aoL: l, ao: op, aoR: r)
+    BitOp    <- >("<<" | ">>" | "&" | "|" | "^") * R:
+      var op: BitOp
+      case $0
+      of "<<": op = boLShift
+      of ">>": op = boRShift
+      of "&" : op = boAnd
+      of "|" : op = boOr
+      of "^" : op = boXor
+      let
+        l = pop(stack)
+        r = pop(stack)
+      stack.add KsNode(kind: knkBitOp, boL: l, bo: op, boR: r)
+    CmpOp    <- >("<=" | "<" | ">=" | ">" | "==" | "!=") * R:
+      var op: CmpOp
+      case $0
+      of "<=": op = coLtE
+      of "<" : op = coLt
+      of ">=": op = coGtE
+      of ">" : op = coGt
+      of "==": op = coEq
+      of "!=": op = coNEq
+      let
+        l = pop(stack)
+        r = pop(stack)
+      stack.add KsNode(kind: knkCmpOp, coL: l, co: op, coR: r)
+    RelOp    <- >("and" | "or") * R:
+      var op: RelOp
+      case $0
+      of "and": op = roAnd
+      of "or" : op = roOr
+      let
+        l = pop(stack)
+        r = pop(stack)
+      stack.add KsNode(kind: knkRelOp, roL: l, ro: op, roR: r)
 
-    B        <- *Blank
+  var stack: seq[KsNode]
+  assert p.match(expr, stack).ok
+  assert stack.len == 1
+  stack[0]
 
 #XXX
-proc deriveNimType*(expr: KsNode): string =
+proc deriveType*(expr: KsNode): KsType =
+  case expr.kind
+  of knkIdentifier:
+    result = symbolTable[expr.id].typ
+  of knkLiteral:
+    result = expr.typ
+  else: discard
 
 proc hierarchy(t: Type): seq[string] =
   var t = t
@@ -348,17 +421,17 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
     if kkValue in f.keys:
       let value = f.keys[kkValue].strval
       result.value = value
-      result.typ = parseKsExpr(value).deriveNimType
+      result.typ = parseKsExpr(value).deriveType
     #pos*: int64
     #io: string
     #value: int
 
-proc parseType(t: Type) =
+proc parseType(types: var seq[Nimitype], t: Type) =
   for typ in t.types:
-    parseType(typ)
+    parseType(types, typ)
 
-  let nt = new(Nimitype)
   var h = hierarchy(t)
+  let nt = new(Nimitype)
   nt.id = h.join
   discard h.pop
   nt.parent = h.join
@@ -382,12 +455,16 @@ proc parseType(t: Type) =
     nt.exts = t.meta[kkExts].list
   nt.doc = t.doc
   for a in t.attrs:
-    nt.fields.add parseField(a, false, t)
+    let field = parseField(a, false, t)
+    nt.fields.add field
+    symbolTable[field.id] = field
   for i in t.insts:
-    nt.fields.add parseField(i, true, t)
+    let field = parseField(i, true, t)
+    nt.fields.add field
+    symbolTable[field.id] = field
   nt.enums = t.enums
-  nimitypeTable.add nt
+  types.add nt
 
-proc parseKsyAst*(path: string) =
+proc parseKsyAst*(path: string): seq[Nimitype] =
   let ksy = parseKsy(path)
-  parseType(ksy)
+  result.parseType(ksy)

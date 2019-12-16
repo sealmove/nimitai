@@ -1,48 +1,50 @@
-import macros, strutils, nimitai/private/ast, nimitai/private/kstype
+import macros, strutils, nimitai/private/ast
 #XXX Need to document necessary imports and pragmas
 # imports: kaitai_struct_nim_runtime, options
 # pragmas: dotOperators
 
-proc toNimType(typ: KsType): NimNode =
-  case typ
+proc toNimType*(typ: KsType): NimNode =
+  case typ.kind
   of ktkNil:
-    nnkBracketExpr.newTree(
-      ident"seq",
-      ident"byte")
+    result = nnkBracketExpr.newTree(
+               ident"seq",
+               ident"byte")
   of ktkBit:
     case typ.bits
-    of  1 ..  8: "uint8"
-    of  9 .. 16: "uint16"
-    of 17 .. 32: "uint32"
-    of 33 .. 64: "uint64"
+    of  1 ..  8: result = ident"uint8"
+    of  9 .. 16: result = ident"uint16"
+    of 17 .. 32: result = ident"uint32"
+    of 33 .. 64: result = ident"uint64"
     else: discard
   of ktkInt:
     case typ.isSigned
     of false:
       case typ.size
-      of 1: ident"uint8"
-      of 2: ident"uint16"
-      of 4: ident"uint32"
-      of 8: ident"uint64"
+      of 1: result = ident"uint8"
+      of 2: result = ident"uint16"
+      of 4: result = ident"uint32"
+      of 8: result = ident"uint64"
       else: discard
     of true:
-      of 1: ident"int8"
-      of 2: ident"int16"
-      of 4: ident"int32"
-      of 8: ident"int64"
+      case typ.size
+      of 1: result = ident"int8"
+      of 2: result = ident"int16"
+      of 4: result = ident"int32"
+      of 8: result = ident"int64"
       else: discard
   of ktkFloat:
     case typ.precision:
-    of 4: ident"float32"
-    of 8: ident"float64"
+    of 4: result = ident"float32"
+    of 8: result = ident"float64"
+    else: discard
   of ktkBool:
-    ident"bool"
+    result = ident"bool"
   of ktkString:
-    ident"string"
+    result = ident"string"
   of ktkEnum: #XXX
     discard
   of ktkUser:
-    ident(typ.id)
+    result = ident(typ.id)
 
 proc parentType(t: Nimitype): NimNode =
   if t.parent == "":
@@ -54,82 +56,18 @@ proc parentType(t: Nimitype): NimNode =
 proc bits(typ: string): int =
   parseInt(typ[1..^1])
 
+#XXX
 proc readField(f: Field, e: Endian): NimNode =
   let name = ident(f.id)
-  if f.typ in @["u2", "u4", "u8", "s2", "s4", "s8"]:
-    let fn = case e
-             of eLe: "read" & f.typ & "le"
-             of eBe: "read" & f.typ & "be"
-             of eNone:
-               echo "No endian specified"
-               quit QuitFailure
-    #XXX default endianess
-    result = newStmtList(
-      newLetStmt(
-        name,
-        newCall(
-          fn,
-          ident"io")),
-      newAssignment(
-        newDotExpr(
-          ident"result",
-          name),
-        name))
-  elif f.typ in @["u1", "s1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be",
-                  "s2le", "s2be", "s4le", "s4be", "s8le", "s8be"]:
-    result = newStmtList(
-      newLetStmt(
-        name,
-        newCall(
-          "read" & f.typ,
-          ident"io")),
-      newAssignment(
-        newDotExpr(
-          ident"result",
-          name),
-        name))
-  elif isBitType(f.typ):
-    let bits = bits(f.typ)
-    result = newStmtList(
-      newLetStmt(
-        name,
-        newCall(
-          "readBitsInt",
-          ident"io",
-          newLit(bits))),
-      newAssignment(
-        newDotExpr(
-          ident"result",
-          name),
-        name))
-  else:
-    result = newStmtList(
-      newLetStmt(
-        name,
-        newCall(
-          "read",
-          ident(f.typ),
-          ident"io",
-          ident"root",
-          ident"result")),
-      newAssignment(
-        newDotExpr(
-          ident"result",
-          name),
-        name))
-    if f.kind == fkArray and f.size != "":
-      result.add(
-        newCall(
-          "skip",
-          ident"io",
-          infix(
-            newCall(
-              ident"int",
-              parseKsExpr(f.size)),
-            "-",
-            newCall(
-              ident"sizeof",
-              name))))
+  case f.typ
+  of ktkNil:
+  of ktkBit:
+  of ktkInt:
+  of ktkFloat:
+  of ktkBool:
+  of ktkString:
+  of ktkEnum:
+  of ktkUser:
 
 proc typeDecl(t: Nimitype): seq[NimNode] =
   result = newSeq[NimNode](2)
@@ -273,9 +211,9 @@ proc fromFileProc(t: Nimitype): NimNode =
 
 macro injectParser*(path: static[string]) =
   result = newStmtList()
-  parseKsyAst(path)
+  let types = parseKsyAst(path)
   var typeSection = newTree(nnkTypeSection)
-  for t in nimitypeTable:
+  for t in types:
     typeSection.add(typeDecl(t))
   result.add typeSection
 
@@ -289,7 +227,7 @@ macro injectParser*(path: static[string]) =
       ident"untyped",
       newIdentDefs(
         ident"a",
-        ident(nimitypeTable[^1].id)),
+        ident(types[^1].id)),
       newIdentDefs(
         ident"b",
         ident"untyped")),
@@ -304,7 +242,7 @@ macro injectParser*(path: static[string]) =
               idkstype
               ident"inst"))))))
 
-  for t in nimitypeTable:
+  for t in types:
     result.add readProc(t)
     result.add destroyProc(t)
-  result.add fromFileProc(nimitypeTable[^1])
+  result.add fromFileProc(types[^1])

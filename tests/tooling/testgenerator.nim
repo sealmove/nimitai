@@ -1,5 +1,6 @@
 import
-  npeg, strutils, sequtils, macros, oswalkdir, ../../nimitai/private/ast
+  npeg, strutils, sequtils, macros, oswalkdir,
+  ../../nimitai, ../../nimitai/private/ast
 
 type Kst = object
   id: string
@@ -43,7 +44,7 @@ proc test(kst: Kst): NimNode =
             ident"r",
             ident(a.actual)),
           "==",
-          parseKsExpr(a.expected).toNimExpr)))
+          parseKsExpr(a.expected).deriveType.toNimType)))
 
   nnkCommand.newTree(
     ident"test",
