@@ -91,9 +91,3 @@ Block1, number2: 45
 Alternatively, nimitai can be set to accept Nim expressions and types instead of Kaitai Struct ones.
 
 *Toggling this setting will be described in future documentation*
-
-## Notes
-NimVM on [devel](https://github.com/nim-lang/Nim/tree/devel) uses a 16bit address space which doesn't suffice for this project.  
-Zevv tweaked NimVM so that its registers' size can change easily.  
-Using [zevv's fork](https://github.com/zevv/Nim/tree/zevv-vmrework) you can run this project already.  
-[Araq](https://github.com/Araq) likes the idea so I expect his changes to be merged soon.
