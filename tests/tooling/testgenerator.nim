@@ -1,5 +1,5 @@
 import
-  npeg, strutils, sequtils, macros, oswalkdir, ../../nimitai/private/ksexpr
+  npeg, strutils, sequtils, macros, oswalkdir, ../../nimitai/private/ast
 
 type Kst = object
   id: string
@@ -43,14 +43,14 @@ proc test(kst: Kst): NimNode =
             ident"r",
             ident(a.actual)),
           "==",
-          parseKsExpr(a.expected))))
+          parseKsExpr(a.expected).toNimExpr)))
 
   nnkCommand.newTree(
     ident"test",
     newLit(kst.id),
     newStmtList(
       newCall(
-        ident"generateParser",
+        ident"injectParser",
         newLit("../material/ksy/" & kst.id & ".ksy")),
       newLetStmt(
         ident"r",
@@ -71,6 +71,10 @@ proc suite(): NimNode =
       ident"../../nimitai",
       ident"kaitai_struct_nim_runtime",
       ident"unittest"),
+    nnkPragma.newTree(
+      newColonExpr(
+        ident"experimental",
+        newLit("dotOperators"))),
     nnkCommand.newTree(
         ident"suite",
         newLit("Nimitai Test Suite"),

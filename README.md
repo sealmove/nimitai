@@ -10,7 +10,7 @@ It accepts [KSY grammars](https://doc.kaitai.io/ksy_reference.html) which work b
 |-----------------|------------|
 | `proc writeModule(ksy, module: string)` | nim module (source code) |
 | `proc writeDll(ksy, dll: string)` | dynamic library |
-| `macro emitParser(ksy: static[string])` | static library (compile time code embedding) |
+| `macro injectParser(ksy: static[string])` | static library (compile time code embedding) |
 
 ## Example
 
@@ -49,7 +49,7 @@ ee 00 00 00
 test_nimitai.nim
 ```nim
 import ../../nimitai, kaitai_struct_nim_runtime
-generateParser("buffered_struct.ksy")
+injectParser("buffered_struct.ksy")
 let x = BufferedStruct.fromFile("buffered_struct.bin")
 
 echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)

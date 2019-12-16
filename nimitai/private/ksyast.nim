@@ -14,7 +14,7 @@ type
     level: int
     inds: seq[int]
   Type* = ref object
-    name*: string
+    id*: string
     parent*: Type
     root*: Type
     meta*: Table[KeyKind, Key]
@@ -48,10 +48,10 @@ type
     id*: string
     keys*: Table[KeyKind, Key]
   Inst* = ref object
-    name*: string
+    id*: string
     keys*: Table[KeyKind, Key]
   Enum* = ref object
-    name*: string
+    id*: string
     pairs*: Table[string, int]
   KeyKind* = enum
     kkApp
@@ -150,7 +150,7 @@ proc parseKsy*(path: string): Type =
       if state.level == 0:
         if kkId notin sect.keys:
           ksyError "Missing id in meta section"
-        state.maintype.name = sect.keys[kkId].strval
+        state.maintype.id = sect.keys[kkId].strval
         state.maintype.meta = sect.keys
       else:
         state.sects[^1][skMeta] = sect
@@ -190,7 +190,7 @@ proc parseKsy*(path: string): Type =
       state.attrs.add Attr(id: $1, keys: state.keys)
       clear(state.keys)
     Type <- K(>Identifier) * AddSectionTable * Array(Sect):
-      var t = Type(name: $1, root: state.maintype)
+      var t = Type(id: $1, root: state.maintype)
       let sections = state.sects.pop
       if skDoc in sections:
         t.doc = sections[skDoc].doc
@@ -204,10 +204,10 @@ proc parseKsy*(path: string): Type =
         t.types = sections[skTypes].types
       state.types.add t
     Inst <- K(>Identifier) * Array(Key):
-      state.insts.add Inst(name: $1, keys: state.keys)
+      state.insts.add Inst(id: $1, keys: state.keys)
       clear(state.keys)
     Enum <- K(>Identifier) * Array(Pair):
-      state.enums.add Enum(name: $1, pairs: state.pairs)
+      state.enums.add Enum(id: $1, pairs: state.pairs)
       clear(state.pairs)
     Pair <- K(>+Digit) * >Identifier:
       state.pairs[$2] = parseInt($1)
@@ -275,7 +275,7 @@ proc parseKsy*(path: string): Type =
                            .filterIt(not it.strip.startsWith('#'))
                            .join("\n")
   var state: State
-  state.maintype = Type(parent: Type(name: "RootObj"))
+  state.maintype = Type(parent: Type(id: "RootObj"))
   state.maintype.root = state.maintype
   doAssert p.match(file, state).ok
   state.maintype

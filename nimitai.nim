@@ -1,19 +1,48 @@
-import nimitai/private/ast, macros, nimitai/private/ksexpr
+import macros, strutils, nimitai/private/ast, nimitai/private/kstype
+#XXX Need to document necessary imports and pragmas
+# imports: kaitai_struct_nim_runtime, options
+# pragmas: dotOperators
 
-proc ksToNim(ksType: string): NimNode =
-  case ksType
-  of "": nnkBracketExpr.newTree(
-    ident"seq",
-    ident"byte")
-  of "u1": ident"uint8"
-  of "u2", "u2le", "u2be": ident"uint16"
-  of "u4", "u4le", "u4be": ident"uint32"
-  of "u8", "u8le", "u8be": ident"uint64"
-  of "s1": ident"int8"
-  of "s2", "s2le", "s2be": ident"int16"
-  of "s4", "s4le", "s4be": ident"int32"
-  of "s8", "s8le", "s8be": ident"int64"
-  else: ident(ksType)
+proc toNimType(typ: KsType): NimNode =
+  case typ
+  of ktkNil:
+    nnkBracketExpr.newTree(
+      ident"seq",
+      ident"byte")
+  of ktkBit:
+    case typ.bits
+    of  1 ..  8: "uint8"
+    of  9 .. 16: "uint16"
+    of 17 .. 32: "uint32"
+    of 33 .. 64: "uint64"
+    else: discard
+  of ktkInt:
+    case typ.isSigned
+    of false:
+      case typ.size
+      of 1: ident"uint8"
+      of 2: ident"uint16"
+      of 4: ident"uint32"
+      of 8: ident"uint64"
+      else: discard
+    of true:
+      of 1: ident"int8"
+      of 2: ident"int16"
+      of 4: ident"int32"
+      of 8: ident"int64"
+      else: discard
+  of ktkFloat:
+    case typ.precision:
+    of 4: ident"float32"
+    of 8: ident"float64"
+  of ktkBool:
+    ident"bool"
+  of ktkString:
+    ident"string"
+  of ktkEnum: #XXX
+    discard
+  of ktkUser:
+    ident(typ.id)
 
 proc parentType(t: Nimitype): NimNode =
   if t.parent == "":
@@ -22,10 +51,12 @@ proc parentType(t: Nimitype): NimNode =
   else:
     ident(t.parent)
 
+proc bits(typ: string): int =
+  parseInt(typ[1..^1])
+
 proc readField(f: Field, e: Endian): NimNode =
   let name = ident(f.id)
-  case f.typ
-  of "u2", "u4", "u8", "s2", "s4", "s8":
+  if f.typ in @["u2", "u4", "u8", "s2", "s4", "s8"]:
     let fn = case e
              of eLe: "read" & f.typ & "le"
              of eBe: "read" & f.typ & "be"
@@ -44,14 +75,28 @@ proc readField(f: Field, e: Endian): NimNode =
           ident"result",
           name),
         name))
-  of "u1", "s1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be", "s2le",
-     "s2be", "s4le", "s4be", "s8le", "s8be":
+  elif f.typ in @["u1", "s1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be",
+                  "s2le", "s2be", "s4le", "s4be", "s8le", "s8be"]:
     result = newStmtList(
       newLetStmt(
         name,
         newCall(
           "read" & f.typ,
           ident"io")),
+      newAssignment(
+        newDotExpr(
+          ident"result",
+          name),
+        name))
+  elif isBitType(f.typ):
+    let bits = bits(f.typ)
+    result = newStmtList(
+      newLetStmt(
+        name,
+        newCall(
+          "readBitsInt",
+          ident"io",
+          newLit(bits))),
       newAssignment(
         newDotExpr(
           ident"result",
@@ -121,7 +166,7 @@ proc typeDecl(t: Nimitype): seq[NimNode] =
     fields.add(
       nnkIdentDefs.newTree(
         ident(f.id),
-        ksToNim(f.typ),
+        toNimType(f.typ),
         newEmptyNode()))
 
   obj.add(fields)
@@ -226,14 +271,40 @@ proc fromFileProc(t: Nimitype): NimNode =
     newNilLit(),
     newNilLit())
 
-macro generateParser*(path: static[string]) =
-  var types = parseKsyAst(path)
+macro injectParser*(path: static[string]) =
   result = newStmtList()
+  parseKsyAst(path)
   var typeSection = newTree(nnkTypeSection)
-  for t in types:
+  for t in nimitypeTable:
     typeSection.add(typeDecl(t))
   result.add typeSection
-  for t in types:
+
+  # Template for pythonic @property behavior
+  result.add nnkTemplateDef.newTree(
+    nnkAccQuoted.newTree(
+      ident"."),
+    newEmptyNode(),
+    newEmptyNode(),
+    nnkFormalParams.newTree(
+      ident"untyped",
+      newIdentDefs(
+        ident"a",
+        ident(nimitypeTable[^1].id)),
+      newIdentDefs(
+        ident"b",
+        ident"untyped")),
+    newEmptyNode(),
+    newEmptyNode(),
+    newStmtList(
+      newCall(
+        newPar(
+          newDotExpr(
+            ident"a",
+            nnkAccQuoted.newTree(
+              idkstype
+              ident"inst"))))))
+
+  for t in nimitypeTable:
     result.add readProc(t)
     result.add destroyProc(t)
-  result.add fromFileProc(types[^1])
+  result.add fromFileProc(nimitypeTable[^1])
