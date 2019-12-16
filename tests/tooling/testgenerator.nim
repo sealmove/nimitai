@@ -44,7 +44,7 @@ proc test(kst: Kst): NimNode =
             ident"r",
             ident(a.actual)),
           "==",
-          parseKsExpr(a.expected).deriveType.toNimType)))
+          parseKsExpr(a.expected).toNim)))
 
   nnkCommand.newTree(
     ident"test",

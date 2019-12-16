@@ -87,9 +87,11 @@ type
       list*: seq[string]
     of kkApp, kkConsume, kkEndian, kkDoc, kkDocRef, kkEnum, kkEosError,
        kkEncoding, kkId, kkIf, kkInclude, kkIo, kkLicense, kkProcess, kkPos,
-       kkRepeat, kkRepeatExpr, kkRepeatUntil, kkSize, kkSizeEos, kkTerminator,
-       kkTitle, kkType, kkValue:
+       kkRepeat, kkRepeatExpr, kkRepeatUntil, kkSize, kkSizeEos, kkTitle,
+       kkType, kkValue:
       strval*: string
+    of kkTerminator:
+      charval*: char
 
 # Debug procs
 proc ksyError(msg: string) =
@@ -267,7 +269,7 @@ proc parseKsy*(path: string): Type =
     SizeEos <- K("size-eos") * >Line:
       state.keys[kkSizeEos] = Key(kind: kkSizeEos, strval: $1)
     Terminator <- K("terminator") * >Line:
-      state.keys[kkTerminator] = Key(kind: kkTerminator, strval: $1)
+      state.keys[kkTerminator] = Key(kind: kkTerminator, charval: ($1)[0])
     Value <- K("value") * >Line: # Expression
       state.keys[kkValue] = Key(kind: kkValue, strval: $1)
 

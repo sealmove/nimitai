@@ -75,7 +75,7 @@ Block1, number2: 45
   - `parent`: holds a reference to the parent object
 
 ## Internals
-- An import statement for the *__runtime library__* is generated.
+- An import statement for the **runtime library** is generated.
 - The `.ksy` file gets parsed into a nim object hierarchy (with [npeg)](https://github.com/zevv/npeg)
 - The object hierarchy is transformed into a sequence of nodes -each one representing a concrete type-
 - For each concrete type the following are generated:

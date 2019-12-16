@@ -5,10 +5,6 @@ import macros, strutils, nimitai/private/ast
 
 proc toNimType*(typ: KsType): NimNode =
   case typ.kind
-  of ktkNil:
-    result = nnkBracketExpr.newTree(
-               ident"seq",
-               ident"byte")
   of ktkBit:
     case typ.bits
     of  1 ..  8: result = ident"uint8"
@@ -16,6 +12,8 @@ proc toNimType*(typ: KsType): NimNode =
     of 17 .. 32: result = ident"uint32"
     of 33 .. 64: result = ident"uint64"
     else: discard
+  of ktkBool:
+    result = ident"bool"
   of ktkInt:
     case typ.isSigned
     of false:
@@ -37,14 +35,17 @@ proc toNimType*(typ: KsType): NimNode =
     of 4: result = ident"float32"
     of 8: result = ident"float64"
     else: discard
-  of ktkBool:
-    result = ident"bool"
-  of ktkString:
+  of ktkArray: #XXX nested array (recursion)
+    result = nnkBracketExpr.newTree(
+               ident"seq",
+               ident"byte")
+  of ktkStr, ktkStrz:
     result = ident"string"
-  of ktkEnum: #XXX
-    discard
   of ktkUser:
     result = ident(typ.id)
+
+proc toNim*(expr: KsNode): NimNode =
+
 
 proc parentType(t: Nimitype): NimNode =
   if t.parent == "":
@@ -58,16 +59,52 @@ proc bits(typ: string): int =
 
 #XXX
 proc readField(f: Field, e: Endian): NimNode =
-  let name = ident(f.id)
-  case f.typ
-  of ktkNil:
+  var letStmt: NimNode
+  case f.typ.kind
   of ktkBit:
-  of ktkInt:
-  of ktkFloat:
+    var sizeAdj: string
+    case f.typ.bits
+    of  1 ..  8: sizeAdj = "uint8"
+    of  9 .. 16: sizeAdj = "uint16"
+    of 17 .. 32: sizeAdj = "uint32"
+    of 33 .. 64: sizeAdj = "uint64"
+    else: discard
+    letStmt = newLetStmt(
+      ident(f.id),
+      newCall(
+        ident(sizeAdj),
+        newCall(
+          ident"readBitsInt",
+          ident"io",
+          newLit(f.typ.bits))))
   of ktkBool:
-  of ktkString:
-  of ktkEnum:
+    letStmt = newLetStmt(
+      ident(f.id),
+      newCall(
+        ident"bool",
+        newCall(
+          ident"readBitsInt",
+          ident"io",
+          newLit(1))))
+  of ktkInt:
+    discard
+  of ktkFloat:
+    discard
+  of ktkArray:
+    discard
+  of ktkStr:
+    discard
+  of ktkStrz:
+    discard
   of ktkUser:
+    discard
+  result = newStmtList(
+    letStmt,
+    newAssignment(
+      newDotExpr(
+        ident"result",
+        ident(f.id)),
+      ident(f.id)))
 
 proc typeDecl(t: Nimitype): seq[NimNode] =
   result = newSeq[NimNode](2)
@@ -239,7 +276,7 @@ macro injectParser*(path: static[string]) =
           newDotExpr(
             ident"a",
             nnkAccQuoted.newTree(
-              idkstype
+              ident"b",
               ident"inst"))))))
 
   for t in types:
