@@ -48,7 +48,7 @@ ee 00 00 00
 ```
 test_nimitai.nim
 ```nim
-import ../../nimitai, kaitai_struct_nim_runtime
+import nimitai, kaitai_struct_nim_runtime
 injectParser("buffered_struct.ksy")
 let x = BufferedStruct.fromFile("buffered_struct.bin")
 
