@@ -65,7 +65,7 @@ Block2, number1: 44
 Block1, number2: 45
 ```
 ## API
-- One procedure call (called `fromFile`) is generated.
+- One procedure -called `fromFile`- is generated.
 - The procedure is namespaced under the file format type as written in the top-level meta section.
 - The procedure accepts a file path and returns an object.
 - The object have one field for each attribute described in the `.ksy` file.
