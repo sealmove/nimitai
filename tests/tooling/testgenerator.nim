@@ -71,7 +71,8 @@ proc suite(): NimNode =
     nnkImportStmt.newTree(
       ident"../../nimitai",
       ident"kaitai_struct_nim_runtime",
-      ident"unittest"),
+      ident"unittest",
+      ident"options"),
     nnkPragma.newTree(
       newColonExpr(
         ident"experimental",

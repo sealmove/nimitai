@@ -24,16 +24,18 @@ type
     doc*: string
     docRef*: string
     contents*: seq[byte]
+    endian*: Endian
     typ*: KsType
+    size*: KsNode
     repeat*: Repeat
-    repeatExpr*: string
-    repeatUntil*: string
-    ifExpr*: string
+    repeatExpr*: KsNode
+    repeatUntil*: KsNode
+    ifExpr*: KsNode
     case isLazy*: bool
     of true:
-      pos*: int64
+      pos*: KsNode
       io: string
-      value: string
+      value: KsNode
     of false: discard
   Repeat* = enum
     rExpr
@@ -47,6 +49,10 @@ type
     eBe
 
   # Kaitai Struct Expression Language AST
+  Radix* = enum
+    rBin
+    rDec
+    rHex
   KsTypeKind* = enum
     ktkBit
     ktkBool
@@ -63,18 +69,17 @@ type
     of ktkBool:
       discard
     of ktkInt:
+      radix*: Radix
       size*: int
       isSigned*: bool
       label: string
     of ktkFloat:
       precision*: int
     of ktkArray:
-      typ: KsType
-      ArrSize*: KsNode
+      arrType: KsType
       sizeEos*: bool
       process*: Process
     of ktkStr:
-      len*: KsNode
       lenEos*: bool
       encoding*: string
     of ktkStrz:
@@ -119,7 +124,7 @@ type
     knkRelOp
     knkUnaryOp
   KsNode* = ref object
-    case kind: KsNodeKind
+    case kind*: KsNodeKind
     of knkIdentifier:
       id*: string
     of knkLiteral:
@@ -166,10 +171,23 @@ proc parseKsExpr*(expr: string): KsNode =
       stack.add KsNode(kind: knkLiteral,
                        typ: KsType(kind: ktkFloat, precision: 8),
                        val: $0)
-    Int      <- "0x" * +Xdigit | "0b" * +{'0', '1'} | +Digit:
-      stack.add KsNode(kind: knkLiteral,
-                       typ: KsType(kind: ktkInt, size: 8, isSigned: true),
-                       val: $0)
+    Int      <- Hex | Bin | Dec
+    
+    Hex      <- "0x" * +Xdigit:
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
+                                                     radix: rHex,
+                                                     size: 8,
+                                                     isSigned: true), val: $0)
+    Bin      <- "0b" * +{'0', '1'}:
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
+                                                     radix: rBin,
+                                                     size: 8,
+                                                     isSigned: true), val: $0)
+    Dec      <- +Digit:
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
+                                                     radix: rDec,
+                                                     size: 8,
+                                                     isSigned: true), val: $0)
 
     UnaryOp  <- >("-"|"~"|"not") * (Literal | Id):
       var op: UnaryOp
@@ -257,11 +275,8 @@ proc hierarchy(t: Type): seq[string] =
     result.insert(t.id.capitalizeAscii)
     t = t.parent
 
-proc endian(t: Type): Endian =
-  if kkEndian in t.meta:
-    if t.meta[kkEndian].strval == "le": eLe else: eBe
-  else:
-    eNone
+proc endian(s: string): Endian =
+  if s == "le": eLe else: eBe
 
 proc isBitType*(typ: string): tuple[isBit: bool, bits: int] =
   let p = peg(t, bits: int):
@@ -283,32 +298,28 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
   if kkType in f.keys:
     let typ = f.keys[kkType].strval
     case typ
-    of "u1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be",
-       "s1", "s2le", "s2be", "s4le", "s4be", "s8le", "s8be":
+    of "u1", "u2", "u2le", "u2be", "u4", "u4le", "u4be", "u8", "u8le", "u8be",
+       "s1", "s2", "s2le", "s2be", "s4", "s4le", "s4be", "s8", "s8le", "s8be":
       result.typ = KsType(kind: ktkInt)
       if kkEnum in f.keys:
         result.typ.label = f.keys[kkEnum].strval
       if typ.startsWith('u'):
         result.typ.isSigned = true
       result.typ.size = parseInt(typ[1..1])
+      if typ.len > 2:
+        result.endian = endian(typ[2..3])
     of "f4", "f8":
       result.typ = KsType(kind: ktkFloat)
       result.typ.precision = parseInt(typ[1..1])
     of "str":
       var
-        len: KsNode
         lenEos: bool
         encoding: string
-      if kkSize in f.keys:
-        len = parseKsExpr(f.keys[kkSize].strval)
       if kkSizeEos in f.keys:
         lenEos = parseBool(f.keys[kkSizeEos].strval)
       if kkEncoding in f.keys:
         encoding = f.keys[kkEncoding].strval
-      result.typ = KsType(kind: ktkStr,
-                          len: len,
-                          lenEos: lenEos,
-                          encoding: encoding)
+      result.typ = KsType(kind: ktkStr, lenEos: lenEos, encoding: encoding)
     of "strz":
       var
         terminator: char
@@ -335,17 +346,15 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
       else: # user type
         result.typ = KsType(kind: ktkUser)
         var t = currentType
-        while t.id notin t.types.mapIt(it.id):
+        echo t.id
+        while typ notin t.types.mapIt(it.id):
           t = t.parent
         result.typ.id = hierarchy(t).join & typ.capitalizeAscii
   else: # no type - byte array
     #XXX do enums
     var
-      ArrSize: KsNode
       sizeEos: bool
       process: Process
-    if kkSize in f.keys:
-      ArrSize = parseKsExpr(f.keys[kkSize].strval)
     if kkSizeEos in f.keys:
       sizeEos = parseBool(f.keys[kkSizeEos].strval)
     if kkProcess in f.keys:
@@ -354,8 +363,15 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
         process = pXor
       else: discard
     result.typ = KsType(kind: ktkArray,
-                        typ: KsType(kind: ktkInt, size: 1, isSigned: false),
-                        ArrSize: ArrSize, sizeEos: sizeEos, process: process)
+                        arrType: KsType(kind: ktkInt, size: 1, isSigned: false),
+                        sizeEos: sizeEos, process: process)
+  if kkSize in f.keys:
+    result.size = parseKsExpr(f.keys[kkSize].strval)
+  # value calculated value instances
+  if kkValue in f.keys:
+    let val = parseKsExpr(f.keys[kkValue].strval)
+    result.value = val
+    result.typ = val.deriveType
   # kkIf
 
   # kkRepeat
@@ -364,67 +380,6 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
 
   # kkIo
   # kkPos
-  # kkValue
-#-------------------------------------------------------------------------------
-#[
-  if kkType in f.keys:
-    result.typ = fieldType(f, currentType)
-  else:
-    result.typ = KsType(kind: ktkNil)
-  if kkRepeat in f.keys:
-    case f.keys[kkRepeat].strval
-    of "expr":
-      if kkRepeatExpr notin f.keys:
-        echo "Attribute has \"repeat: expr\" key but not \"repeat-expr\""
-        quit QuitFailure
-      result.repeat = rExpr
-      result.repeatExpr = "" #XXX
-    of "eos":
-      result.repeat = rEos
-    of "until":
-      if kkRepeatUntil notin f.keys:
-        echo "Attribute has \"repeat: until\" key but not \"repeat-until\""
-        quit QuitFailure
-      result.repeat = rUntil
-      result.repeatUntil = "" #XXX
-  if kkIf in f.keys:
-    result.ifExpr = "" #XXX
-  case result.kind
-  of fkInteger:
-    result.label = f.keys[kkEnum].strval
-  of fkArray:
-    if kkSize in f.keys:
-      f.ensureMissing(kkSizeEos)
-      result.size = f.keys[kkSize].strval
-    elif kkSizeEos in f.keys:
-      result.sizeEos = true
-    result.arrayKind = determineArrayKind(f)
-    case result.arrayKind
-    of akByte:
-      result.process = pXor #XXX
-    of akString:
-      result.encoding = "encoding" #XXX
-    of akNone: discard
-  of fkStrz:
-    if kkTerminator in f.keys:
-      result.terminator = parseInt(f.keys[kkTerminator].strval).byte
-    if kkConsume in f.keys:
-      result.consume = parseBool(f.keys[kkConsume].strval)
-    if kkInclude in f.keys:
-      result.includeTerminator = parseBool(f.keys[kkInclude].strval)
-    if kkEosError in f.keys:
-      result.eosError = parseBool(f.keys[kkEosError].strval)
-  else: discard
-  if isLazy:
-    result.isLazy = true
-    if kkValue in f.keys:
-      let value = f.keys[kkValue].strval
-      result.value = value
-      result.typ = parseKsExpr(value).deriveType
-    #pos*: int64
-    #io: string
-    #value: int
-]#
 
 proc parseType(types: var seq[Nimitype], t: Type) =
   for typ in t.types:
@@ -436,6 +391,15 @@ proc parseType(types: var seq[Nimitype], t: Type) =
   discard h.pop
   nt.parent = h.join
   nt.root = t.root.id.capitalizeAscii
+  if kkEndian in t.meta:
+    nt.endian = endian(t.meta[kkEndian].strval)
+  else:
+    var pt = t
+    while t.parent.id != "RootObj":
+      if kkEndian in t.parent.meta:
+        nt.endian = endian(t.parent.meta[kkEndian].strval)
+        break
+      pt = t.parent
   if kkTitle in t.meta:
     nt.title = t.meta[kkTitle].strval
   if kkApp in t.meta:
@@ -444,11 +408,6 @@ proc parseType(types: var seq[Nimitype], t: Type) =
     nt.imports = t.meta[kkImports].list
   if kkEncoding in t.meta:
     nt.encoding = t.meta[kkEncoding].strval
-  if kkEndian in t.meta:
-    nt.endian = endian(t)
-  else:
-    if t.id != "RootObj":
-      nt.endian = endian(t.parent)
   if kkLicense in t.meta:
     nt.license = t.meta[kkLicense].strval
   if kkExts in t.meta:
