@@ -34,8 +34,8 @@ type
     case isLazy*: bool
     of true:
       pos*: KsNode
-      io: string
-      value: KsNode
+      io*: string
+      value*: KsNode
     of false: discard
   Repeat* = enum
     rExpr
@@ -163,8 +163,21 @@ proc parseKsExpr*(expr: string): KsNode =
       stack.add KsNode(kind: knkIdentifier, id: $0)
     Literal  <- Int | Float | Bool | String
 
-    String   <- '\'' * *(Print - '\'') | '\"' * *(Print - '\"'):
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: $0)
+    String   <- StringQuote | StringDoubleQuote
+
+    StringQuote <- '\'' * *(Print - '\''):
+      var s = $0
+      s[0]  = '\\'
+      s[^2] = '\\'
+      s[^1] = '"'
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: s)
+    StringDoubleQuote <- '\"' * >*(Print - '\"'):
+      var s = $0
+      s[0]  = '\\'
+      s[^2] = '\\'
+      s[^1] = '\''
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: s)
+
     Bool     <- "true" | "false":
       stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkBool), val: $0)
     Float    <- Int * '.' * Int * ?('e' * Int):

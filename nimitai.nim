@@ -217,8 +217,11 @@ proc readField(f: Field, e: Endian): NimNode =
         newEmptyNode(),
         newEmptyNode(),
         newStmtList(
-          nnkDiscardStmt.newTree(
-            newEmptyNode()))))
+          if f.value == nil:
+            nnkDiscardStmt.newTree(
+              newEmptyNode())
+          else:
+            f.value.toNim)))
     result = newStmtList(
       valDecl,
       letStmt,

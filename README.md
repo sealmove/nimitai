@@ -87,13 +87,13 @@ There is a seperate program -`testgenerator`- which compiles the official `.kst`
 132 total       |           /     \           
   ✔️ 12 compile  |          12     123         
     ✔️ 9 run     |         / \                 
-      ✔️ 4 pass  |        ✔️ R ✗                
-      ✗ 5 fail  |       /     \               
+      ✔️ 6 pass  |        ✔️ R ✗                
+      ✗ 3 fail  |       /     \               
     ✗ 3 crash   |      9       3              
   ✗ 123 error   |     / \                     
                 |    ✔️ P ✗
                 |   /     \
-                |  4       5
+                |  6       3
 </pre>
 
 ## Internals
