@@ -1,11 +1,19 @@
 import
   npeg, strutils, strformat, sequtils, macros, oswalkdir,
   ../../nimitai, ../../nimitai/private/ast
+from os import extractFilename
 
 type Kst = object
   id: string
   data: string
   asserts: seq[tuple[actual, expected: string]]
+
+const
+  R = "\e[31;1m"
+  G = "\e[32;1m"
+  Y = "\e[33;1m"
+  B = "\e[34;1m"
+  D = "\e[0m"
 
 proc parseKst(path: string): Kst =
   let p = peg(kst, test: Kst):
@@ -61,52 +69,8 @@ proc test(kst: Kst): NimNode =
           newLit("../material/bin/" & kst.data))),
       asserts))
 
-proc suite(): NimNode =
-  #XXX tidy up the code
-  #XXX Add colors
-  var
-    tests = newStmtList()
-    included: int
-    walking: int
-  for k, p in walkDir("../material/kst/"):
-    inc walking
-    if k == pcFile:
-      try:
-        let
-          newTest = newStmtList(p.parseKst.test)
-          newSuite = newStmtList(
-            nnkImportStmt.newTree(
-              ident"../../nimitai",
-              ident"kaitai_struct_nim_runtime",
-              ident"unittest",
-              ident"options"),
-            nnkPragma.newTree(
-              newColonExpr(
-                ident"experimental",
-                newLit("dotOperators"))),
-            nnkCommand.newTree(
-                ident"suite",
-                newLit("Nimitai Test Suite"),
-                newTest),
-            newCall(
-              ident"quit",
-              newLit(2))).toStrLit.strVal
-        writeFile("temp.nim", newSuite)
-        let (_, compile) = gorgeEx("nim c temp")
-        if compile != 0:
-          echo &"{walking.intToStr(3)}/132 [{compile}]: Could not compile"
-          continue
-        let (_, run) = gorgeEx("./temp")
-        if run == 2:
-          tests.add(p.parseKst.test)
-          inc included
-          echo &"{walking.intToStr(3)}/132 [{run}]: {included} included"
-        else:
-          echo &"{walking.intToStr(3)}/132 [{run}]: ???"
-      except:
-        echo &"{walking.intToStr(3)}/132 [exception]: Could not add"
-
-  newStmtList(
+proc suite(tests: varargs[NimNode], errorCode = -1): string =
+  var res = newStmtList(
     nnkImportStmt.newTree(
       ident"../../nimitai",
       ident"kaitai_struct_nim_runtime",
@@ -119,9 +83,50 @@ proc suite(): NimNode =
     nnkCommand.newTree(
         ident"suite",
         newLit("Nimitai Test Suite"),
-        tests))
+        newStmtList().add(tests)))
+  if errorCode != -1:
+    res.add(
+      newCall(
+        ident"quit",
+        newLit(errorCode)))
 
-#XXX Gen code that prints some stats
+  res.toStrLit.strVal
 
-const code = suite().toStrLit.strVal.strip
+# [CC] = FAILED TO COMPILE
+# [CE] = CODGEN ERROR
+# [RC] = RUNTIME CRASH
+proc siftedSuite(): string =
+  var
+    tests: seq[NimNode]
+    CC, CE, RC, OK: int
+  for k, p in walkDir("../material/kst/"):
+    var name = extractFilename(p)
+    name.removeSuffix(".kst")
+    if k == pcFile:
+      try:
+        writeFile("temp.nim", suite(p.parseKst.test, 2))
+        let (_, compile) = gorgeEx("nim c temp")
+        if compile != 0:
+          inc CC
+          echo &"{R}[CC]{D} {name}"
+          continue
+        let (_, run) = gorgeEx("./temp")
+        if run == 2:
+          tests.add(p.parseKst.test)
+          inc OK
+          echo &"{G}[OK]{D} {name}"
+        else:
+          inc RC
+          echo &"{B}[RC]{D} {name}"
+      except:
+        inc CE
+        echo &"{Y}[CE]{D} {name}"
+
+  echo ""
+  echo &"{G}[OK]{D} {OK.intToStr(3)} {B}[RC]{D} {RC.intToStr(3)} " &
+       &"{Y}[CE]{D} {CE.intToStr(3)} {R}[CC]{D} {CC.intToStr(3)}"
+
+  suite(tests)
+
+const code = siftedSuite()
 writeFile("testsuite.nim", code)
