@@ -1,6 +1,6 @@
 #!/bin/sh
 
 cd tooling
-nim c -r testsuite
+nim c -r --hints:off testsuite
 rm -f testsuite
 cd ..

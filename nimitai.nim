@@ -228,7 +228,6 @@ proc readField(f: Field, e: Endian): NimNode =
           ident(f.id & "Inst")),
         ident(f.id)))
   if f.size != nil:
-    echo "ye"
     case f.typ.kind
     of ktkUser:
       result.add newCall(

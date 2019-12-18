@@ -2,5 +2,5 @@
 
 cd tooling
 nim c -r testgenerator
-rm -f testgenerator
+rm -f testgenerator temp temp.nim
 cd ..
