@@ -74,14 +74,35 @@ Block1, number2: 45
   - `root`: holds a reference to the root object
   - `parent`: holds a reference to the parent object
 
+## Progress
+Nimitai is tested against the same material as Kaitai Struct.  
+There is a seperate program -`testgenerator`- which compiles the official `.kst` files into a unittest module.
+
+<pre>
+   List view    |         Tree view
+----------------|----------------------------
+                |             132
+                |             / \
+                |            ✔️ C ✗
+132 total       |           /     \           
+  ✔️ 12 compile  |          12     123         
+    ✔️ 9 run     |         / \                 
+      ✔️ 4 pass  |        ✔️ R ✗                
+      ✗ 5 fail  |       /     \               
+    ✗ 3 crash   |      9       3              
+  ✗ 123 error   |     / \                     
+                |    ✔️ P ✗
+                |   /     \
+                |  4       5
+</pre>
+
 ## Internals
-- An import statement for the **runtime library** is generated.
-- The `.ksy` file gets parsed into a nim object hierarchy (with [npeg)](https://github.com/zevv/npeg)
-- The object hierarchy is transformed into a sequence of nodes -each one representing a concrete type-
+- The `.ksy` file gets parsed into an hierarchical nimm object (with [npeg)](https://github.com/zevv/npeg)
+- The object is transformed into a sequence of nodes -each one representing a concrete type-
 - For each concrete type the following are generated:
-  - a type declaration
-  - a parsing procedure
-  - a destructor
+  - type declaration
+  - `read` procedure (reads data from file)
+  - destructor
 - Lastly, `fromFile` proc is generated
 
 *Everything is done at compile-time*
