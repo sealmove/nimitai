@@ -62,6 +62,8 @@ proc test(kst: Kst): NimNode =
       asserts))
 
 proc suite(): NimNode =
+  #XXX tidy up the code
+  #XXX Add colors
   var
     tests = newStmtList()
     included: int
@@ -118,6 +120,8 @@ proc suite(): NimNode =
         ident"suite",
         newLit("Nimitai Test Suite"),
         tests))
+
+#XXX Gen code that prints some stats
 
 const code = suite().toStrLit.strVal.strip
 writeFile("testsuite.nim", code)
