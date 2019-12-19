@@ -1,7 +1,11 @@
 #!/bin/sh
 
+echo "=== KST ==="
+cat material/kst/"$1.kst"
+echo "=== KSY ==="
 cat material/ksy/"$1.ksy"
 cd tooling
+echo "=== GEN ==="
 nim c -r --hints:off printparser "$1"
 rm -f printparser
 cd ..

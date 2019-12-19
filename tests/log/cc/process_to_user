@@ -1,0 +1,12 @@
+stack trace: (most recent call last)
+/home/sealmove/Programming/nimitai/nimitai.nim(404, 26) injectParser
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(453, 9) parseKsyAst
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(410, 14) parseType
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(423, 19) parseType
+/home/sealmove/Programming/Nim/lib/pure/collections/tables.nim(408, 22) contains
+/home/sealmove/Programming/Nim/lib/pure/collections/tables.nim(398, 18) hasKey
+/home/sealmove/Programming/Nim/lib/pure/collections/hashcommon.nim(40, 17) rawGet
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 17) template/generic instantiation of `injectParser` from here
+/home/sealmove/Programming/Nim/lib/pure/collections/hashcommon.nim(40, 17) Error: interpretation requires too many iterations; if you are sure this is not a bug in your code edit compiler/vmdef.MaxLoopIterations and rebuild the compiler

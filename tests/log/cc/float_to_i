@@ -1,0 +1,5 @@
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(10, 21) template/generic instantiation of `fromFile` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 18) template/generic instantiation of `read` from here
+/home/sealmove/Programming/nimitai/nimitai.nim(186, 14) Error: type mismatch: got <NimNode> but expected 'float32'

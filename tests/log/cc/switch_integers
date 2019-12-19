@@ -1,0 +1,11 @@
+stack trace: (most recent call last)
+/home/sealmove/Programming/nimitai/nimitai.nim(404, 26) injectParser
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(452, 21) parseKsyAst
+/home/sealmove/Programming/nimitai/nimitai/private/ksyast.nim(282, 11) parseKsy
+/home/sealmove/.nimble/pkgs/npeg-0.21.3/npeg.nim(126, 7) match
+/home/sealmove/Programming/nimitai/nimitai/private/ksyast.nim(148, 20) :anonymous
+/home/sealmove/Programming/Nim/lib/system.nim(4025, 14) []
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 17) template/generic instantiation of `injectParser` from here
+/home/sealmove/Programming/Nim/lib/system.nim(4025, 14) Error: index out of bounds, the container is empty

@@ -1,0 +1,16 @@
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(11, 11) template/generic instantiation of `check` from here
+/home/sealmove/Programming/Nim/lib/pure/unittest.nim(665, 14) Error: type mismatch: got <uint32, seq[int]>
+but expected one of: 
+proc coEq[T: SomeInteger](a: T; b: bool): bool
+  first type mismatch at position: 2
+  required type for b: bool
+  but expression '@[2069, 66, 66, 0]' is of type: seq[int]
+proc coEq[T: SomeInteger; U: SomeInteger](a: T; b: U): bool
+  first type mismatch at position: 2
+  required type for b: U: SomeInteger
+  but expression '@[2069, 66, 66, 0]' is of type: seq[int]
+1 other mismatching symbols have been suppressed; compile with --showAllMismatches:on to see them
+
+expression: coEq(r.numbers, @[2069, 66, 66, 0])

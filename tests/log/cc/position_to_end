@@ -1,0 +1,13 @@
+stack trace: (most recent call last)
+/home/sealmove/Programming/nimitai/nimitai.nim(404, 26) injectParser
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(453, 9) parseKsyAst
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(445, 27) parseType
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(406, 29) parseField
+/home/sealmove/Programming/nimitai/nimitai/private/ast.nim(265, 11) parseKsExpr
+/home/sealmove/Programming/Nim/lib/system/assertions.nim(27, 20) failedAssertImpl
+/home/sealmove/Programming/Nim/lib/system/assertions.nim(20, 11) raiseAssert
+/home/sealmove/Programming/Nim/lib/system/fatal.nim(39, 5) sysFatal
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 17) template/generic instantiation of `injectParser` from here
+/home/sealmove/Programming/Nim/lib/system/fatal.nim(39, 5) Error: unhandled exception: /home/sealmove/Programming/nimitai/nimitai/private/ast.nim(265, 10) `p.match(expr, stack).ok`  [AssertionError]

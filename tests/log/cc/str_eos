@@ -1,0 +1,9 @@
+stack trace: (most recent call last)
+/home/sealmove/Programming/nimitai/nimitai.nim(436, 24) injectParser
+/home/sealmove/Programming/nimitai/nimitai.nim(359, 30) readProc
+/home/sealmove/Programming/nimitai/nimitai.nim(165, 13) readField
+/home/sealmove/Programming/nimitai/nimitai.nim(50, 12) toNim
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 17) template/generic instantiation of `injectParser` from here
+/home/sealmove/Programming/nimitai/nimitai.nim(50, 12) Error: attempt to access a nil address

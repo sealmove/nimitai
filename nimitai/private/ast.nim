@@ -69,7 +69,6 @@ type
     of ktkBool:
       discard
     of ktkInt:
-      radix*: Radix
       size*: int
       isSigned*: bool
       label: string
@@ -117,7 +116,11 @@ type
     uoNot
   KsNodeKind* = enum
     knkIdentifier
-    knkLiteral
+    knkBool
+    knkInt
+    knkFloat
+    knkStr
+    knkArray
     knkArithOp
     knkBitOp
     knkCmpOp
@@ -127,9 +130,16 @@ type
     case kind*: KsNodeKind
     of knkIdentifier:
       id*: string
-    of knkLiteral:
-      typ*: KsType
-      val*: string
+    of knkBool:
+      boolval*: bool
+    of knkInt:
+      intval*: int
+    of knkFloat:
+      floatval*: float
+    of knkStr:
+      strval*: string
+    of knkArray:
+      arrval*: seq[KsNode]
     of knkArithOp:
       aoL*: KsNode
       ao*: ArithOp
@@ -153,38 +163,46 @@ type
 var symbolTable* {.compileTime.}: Table[string, Field]
 
 proc parseKsExpr*(expr: string): KsNode =
+  var stackItems: int
   let p = peg(kse, stack: seq[KsNode]):
-    kse      <- Lexeme * B * *BinaryOp
+    kse      <- Expr
 
     B        <- *Blank
+    CS       <- 0:
+      stackItems = stack.len
+
+    Expr     <- Lexeme * B * *BinaryOp
 
     Lexeme   <- UnaryOp | Literal | Id
     Id       <- Lower * *(Alnum | '_'):
       stack.add KsNode(kind: knkIdentifier, id: $0)
-    Literal  <- Expression | Int | Float | Bool | String
+    Literal  <- QExpr | Array | Int | Float | Bool | String
 
-    Expression <- '\'' * >*(Print - '\'') * '\'':
+    QExpr    <- '\'' * >*(Print - '\'') * '\'':
       stack.add parseKsExpr($1)
-    String <- '\"' * >*(Print - '\"') * '\"':
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: $1)
 
-    Bool     <- "true" | "false":
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkBool), val: $0)
-    Float    <- Int * '.' * Int * ?('e' * Int):
-      stack.add KsNode(kind: knkLiteral,
-                       typ: KsType(kind: ktkFloat, precision: 8),
-                       val: $0)
+    Array    <- '[' * CS * B * Expr * *(B * ',' * B * Expr) * ']':
+      let num = stack.len - stackItems
+      var arr = KsNode(kind: knkArray)
+      for _ in 0 ..< num:
+        arr.arrval.add(stack.pop)
+      stack.add arr
+
     Int      <- Hex | Bin | Dec
-    
     Hex      <- "0x" * +Xdigit:
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
-                                                     radix: rHex), val: $0)
+      stack.add KsNode(kind: knkInt, intval: parseHexInt($0))
+                       
     Bin      <- "0b" * +{'0', '1'}:
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
-                                                     radix: rBin), val: $0)
+      stack.add KsNode(kind: knkInt, intval: parseBinInt($0))
     Dec      <- +Digit:
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
-                                                     radix: rDec), val: $0)
+      stack.add KsNode(kind: knkInt, intval: parseInt($0))
+
+    Float    <- Int * '.' * Int * ?('e' * Int):
+      stack.add KsNode(kind: knkFloat, floatval: parseFloat($0))
+    Bool     <- "true" | "false":
+      stack.add KsNode(kind: knkBool, boolval: parseBool($0))
+    String <- '\"' * >*(Print - '\"') * '\"':
+      stack.add KsNode(kind: knkStr, strval: $1)
 
     UnaryOp  <- >("-"|"~"|"not") * (Literal | Id):
       var op: UnaryOp
@@ -253,8 +271,16 @@ proc deriveType*(expr: KsNode): KsType =
   case expr.kind
   of knkIdentifier:
     result = symbolTable[expr.id].typ
-  of knkLiteral:
-    result = expr.typ
+  of knkBool:
+    result = KsType(kind: ktkBool)
+  of knkInt:
+    result = KsType(kind: ktkInt, isSigned: true)
+  of knkFloat:
+    result = KsType(kind: ktkFloat)
+  of knkStr:
+    result = KsType(kind: ktkStr)
+  of knkArray:
+    result = KsType(kind: ktkArray, arrType: expr.arrval[0].deriveType)
   of knkArithOp:
     result = deriveType(expr.aoL)
   of knkBitOp:
@@ -343,25 +369,25 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
       else: # user type
         result.typ = KsType(kind: ktkUser)
         var t = currentType
-        echo t.id
         while typ notin t.types.mapIt(it.id):
           t = t.parent
         result.typ.id = hierarchy(t).join & typ.capitalizeAscii
   else: # no type - byte array
     #XXX do enums
-    var
-      sizeEos: bool
-      process: Process
-    if kkSizeEos in f.keys:
-      sizeEos = parseBool(f.keys[kkSizeEos].strval)
-    if kkProcess in f.keys:
-      case f.keys[kkProcess].strval:
-      of "xor":
-        process = pXor
-      else: discard
-    result.typ = KsType(kind: ktkArray,
-                        arrType: KsType(kind: ktkInt, size: 1, isSigned: false),
-                        sizeEos: sizeEos, process: process)
+    if not isLazy:
+      var
+        sizeEos: bool
+        process: Process
+      if kkSizeEos in f.keys:
+        sizeEos = parseBool(f.keys[kkSizeEos].strval)
+      if kkProcess in f.keys:
+        case f.keys[kkProcess].strval:
+        of "xor":
+          process = pXor
+        else: discard
+      result.typ = KsType(kind: ktkArray,
+                          arrType: KsType(kind: ktkInt, size: 1, isSigned: false),
+                          sizeEos: sizeEos, process: process)
   if kkSize in f.keys:
     result.size = parseKsExpr(f.keys[kkSize].strval)
   # value calculated value instances
@@ -376,7 +402,8 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
   # kkRepeatUntil
 
   # kkIo
-  # kkPos
+  if kkPos in f.keys:
+    result.pos = parseKsExpr(f.keys[kkPos].strval)
 
 proc parseType(types: var seq[Nimitype], t: Type) =
   for typ in t.types:

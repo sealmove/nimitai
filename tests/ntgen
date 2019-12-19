@@ -1,5 +1,6 @@
 #!/bin/sh
 
+./ntclrlog
 cd tooling
 nim c -r --hints:off testgenerator
 rm -f testgenerator temp temp.nim

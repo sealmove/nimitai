@@ -79,21 +79,21 @@ Nimitai is tested against the same material as Kaitai Struct.
 There is a seperate program -`testgenerator`- which compiles the official `.kst` files into a unittest module.
 
 <pre>
-   List view    |         Tree view
-----------------|----------------------------
-                |             132
-                |             / \
-                |            ✔️ C ✗
-132 total       |           /     \           
-  ✔️ 46 compile  |          46     86        
-    ✔️ 11 run    |         / \                 
-      ✔️ 10 pass |        ✔️ R ✗                
-      ✗ 1 fail  |       /     \               
-    ✗ 35 crash  |      11       35              
-  ✗ 86 error    |     / \                     
-                |    ✔️ P ✗
-                |   /     \
-                |  10       1
+   List view       |         Tree view
+-------------------|----------------------------
+                   |             132
+                   |             / \
+                   |            ✔️ G ✗
+132 total          |           /     \
+  ✔️ 127 generate   |         127      5
+    ✔️ 11 compile   |         / \
+      ✔️ 10 pass    |        ✔️ C ✗
+      ✗ 1 fail     |       /     \
+    ✗ 116 error    |      11     116
+  ✗ 5 crash        |     / \
+                   |    ✔️ P ✗
+                   |   /     \
+                   |  10      1
 </pre>
 
 ## Internals

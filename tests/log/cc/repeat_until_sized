@@ -1,0 +1,14 @@
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(11, 25) Error: type mismatch: got <Repeat_until_sizedRecord>
+but expected one of: 
+proc size(ks: KaitaiStream): int
+  first type mismatch at position: 1
+  required type for ks: KaitaiStream
+  but expression 'r.records' is of type: Repeat_until_sizedRecord
+template `.`(a: Repeat_until_sized; b: untyped): untyped
+  first type mismatch at position: 1
+  required type for a: Repeat_until_sized
+  but expression 'r.records' is of type: Repeat_until_sizedRecord
+
+expression: size(r.records)

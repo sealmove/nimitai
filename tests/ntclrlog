@@ -1,5 +1,5 @@
 #!/bin/sh
 
-rm log/cc/* 
-rm log/ce/* 
-rm log/rc/* 
+rm -f log/cc/* 
+rm -f log/ce/* 
+rm -f log/rc/* 

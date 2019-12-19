@@ -108,7 +108,7 @@ proc siftedSuite(): string =
         let (ccOut, ccCode) = gorgeEx("nim c --hints:off temp")
         if ccCode != 0:
           inc CC
-          echo &"{R}[CC]{D} {name}"
+          echo &"{Y}[CC]{D} {name}"
           writeFile(&"../log/cc/{name}", ccOut)
           continue
         let (rcOut, rcCode) = gorgeEx("./temp")
@@ -122,12 +122,12 @@ proc siftedSuite(): string =
           writeFile(&"../log/rc/{name}", rcOut)
       except:
         inc CE
-        echo &"{Y}[CE]{D} {name}"
+        echo &"{R}[CE]{D} {name}"
         writeFile(&"../log/ce/{name}", getCurrentExceptionMsg())
 
   echo ""
   echo &"{G}[OK]{D} {OK.intToStr(3)} {B}[RC]{D} {RC.intToStr(3)} " &
-       &"{Y}[CE]{D} {CE.intToStr(3)} {R}[CC]{D} {CC.intToStr(3)}"
+       &"{R}[CE]{D} {CE.intToStr(3)} {Y}[CC]{D} {CC.intToStr(3)}"
 
   suite(tests)
 

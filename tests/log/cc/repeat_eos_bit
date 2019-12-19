@@ -1,0 +1,14 @@
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(11, 25) Error: type mismatch: got <uint8>
+but expected one of: 
+proc size(ks: KaitaiStream): int
+  first type mismatch at position: 1
+  required type for ks: KaitaiStream
+  but expression 'r.nibbles' is of type: uint8
+template `.`(a: Repeat_eos_bit; b: untyped): untyped
+  first type mismatch at position: 1
+  required type for a: Repeat_eos_bit
+  but expression 'r.nibbles' is of type: uint8
+
+expression: size(r.nibbles)

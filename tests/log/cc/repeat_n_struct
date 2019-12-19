@@ -1,0 +1,14 @@
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(11, 24) Error: type mismatch: got <Repeat_n_structChunk>
+but expected one of: 
+proc size(ks: KaitaiStream): int
+  first type mismatch at position: 1
+  required type for ks: KaitaiStream
+  but expression 'r.chunks' is of type: Repeat_n_structChunk
+template `.`(a: Repeat_n_struct; b: untyped): untyped
+  first type mismatch at position: 1
+  required type for a: Repeat_n_struct
+  but expression 'r.chunks' is of type: Repeat_n_structChunk
+
+expression: size(r.chunks)

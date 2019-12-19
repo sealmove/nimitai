@@ -1,0 +1,12 @@
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(10, 21) template/generic instantiation of `fromFile` from here
+/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 18) Error: type mismatch: got <KaitaiStream, uint32>
+but expected one of: 
+proc skip(ks: KaitaiStream; n: int)
+  first type mismatch at position: 2
+  required type for n: int
+  but expression 'index_offset' is of type: uint32
+1 other mismatching symbols have been suppressed; compile with --showAllMismatches:on to see them
+
+expression: skip(io, index_offset)
