@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rm log/cc/* 
+rm log/ce/* 
+rm log/rc/* 

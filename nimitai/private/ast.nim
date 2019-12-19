@@ -161,22 +161,12 @@ proc parseKsExpr*(expr: string): KsNode =
     Lexeme   <- UnaryOp | Literal | Id
     Id       <- Lower * *(Alnum | '_'):
       stack.add KsNode(kind: knkIdentifier, id: $0)
-    Literal  <- Int | Float | Bool | String
+    Literal  <- Expression | Int | Float | Bool | String
 
-    String   <- StringQuote | StringDoubleQuote
-
-    StringQuote <- '\'' * *(Print - '\''):
-      var s = $0
-      s[0]  = '\\'
-      s[^2] = '\\'
-      s[^1] = '"'
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: s)
-    StringDoubleQuote <- '\"' * >*(Print - '\"'):
-      var s = $0
-      s[0]  = '\\'
-      s[^2] = '\\'
-      s[^1] = '\''
-      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: s)
+    Expression <- '\'' * >*(Print - '\'') * '\'':
+      stack.add parseKsExpr($1)
+    String <- '\"' * >*(Print - '\"') * '\"':
+      stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkStr), val: $1)
 
     Bool     <- "true" | "false":
       stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkBool), val: $0)
@@ -188,23 +178,17 @@ proc parseKsExpr*(expr: string): KsNode =
     
     Hex      <- "0x" * +Xdigit:
       stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
-                                                     radix: rHex,
-                                                     size: 8,
-                                                     isSigned: true), val: $0)
+                                                     radix: rHex), val: $0)
     Bin      <- "0b" * +{'0', '1'}:
       stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
-                                                     radix: rBin,
-                                                     size: 8,
-                                                     isSigned: true), val: $0)
+                                                     radix: rBin), val: $0)
     Dec      <- +Digit:
       stack.add KsNode(kind: knkLiteral, typ: KsType(kind: ktkInt,
-                                                     radix: rDec,
-                                                     size: 8,
-                                                     isSigned: true), val: $0)
+                                                     radix: rDec), val: $0)
 
     UnaryOp  <- >("-"|"~"|"not") * (Literal | Id):
       var op: UnaryOp
-      case $0
+      case $1
       of "-"  : op = uoMinus
       of "~"  : op = uoInvert
       of "not": op = uoNot
@@ -214,31 +198,31 @@ proc parseKsExpr*(expr: string): KsNode =
 
     ArithOp  <- >("+" | "-" | "*" | "/" | "%") * B * Lexeme:
       var op: ArithOp
-      case $0
+      case $1
       of "+": op = aoAdd
       of "-": op = aoSub
       of "*": op = aoMul
       of "/": op = aoDiv
       of "%": op = aoMod
       let
-        l = pop(stack)
         r = pop(stack)
+        l = pop(stack)
       stack.add KsNode(kind: knkArithOp, aoL: l, ao: op, aoR: r)
     BitOp    <- >("<<" | ">>" | "&" | "|" | "^") * B * Lexeme:
       var op: BitOp
-      case $0
+      case $1
       of "<<": op = boLShift
       of ">>": op = boRShift
       of "&" : op = boAnd
       of "|" : op = boOr
       of "^" : op = boXor
       let
-        l = pop(stack)
         r = pop(stack)
+        l = pop(stack)
       stack.add KsNode(kind: knkBitOp, boL: l, bo: op, boR: r)
     CmpOp    <- >("<=" | "<" | ">=" | ">" | "==" | "!=") * B * Lexeme:
       var op: CmpOp
-      case $0
+      case $1
       of "<=": op = coLtE
       of "<" : op = coLt
       of ">=": op = coGtE
@@ -246,17 +230,17 @@ proc parseKsExpr*(expr: string): KsNode =
       of "==": op = coEq
       of "!=": op = coNEq
       let
-        l = pop(stack)
         r = pop(stack)
+        l = pop(stack)
       stack.add KsNode(kind: knkCmpOp, coL: l, co: op, coR: r)
     RelOp    <- >("and" | "or") * B * Lexeme:
       var op: RelOp
-      case $0
+      case $1
       of "and": op = roAnd
       of "or" : op = roOr
       let
-        l = pop(stack)
         r = pop(stack)
+        l = pop(stack)
       stack.add KsNode(kind: knkRelOp, roL: l, ro: op, roR: r)
 
   var stack: seq[KsNode]
@@ -272,15 +256,15 @@ proc deriveType*(expr: KsNode): KsType =
   of knkLiteral:
     result = expr.typ
   of knkArithOp:
-    result = expr.aoL.typ
+    result = deriveType(expr.aoL)
   of knkBitOp:
-    result = expr.boL.typ
+    result = deriveType(expr.boL)
   of knkCmpOp:
-    result = expr.coL.typ
+    result = deriveType(expr.coL)
   of knkRelOp:
-    result = expr.roL.typ
+    result = deriveType(expr.roL)
   of knkUnaryOp:
-    result = expr.uoO.typ
+    result = deriveType(expr.uoO)
 
 proc hierarchy(t: Type): seq[string] =
   var t = t
@@ -316,7 +300,7 @@ proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
       result.typ = KsType(kind: ktkInt)
       if kkEnum in f.keys:
         result.typ.label = f.keys[kkEnum].strval
-      if typ.startsWith('u'):
+      if typ.startsWith('s'):
         result.typ.isSigned = true
       result.typ.size = parseInt(typ[1..1])
       if typ.len > 2:

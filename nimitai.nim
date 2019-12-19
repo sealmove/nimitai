@@ -18,6 +18,7 @@ proc toNimType*(typ: KsType): NimNode =
     case typ.isSigned
     of false:
       case typ.size
+      of 0: result = ident"int" # no size specified -> generic int
       of 1: result = ident"uint8"
       of 2: result = ident"uint16"
       of 4: result = ident"uint32"
@@ -78,6 +79,7 @@ proc toNim*(expr: KsNode): NimNode =
         else:
           let lit = parseBiggestUInt(expr.val)
           case expr.typ.size
+          of 0: result = newLit(int(lit)) # size not specified -> generic int
           of 1: result = newLit(uint8(lit))
           of 2: result = newLit(uint16(lit))
           of 4: result = newLit(uint32(lit))
@@ -95,23 +97,36 @@ proc toNim*(expr: KsNode): NimNode =
     of ktkStrz:
       discard
     of ktkUser:
-      discard
-  of knkArithOp: #XXX
-    discard
-  of knkBitOp: #XXX
-    discard
-  of knkCmpOp: #XXX
-    discard
-  of knkRelOp: #XXX
-    discard
+      result = ident(expr.id)
+  of knkArithOp:
+    let fn = ident($expr.ao)
+    result = newCall(
+      fn,
+      expr.aoL.toNim,
+      expr.aoR.toNim)
+  of knkBitOp:
+    let fn = ident($expr.bo)
+    result = newCall(
+      fn,
+      expr.boL.toNim,
+      expr.boR.toNim)
+  of knkCmpOp:
+    let fn = ident($expr.co)
+    result = newCall(
+      fn,
+      expr.coL.toNim,
+      expr.coR.toNim)
+  of knkRelOp:
+    let fn = ident($expr.ao)
+    result = newCall(
+      fn,
+      expr.roL.toNim,
+      expr.roR.toNim)
   of knkUnaryOp:
-    var op: string
-    case expr.uo
-    of uoMinus : op = "-"
-    of uoInvert: op = "not"
-    of uoNot   : op = "not"
-    result = prefix(expr.uoO.toNim, op)
-    discard #XXX
+    let fn = ident($expr.uo)
+    result = newCall(
+      fn,
+      expr.uoO.toNim)
 
 proc parentType(t: Nimitype): NimNode =
   if t.parent == "":
@@ -199,46 +214,58 @@ proc readField(f: Field, e: Endian): NimNode =
           ident(f.id)),
         ident(f.id)))
   of true:
-    let
-      typ = f.typ.toNimType
-      valDecl = newNimNode(nnkVarSection).add(
-        newIdentDefs(
-          ident(f.id & "Val"),
-          nnkBracketExpr.newTree(
-            ident"Option",
-            typ)))
-    letStmt = newLetStmt(
-      ident(f.id),
-      nnkLambda.newTree(
-        newEmptyNode(),
-        newEmptyNode(),
-        newEmptyNode(),
-        nnkFormalParams.newTree(typ),
-        newEmptyNode(),
-        newEmptyNode(),
-        newStmtList(
-          if f.value == nil:
+    if f.value == nil:
+      let
+        typ = f.typ.toNimType
+        valDecl = newNimNode(nnkVarSection).add(
+          newIdentDefs(
+            ident(f.id & "Val"),
+            nnkBracketExpr.newTree(
+              ident"Option",
+              typ)))
+      letStmt = newLetStmt(
+        ident(f.id),
+        nnkLambda.newTree(
+          newEmptyNode(),
+          newEmptyNode(),
+          newEmptyNode(),
+          nnkFormalParams.newTree(typ),
+          newEmptyNode(),
+          newEmptyNode(),
+          newStmtList(
             nnkDiscardStmt.newTree(
-              newEmptyNode())
-          else:
-            f.value.toNim)))
-    result = newStmtList(
-      valDecl,
-      letStmt,
-      newAssignment(
-        newDotExpr(
-          ident"result",
-          ident(f.id & "Inst")),
-        ident(f.id)))
+              newEmptyNode()))))
+      result = newStmtList(
+        valDecl,
+        letStmt,
+        newAssignment(
+          newDotExpr(
+            ident"result",
+            ident(f.id & "Inst")),
+          ident(f.id)))
+    else:
+      letStmt = newLetStmt(
+        ident(f.id),
+        newCall(
+          f.typ.toNimType,
+          f.value.toNim))
+      result = newStmtList(
+        letStmt,
+        newAssignment(
+          newDotExpr(
+            ident"result",
+            ident(f.id)),
+          ident(f.id)))
+
   if f.size != nil:
     case f.typ.kind
     of ktkUser:
       result.add newCall(
         ident"skip",
         ident"io",
-        infix(
+        newCall(
+          ident"aoSub",
           f.size.toNim,
-          "-",
           newCall(
             ident"sizeof",
             ident(f.typ.id))))
@@ -278,7 +305,7 @@ proc typeDecl(t: Nimitype): seq[NimNode] =
   for f in t.fields:
     let typ = f.typ.toNimType
     fields.add(
-      if f.isLazy:
+      if f.isLazy and f.value == nil:
         newIdentDefs(
           ident(f.id & "Inst"),
           nnkProcTy.newTree(

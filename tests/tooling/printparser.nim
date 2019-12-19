@@ -3,7 +3,7 @@ import os
 let path = "../material/ksy/" & paramStr(1) & ".ksy"
 
 writeFile("temp.nim", """
-import ../../nimitai, kaitai_struct_nim_runtime, macros
+import ../../nimitai, ../../../kaitai_struct_nim_runtime/kaitai_struct_nim_runtime, macros
 expandMacros:
   injectParser(""" & "\"" & path & "\")")
 

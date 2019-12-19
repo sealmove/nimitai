@@ -1,5 +1,6 @@
 #!/bin/sh
 
+cat material/ksy/"$1.ksy"
 cd tooling
 nim c -r --hints:off printparser "$1"
 rm -f printparser

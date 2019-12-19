@@ -47,11 +47,11 @@ proc test(kst: Kst): NimNode =
     asserts.add(
       nnkCommand.newTree(
         ident"check",
-        infix(
+        newCall(
+          ident"coEq",
           newDotExpr(
             ident"r",
             ident(a.actual)),
-          "==",
           parseKsExpr(a.expected).toNim)))
 
   nnkCommand.newTree(
@@ -73,7 +73,7 @@ proc suite(tests: varargs[NimNode], errorCode = -1): string =
   var res = newStmtList(
     nnkImportStmt.newTree(
       ident"../../nimitai",
-      ident"kaitai_struct_nim_runtime",
+      ident"../../../kaitai_struct_nim_runtime/kaitai_struct_nim_runtime",
       ident"unittest",
       ident"options"),
     nnkPragma.newTree(
@@ -105,22 +105,25 @@ proc siftedSuite(): string =
     if k == pcFile:
       try:
         writeFile("temp.nim", suite(p.parseKst.test, 2))
-        let (_, compile) = gorgeEx("nim c temp")
-        if compile != 0:
+        let (ccOut, ccCode) = gorgeEx("nim c --hints:off temp")
+        if ccCode != 0:
           inc CC
           echo &"{R}[CC]{D} {name}"
+          writeFile(&"../log/cc/{name}", ccOut)
           continue
-        let (_, run) = gorgeEx("./temp")
-        if run == 2:
+        let (rcOut, rcCode) = gorgeEx("./temp")
+        if rcCode == 2:
           tests.add(p.parseKst.test)
           inc OK
           echo &"{G}[OK]{D} {name}"
         else:
           inc RC
           echo &"{B}[RC]{D} {name}"
+          writeFile(&"../log/rc/{name}", rcOut)
       except:
         inc CE
         echo &"{Y}[CE]{D} {name}"
+        writeFile(&"../log/ce/{name}", getCurrentExceptionMsg())
 
   echo ""
   echo &"{G}[OK]{D} {OK.intToStr(3)} {B}[RC]{D} {RC.intToStr(3)} " &
