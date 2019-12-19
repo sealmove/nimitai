@@ -1,4 +1,0 @@
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 17) template/generic instantiation of `injectParser` from here
-/home/sealmove/Programming/nimitai/nimitai.nim(52, 19) Error: undeclared identifier: 'len_of_1_mod'

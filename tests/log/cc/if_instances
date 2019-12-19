@@ -1,3 +1,0 @@
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(11, 33) Error: undeclared identifier: 'null'

@@ -1,5 +1,0 @@
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(10, 21) template/generic instantiation of `fromFile` from here
-/home/sealmove/Programming/nimitai/tests/tooling/temp.nim(9, 18) template/generic instantiation of `read` from here
-/home/sealmove/Programming/kaitai_struct_nim_runtime/kaitai_struct_nim_runtime.nim(305, 71) Error: type mismatch: got <float> but expected 'int'

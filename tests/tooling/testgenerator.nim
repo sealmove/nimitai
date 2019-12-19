@@ -47,11 +47,11 @@ proc test(kst: Kst): NimNode =
     asserts.add(
       nnkCommand.newTree(
         ident"check",
-        newCall(
-          ident"coEq",
+        infix(
           newDotExpr(
             ident"r",
             ident(a.actual)),
+          "==",
           parseKsExpr(a.expected).toNim)))
 
   nnkCommand.newTree(
@@ -127,7 +127,7 @@ proc siftedSuite(): string =
 
   echo ""
   echo &"{G}[OK]{D} {OK.intToStr(3)} {B}[RC]{D} {RC.intToStr(3)} " &
-       &"{R}[CE]{D} {CE.intToStr(3)} {Y}[CC]{D} {CC.intToStr(3)}"
+       &"{Y}[CC]{D} {CC.intToStr(3)} {R}[CE]{D} {CE.intToStr(3)}"
 
   suite(tests)
 

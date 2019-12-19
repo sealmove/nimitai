@@ -63,35 +63,35 @@ proc toNim*(expr: KsNode): NimNode =
     for i in expr.arrval:
       b.add(i.toNim)
     result = prefix(b, "@")
-  of knkArithOp:
-    let fn = ident($expr.ao)
-    result = newCall(
-      fn,
-      expr.aoL.toNim,
-      expr.aoR.toNim)
-  of knkBitOp:
-    let fn = ident($expr.bo)
-    result = newCall(
-      fn,
-      expr.boL.toNim,
-      expr.boR.toNim)
-  of knkCmpOp:
-    let fn = ident($expr.co)
-    result = newCall(
-      fn,
-      expr.coL.toNim,
-      expr.coR.toNim)
-  of knkRelOp:
-    let fn = ident($expr.ao)
-    result = newCall(
-      fn,
-      expr.roL.toNim,
-      expr.roR.toNim)
-  of knkUnaryOp:
-    let fn = ident($expr.uo)
-    result = newCall(
-      fn,
-      expr.uoO.toNim)
+  of knkInfix:
+    var op: string
+    case expr.inOp
+    of iAdd  : op = "+"
+    of iSub  : op = "-"
+    of iMul  : op = "*"
+    of iDiv  : op = "/"
+    of iMod  : op = "%%%"
+    of iShl  : op = "shl"
+    of iShr  : op = "shr"
+    of iBwAnd: op = "and"
+    of iBwOr : op = "or"
+    of iBwXor: op = "xor"
+    of iGtE  : op = ">="
+    of iGt   : op = ">"
+    of iLtE  : op = "<="
+    of iLt   : op = "<"
+    of iEq   : op = "=="
+    of iNEq  : op = "!="
+    of iAnd  : op = "and"
+    of iOr   : op = "or"
+    result = infix(expr.left.toNim, op, expr.right.toNim)
+  of knkPrefix:
+    var op: string
+    case expr.preOp
+    of pSub: op = "-"
+    of pInv: op = "not"
+    of pNot: op = "not"
+    result = prefix(expr.op.toNim, op)
 
 proc parentType(t: Nimitype): NimNode =
   if t.parent == "":
@@ -245,9 +245,9 @@ proc readField(f: Field, e: Endian): NimNode =
     result.add newCall(
       ident"skip",
       ident"io",
-      newCall(
-        ident"aoSub",
+      infix(
         f.size.toNim,
+        "-",
         newCall(
           ident"sizeof",
           ident(f.typ.id))))

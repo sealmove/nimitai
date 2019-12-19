@@ -88,32 +88,29 @@ type
       eosError*: bool
     of ktkUser:
       id*: string
-  ArithOp* = enum
-    aoAdd
-    aoSub
-    aoMul
-    aoDiv
-    aoMod
-  BitOp* = enum
-    boLShift
-    boRShift
-    boAnd
-    boOr
-    boXor
-  CmpOp* = enum
-    coGtE
-    coGt
-    coLtE
-    coLt
-    coEq
-    coNEq
-  RelOp* = enum
-    roAnd
-    roOr
-  UnaryOp* = enum
-    uoMinus
-    uoInvert
-    uoNot
+  Infix* = enum
+    iAdd
+    iSub
+    iMul
+    iDiv
+    iMod
+    iShl
+    iShr
+    iBwAnd
+    iBwOr
+    iBwXor
+    iGtE
+    iGt
+    iLtE
+    iLt
+    iEq
+    iNEq
+    iAnd
+    iOr
+  Prefix* = enum
+    pSub
+    pInv
+    pNot
   KsNodeKind* = enum
     knkIdentifier
     knkBool
@@ -121,11 +118,8 @@ type
     knkFloat
     knkStr
     knkArray
-    knkArithOp
-    knkBitOp
-    knkCmpOp
-    knkRelOp
-    knkUnaryOp
+    knkInfix
+    knkPrefix
   KsNode* = ref object
     case kind*: KsNodeKind
     of knkIdentifier:
@@ -140,25 +134,13 @@ type
       strval*: string
     of knkArray:
       arrval*: seq[KsNode]
-    of knkArithOp:
-      aoL*: KsNode
-      ao*: ArithOp
-      aoR*: KsNode
-    of knkBitOp:
-      boL*: KsNode
-      bo*: BitOp
-      boR*: KsNode
-    of knkCmpOp:
-      coL*: KsNode
-      co*: CmpOp
-      coR*: KsNode
-    of knkRelOp:
-      roL*: KsNode
-      ro*: RelOp
-      roR*: KsNode
-    of knkUnaryOp:
-      uoO*: KsNode
-      uo*: UnaryOp
+    of knkInfix:
+      left*: KsNode
+      inOp*: Infix
+      right*: KsNode
+    of knkPrefix:
+      op*: KsNode
+      preOp*: Prefix
 
 var symbolTable* {.compileTime.}: Table[string, Field]
 
@@ -205,61 +187,40 @@ proc parseKsExpr*(expr: string): KsNode =
       stack.add KsNode(kind: knkStr, strval: $1)
 
     UnaryOp  <- >("-"|"~"|"not") * (Literal | Id):
-      var op: UnaryOp
+      var op: Prefix
       case $1
-      of "-"  : op = uoMinus
-      of "~"  : op = uoInvert
-      of "not": op = uoNot
+      of "-"  : op = pSub
+      of "~"  : op = pInv
+      of "not": op = pNot
       let l = pop(stack)
-      stack.add KsNode(kind:knkUnaryOp, uoO: l, uo: op)
-    BinaryOp <- ArithOp | BitOp | CmpOp | RelOp
-
-    ArithOp  <- >("+" | "-" | "*" | "/" | "%") * B * Lexeme:
-      var op: ArithOp
+      stack.add KsNode(kind:knkPrefix, op: l, preOp: op)
+    BinaryOp <- >("+" | "-"  | "*" | "/"  | "%" | "<<" | ">>" |  "&"  | "|" |
+                  "^" | ">=" | ">" | "<=" | "<" | "==" | "!=" | "and" | "or") *
+                B * Lexeme:
+      var op: Infix
       case $1
-      of "+": op = aoAdd
-      of "-": op = aoSub
-      of "*": op = aoMul
-      of "/": op = aoDiv
-      of "%": op = aoMod
+      of "+"  : op = iAdd
+      of "-"  : op = iSub
+      of "*"  : op = iMul
+      of "/"  : op = iDiv
+      of "%"  : op = iMod
+      of "<<" : op = iShl
+      of ">>" : op = iShr
+      of "&"  : op = iBwAnd
+      of "|"  : op = iBwOr
+      of "^"  : op = iBwXor
+      of ">=" : op = iGtE
+      of ">"  : op = iGt
+      of "<=" : op = iLtE
+      of "<"  : op = iLt
+      of "==" : op = iEq
+      of "!=" : op = iNEq
+      of "and": op = iAnd
+      of "or" : op = iOr
       let
         r = pop(stack)
         l = pop(stack)
-      stack.add KsNode(kind: knkArithOp, aoL: l, ao: op, aoR: r)
-    BitOp    <- >("<<" | ">>" | "&" | "|" | "^") * B * Lexeme:
-      var op: BitOp
-      case $1
-      of "<<": op = boLShift
-      of ">>": op = boRShift
-      of "&" : op = boAnd
-      of "|" : op = boOr
-      of "^" : op = boXor
-      let
-        r = pop(stack)
-        l = pop(stack)
-      stack.add KsNode(kind: knkBitOp, boL: l, bo: op, boR: r)
-    CmpOp    <- >("<=" | "<" | ">=" | ">" | "==" | "!=") * B * Lexeme:
-      var op: CmpOp
-      case $1
-      of "<=": op = coLtE
-      of "<" : op = coLt
-      of ">=": op = coGtE
-      of ">" : op = coGt
-      of "==": op = coEq
-      of "!=": op = coNEq
-      let
-        r = pop(stack)
-        l = pop(stack)
-      stack.add KsNode(kind: knkCmpOp, coL: l, co: op, coR: r)
-    RelOp    <- >("and" | "or") * B * Lexeme:
-      var op: RelOp
-      case $1
-      of "and": op = roAnd
-      of "or" : op = roOr
-      let
-        r = pop(stack)
-        l = pop(stack)
-      stack.add KsNode(kind: knkRelOp, roL: l, ro: op, roR: r)
+      stack.add KsNode(kind: knkInfix, left: l, inOp: op, right: r)
 
   var stack: seq[KsNode]
   assert p.match(expr, stack).ok
@@ -281,16 +242,10 @@ proc deriveType*(expr: KsNode): KsType =
     result = KsType(kind: ktkStr)
   of knkArray:
     result = KsType(kind: ktkArray, arrType: expr.arrval[0].deriveType)
-  of knkArithOp:
-    result = deriveType(expr.aoL)
-  of knkBitOp:
-    result = deriveType(expr.boL)
-  of knkCmpOp:
-    result = deriveType(expr.coL)
-  of knkRelOp:
-    result = deriveType(expr.roL)
-  of knkUnaryOp:
-    result = deriveType(expr.uoO)
+  of knkInfix:
+    result = deriveType(expr.left)
+  of knkPrefix:
+    result = deriveType(expr.op)
 
 proc hierarchy(t: Type): seq[string] =
   var t = t
