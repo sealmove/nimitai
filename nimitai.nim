@@ -1,7 +1,20 @@
-import macros, strutils, nimitai/private/ast
+import macros, strutils, tables, nimitai/private/ast
 #XXX Need to document necessary imports and pragmas
 # imports: kaitai_struct_nim_runtime, options
 # pragmas: dotOperators
+
+proc deriveCast*(typ: KsType): NimNode =
+  case typ.kind
+  of ktkBit, ktkInt:
+    result = ident"int"
+  of ktkBool:
+    result = ident"bool"
+  of ktkFloat:
+    result = ident"float"
+  of ktkArray:
+    result = deriveCast(typ.arrType)
+  of ktkStr, ktkStrz, ktkUser:
+    discard
 
 proc toNimType*(typ: KsType): NimNode =
   case typ.kind
@@ -49,7 +62,13 @@ proc toNimType*(typ: KsType): NimNode =
 proc toNim*(expr: KsNode): NimNode =
   case expr.kind
   of knkIdentifier:
-    result = ident(expr.id)
+    var fn = deriveCast(symbolTable[expr.id].typ)
+    if fn == nil:
+      result = ident(expr.id)
+    else:
+      result = newCall(
+        fn,
+        ident(expr.id))
   of knkBool:
     result = newLit(expr.boolval)
   of knkInt:
@@ -157,7 +176,10 @@ proc readField(f: Field, e: Endian): NimNode =
   of ktkFloat:
     discard
   of ktkArray:
-    discard
+    call = newCall(
+      ident"read_bytes",
+      ident"io",
+      f.size.toNim)
   of ktkStr:
     call = newCall(
       ident"read_string",
@@ -356,6 +378,11 @@ proc readProc(t: Nimitype): NimNode =
       ident"root"))
 
   for f in t.fields:
+    if f.typ.kind != ktkBit:
+      result.body.add(
+        newCall(
+          ident"alignToByte",
+          ident"io"))
     result.body.add(readField(f, t.endian))
 
 proc destroyProc(t: Nimitype): NimNode =

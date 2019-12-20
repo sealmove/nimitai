@@ -113,9 +113,11 @@ proc parseKsy*(path: string): Type =
       validate len($1) == state.level
     I <- >*' ':
       let indent = len($1) - state.level
-      doAssert indent > 0
-      state.inds.add(indent)
-      state.level = len($1)
+      if indent > 0:
+        state.inds.add(indent)
+        state.level = len($1)
+      else:
+        fail()
     D <- 0:
       dec(state.level, state.inds.pop)
 
@@ -252,7 +254,7 @@ proc parseKsy*(path: string): Type =
       state.keys[kkTitle] = Key(kind: kkTitle, strval: $1)
     TypeKey <- K("type") * >Identifier:
       state.keys[kkType] = Key(kind: kkType, strval: $1)
-    If <- K("if") * >Line: # Expression
+    If <- K("if") * >Line:
       state.keys[kkIf] = Key(kind: kkIf, strval: $1)
     Include <- K("include") * >Line:
       state.keys[kkInclude] = Key(kind: kkInclude, strval: $1)
@@ -262,15 +264,15 @@ proc parseKsy*(path: string): Type =
       state.keys[kkProcess] = Key(kind: kkProcess, strval: $1)
     Pos <- K("pos") * >Line:
       state.keys[kkPos] = Key(kind: kkPos, strval: $1)
-    RepeatExpr <- K("repeat-expr") * >Line: # Expression
+    RepeatExpr <- K("repeat-expr") * >Line:
       state.keys[kkRepeatExpr] = Key(kind: kkRepeatExpr, strval: $1)
-    RepeatUntil <- K("repeat-until") * >Line: # Expression
+    RepeatUntil <- K("repeat-until") * >Line:
       state.keys[kkRepeatUntil] = Key(kind: kkRepeatUntil, strval: $1)
     SizeEos <- K("size-eos") * >Line:
       state.keys[kkSizeEos] = Key(kind: kkSizeEos, strval: $1)
     Terminator <- K("terminator") * >Line:
       state.keys[kkTerminator] = Key(kind: kkTerminator, charval: ($1)[0])
-    Value <- K("value") * >Line: # Expression
+    Value <- K("value") * >(Line * Array(Line) | Line):
       state.keys[kkValue] = Key(kind: kkValue, strval: $1)
 
   let file = readFile(path).splitLines

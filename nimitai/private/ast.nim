@@ -75,7 +75,7 @@ type
     of ktkFloat:
       precision*: int
     of ktkArray:
-      arrType: KsType
+      arrType*: KsType
       sizeEos*: bool
       process*: Process
     of ktkStr:
@@ -153,9 +153,11 @@ proc parseKsExpr*(expr: string): KsNode =
     CS       <- 0:
       stackItems = stack.len
 
-    Expr     <- Lexeme * B * *BinaryOp
+    Expr     <- B * (PExpr | BExpr)
+    BExpr    <- (UnaryOp | Lexeme) * B * *BinaryOp
+    PExpr    <- '(' * B * Expr * B * ')'
 
-    Lexeme   <- UnaryOp | Literal | Id
+    Lexeme   <- Literal | Id
     Id       <- Lower * *(Alnum | '_'):
       stack.add KsNode(kind: knkIdentifier, id: $0)
     Literal  <- QExpr | Array | Int | Float | Bool | String
@@ -171,12 +173,12 @@ proc parseKsExpr*(expr: string): KsNode =
       stack.add arr
 
     Int      <- Hex | Bin | Dec
-    Hex      <- "0x" * +Xdigit:
+    Hex      <- "0x" * +(Xdigit | '_'):
       stack.add KsNode(kind: knkInt, intval: parseHexInt($0))
                        
-    Bin      <- "0b" * +{'0', '1'}:
+    Bin      <- "0b" * +{'0', '1', '_'}:
       stack.add KsNode(kind: knkInt, intval: parseBinInt($0))
-    Dec      <- +Digit:
+    Dec      <- +(Digit | '_'):
       stack.add KsNode(kind: knkInt, intval: parseInt($0))
 
     Float    <- Int * '.' * Int * ?('e' * Int):
@@ -186,7 +188,7 @@ proc parseKsExpr*(expr: string): KsNode =
     String <- '\"' * >*(Print - '\"') * '\"':
       stack.add KsNode(kind: knkStr, strval: $1)
 
-    UnaryOp  <- >("-"|"~"|"not") * (Literal | Id):
+    UnaryOp  <- >("-"|"~"|"not") * B * (Lexeme | PExpr):
       var op: Prefix
       case $1
       of "-"  : op = pSub
@@ -196,7 +198,7 @@ proc parseKsExpr*(expr: string): KsNode =
       stack.add KsNode(kind:knkPrefix, op: l, preOp: op)
     BinaryOp <- >("+" | "-"  | "*" | "/"  | "%" | "<<" | ">>" |  "&"  | "|" |
                   "^" | ">=" | ">" | "<=" | "<" | "==" | "!=" | "and" | "or") *
-                B * Lexeme:
+                B * Expr:
       var op: Infix
       case $1
       of "+"  : op = iAdd
