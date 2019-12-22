@@ -85,15 +85,15 @@ There is a seperate program -`testgenerator`- which compiles the official `.kst`
                    |             / \
                    |            ✔️ G ✗
 132 total          |           /     \
-  ✔️ 127 generate   |         127      5
+  ✔️ 130 generate   |         130      2
     ✔️ 11 compile   |         / \
-      ✔️ 101pass    |        ✔️ C ✗
+      ✔️ 10 pass    |        ✔️ C ✗
       ✗ 0 fail     |       /     \
-    ✗ 116 error    |      11     116
-  ✗ 5 crash        |     / \
+    ✗ 116 error    |      6      125
+  ✗ 2 crash        |     / \
                    |    ✔️ P ✗
                    |   /     \
-                   |  11      0
+                   |  6       0
 </pre>
 
 ## Internals

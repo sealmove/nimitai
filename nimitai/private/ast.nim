@@ -127,7 +127,7 @@ type
     of knkBool:
       boolval*: bool
     of knkInt:
-      intval*: int
+      intval*: BiggestUInt
     of knkFloat:
       floatval*: float
     of knkStr:
@@ -160,26 +160,25 @@ proc parseKsExpr*(expr: string): KsNode =
     Lexeme   <- Literal | Id
     Id       <- Lower * *(Alnum | '_'):
       stack.add KsNode(kind: knkIdentifier, id: $0)
-    Literal  <- QExpr | Array | Int | Float | Bool | String
+    Literal  <- QExpr | Array | Int | Float | Bool | String | Bytes
 
     QExpr    <- '\'' * >*(Print - '\'') * '\'':
       stack.add parseKsExpr($1)
 
     Array    <- '[' * CS * B * Expr * *(B * ',' * B * Expr) * ']':
-      let num = stack.len - stackItems
       var arr = KsNode(kind: knkArray)
-      for _ in 0 ..< num:
+      for _ in 0 ..< stack.len - stackItems:
         arr.arrval.add(stack.pop)
       stack.add arr
 
     Int      <- Hex | Bin | Dec
     Hex      <- "0x" * +(Xdigit | '_'):
-      stack.add KsNode(kind: knkInt, intval: parseHexInt($0))
+      stack.add KsNode(kind: knkInt, intval: parseHexInt($0).BiggestUInt)
                        
     Bin      <- "0b" * +{'0', '1', '_'}:
-      stack.add KsNode(kind: knkInt, intval: parseBinInt($0))
+      stack.add KsNode(kind: knkInt, intval: parseBinInt($0).BiggestUInt)
     Dec      <- +(Digit | '_'):
-      stack.add KsNode(kind: knkInt, intval: parseInt($0))
+      stack.add KsNode(kind: knkInt, intval: parseBiggestUInt($0))
 
     Float    <- Int * '.' * Int * ?('e' * Int):
       stack.add KsNode(kind: knkFloat, floatval: parseFloat($0))
@@ -187,6 +186,12 @@ proc parseKsExpr*(expr: string): KsNode =
       stack.add KsNode(kind: knkBool, boolval: parseBool($0))
     String <- '\"' * >*(Print - '\"') * '\"':
       stack.add KsNode(kind: knkStr, strval: $1)
+    Bytes <- +Print:
+      var arr = KsNode(kind: knkArray)
+      for c in $0:
+        arr.arrval.add(KsNode(kind: knkInt, intval: c.BiggestUInt))
+      stack.add arr
+
 
     UnaryOp  <- >("-"|"~"|"not") * B * (Lexeme | PExpr):
       var op: Prefix
@@ -270,7 +275,20 @@ proc isBitType*(typ: string): tuple[isBit: bool, bits: int] =
 
 proc parseField(f: Attr|Inst, isLazy: bool, currentType: Type): Field =
   result = Field(id: f.id, isLazy: isLazy)
-  #XXX kkContents
+  if kkContents in f.keys:
+    let contents = f.keys[kkContents].list
+    for i in contents:
+      if i.startsWith('"') or i.startsWith('\''):
+        for c in i[1..^2]:
+          result.contents.add c.byte
+      elif i.startsWith("0x"):
+        result.contents.add i.parseHexInt.byte
+      elif i.allIt(it in '0'..'9'):
+        result.contents.add i.parseInt.byte
+      else:
+        for c in i:
+          result.contents.add c.byte
+    result.size = KsNode(kind: knkInt, intval: result.contents.len.BiggestUInt)
   if kkDoc in f.keys:
     result.doc = f.keys[kkDoc].strval
   if kkDocRef in f.keys:

@@ -127,12 +127,12 @@ proc parseKsy*(path: string): Type =
     Tag <- '-' * B
     Colon <- B * ':' * B
     Bool <- "true" | "false"
-    String <- '"' * *(1 - {'"', '\n'}) * '"'
+    String <- '"' * *(1 - {'"', '\n'}) * '"' | '\'' * *(1 - {'\'', '\n'}) * '\''
     Identifier <- {'a'..'z'} * *{'a'..'z','0'..'9','_'}
     FileName <- >+{'A'..'Z','a'..'z','0'..'9','_','-','/'}:
       state.elems.add $1
-    Item <- >(String | "0x" * +Xdigit | +Digit):
-      state.elems.add $1
+    Item <- String | "0x" * +Xdigit | +Digit:
+      state.elems.add $0
     AddSectionTable <- 0:
       state.sects.add(newTable[SectKind, Sect]())
 
