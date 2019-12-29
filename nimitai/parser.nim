@@ -3,14 +3,11 @@ import npeg
 import lexer, exprlang
 
 type
-  Keys* = Table[KeyKind, Key]
+  Type* = ref object
+    name*: string
+    parent*: Type
+    sects*: Sects
   Sects* = Table[SectKind, Sect]
-  Type* = tuple[name: string, sects: Sects]
-  Types* = Table[string, Sects]
-  Inst* = tuple[name: string, keys: Keys]
-  Insts* = Table[string, Keys]
-  Enum* = tuple[name: string, es: Table[string, int]]
-  Enums* = Table[string, Table[string, int]]
   SectKind* = enum
     skMeta
     skDoc
@@ -30,11 +27,12 @@ type
     of skSeq:
       `seq`*: seq[Keys]
     of skTypes:
-      types*: Types
+      types*: seq[Type]
     of skInstances:
-      instances*: Insts
+      instances*: seq[Inst]
     of skEnums:
-      enums*: Enums
+      enums*: seq[Enum]
+  Keys* = Table[KeyKind, Key]
   KeyKind* = enum
     kkApplication
     kkConsume
@@ -76,13 +74,14 @@ type
       items*: seq[string]
     else:
       expr*: Expr
+  Inst* = tuple[name: string, keys: Keys]
+  Enum* = tuple[name: string, es: Table[string, int]]
   State = ref object
     itemStack: seq[string]
     exprStack: seq[Expr]
     keyStack:  seq[Key]
     keysStack: seq[Keys]
-    sectsStack: seq[Sects]
-    typeStack: seq[Type]
+    typeStack: seq[seq[Type]]
     instStack: seq[Inst]
     eStack: seq[tuple[name: string, ordinal: int]]
     enumStack: seq[Enum]
@@ -90,7 +89,7 @@ type
 proc `==`(token: Token, tk: TokenKind): bool =
   token.kind == tk
 
-proc parseKsy(tokens: seq[Token]): Sects =
+proc parseKsy(tokens: seq[Token]): Type =
   var
     s = State()
   let parser = peg(G, Token, s: State):
@@ -104,14 +103,24 @@ proc parseKsy(tokens: seq[Token]): Sects =
 
     Array <- +([tkDash] * Item)
 
-    G <- T * !1
-    NSS <- 0:
-      s.sectsStack.add Sects()
-    T <- NSS * +Sect
+    G <- MT * !1
+    MT <- NL * NT * +Sect:
+      s.typeStack[0][0].name = s.typeStack[0][0].sects[skMeta].meta[kkId].item
+    NL <- 0:
+      s.typeStack.add newSeq[Type]()
+    NT <- 0:
+      let last = s.typeStack.len - 1
+      s.typeStack[last].add Type()
     Doc <- [tkDoc] * (Item | [tkDocMark] * i(+Item))
     DocRef <- [tkDocRef] * Item
-    LabeledType <- >[tkName] * i(T):
-      s.typeStack.add (($1).value, s.sectsStack.pop)
+    LabeledType <- >[tkName] * NT * i(+Sect):
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].name = ($1).value
+      if i > 0:
+        let k = s.typeStack[i-1].len - 1
+        s.typeStack[i][j].parent = s.typeStack[i-1][k]
     Inst <- >[tkName] * i(+Key):
       var inst: Keys
       for key in s.keyStack:
@@ -146,40 +155,48 @@ proc parseKsy(tokens: seq[Token]): Sects =
       for key in s.keyStack:
         meta[key.kind] = key
       s.keyStack.setlen(0)
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skMeta] = Sect(kind: skMeta, meta: meta)
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skMeta] = Sect(kind: skMeta, meta: meta)
     DocSect <- Doc:
       var doc = s.itemStack.join(" ")
       s.itemStack.setlen(0)
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skDoc] = Sect(kind: skDoc, doc: doc)
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skDoc] = Sect(kind: skDoc, doc: doc)
     DocRefSect <- DocRef:
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skDocRef] = Sect(kind: skDocRef, `doc-ref`: s.itemStack.pop)
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skDocRef] =
+        Sect(kind: skDocRef, `doc-ref`: s.itemStack.pop)
     Seq <- [tkSeq] * i(+Keys):
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skSeq] = Sect(kind: skSeq, `seq`: s.keysStack)
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skSeq] = Sect(kind: skSeq, `seq`: s.keysStack)
       s.keysStack.setlen(0)
-    Types <- [tkTypes] * i(+LabeledType):
-      var types: Types
-      for t in s.typeStack:
-        types[t.name] = t.sects
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skTypes] = Sect(kind: skTypes, types: types)
-      s.typeStack.setlen(0)
+    Types <- [tkTypes] * NL * i(+LabeledType):
+      let
+        i = s.typeStack.len - 2
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skTypes] =
+        Sect(kind: skTypes, types: s.typeStack.pop)
     Instances <- [tkInstances] * i(+Inst):
-      var insts: Insts
-      for i in s.instStack:
-        insts[i.name] = i.keys
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skInstances] = Sect(kind: skInstances, instances: insts)
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skInstances] =
+        Sect(kind: skInstances, instances: s.instStack)
       s.instStack.setlen(0)
     Enums <- [tkEnums] * i(+Enum):
-      var enums: Enums
-      for `enum` in s.enumStack:
-        enums[`enum`.name] = `enum`.es
-      let last = s.sectsStack.len - 1
-      s.sectsStack[last][skEnums] = Sect(kind: skEnums, enums: enums)
+      let
+        i = s.typeStack.len - 1
+        j = s.typeStack[i].len - 1
+      s.typeStack[i][j].sects[skEnums] =
+        Sect(kind: skEnums, enums: s.enumStack)
       s.enumStack.setlen(0)
     Application <- [tkApplication] * >[tkItem]:
       s.keyStack.add Key(kind: kkApplication, item: ($1).value)
@@ -251,11 +268,9 @@ proc parseKsy(tokens: seq[Token]): Sects =
       s.keyStack.add Key(kind: kkValue, expr: s.exprStack.pop)
 
   assert parser.match(tokens, s).ok
-  assert s.sectsStack.len == 1
-  s.sectsStack[0]
+  s.typeStack[0][0]
 
-proc parse*(path: string): Table[SectKind, Sect] = path.tokenizeKsy.parseKsy
-
+proc parse*(path: string): Type = path.tokenizeKsy.parseKsy
 
 var indentCnt: int
 proc indent(): string =
@@ -280,14 +295,14 @@ proc `$`(keys: Keys): string =
   for v in keys.values:
     result &= "\n" & $v
 
-proc `$`(insts: Insts): string =
-  for (name, keys) in insts.pairs:
-    result &= name & "\n"
+proc `$`(insts: seq[Inst]): string =
+  for i in insts:
+    result &= indent() & i.name & "\n"
     inc indentCnt
-    result &= indent() & $keys
+    result &= $i.keys
     dec indentCnt
 
-proc `$`(types: Types): string # forward decl needed
+proc `$`(types: seq[Type]): string # forward decl needed
 
 proc `$`(s: Sect): string =
   result &= indent() & ($s.kind)[2..^1] & ":"
@@ -313,12 +328,15 @@ proc `$`(t: Sects): string =
   for v in t.values:
     result &= "\n" & $v
 
-proc `$`(types: Types): string =
-  for (name, sects) in types.pairs:
-    result &= "\n" & indent() & name & ":"
+proc `$`(types: seq[Type]): string =
+  for t in types:
+    result &= "\n" & indent() & t.name & "(parent = " & t.parent.name & "):"
     inc indentCnt
-    result &= $sects
+    result &= $t.sects
     dec indentCnt
+
+proc `$`(typ: Type): string =
+  result = $typ.sects
 
 proc debugParser*(path: string) =
   let tokens = tokenizeKsy(path)
