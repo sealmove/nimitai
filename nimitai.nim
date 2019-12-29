@@ -23,15 +23,10 @@ proc hierarchy(t: Type): seq[string] =
     t = t.parent
 
 proc parentType(t: Type): NimNode =
-  var p = t.parent
-  if p == nil:
-    return nnkRefTy.newTree(
-             ident"RootObj")
-  var hierarchy: seq[string]
-  while p != nil:
-    hierarchy.insert p.name.capitalizeAscii
-    p = p.parent
-  ident(hierarchy.join)
+  if t.parent == nil:
+    nnkRefTy.newTree(ident"RootObj")
+  else:
+    ident(hierarchy(t.parent).join)
 
 proc attributes(t: Type): seq[NimNode] =
   for attr in t.sects[skSeq].`seq`:
