@@ -255,7 +255,7 @@ proc parseKsy(tokens: seq[Token]): Sects =
 
 proc parse*(path: string): Table[SectKind, Sect] = path.tokenizeKsy.parseKsy
 
-proc `$`*(k: Key): string =
+proc `$`(k: Key): string =
   result = $k.kind
   case k.kind
   of kkApplication, kkDoc, kkDocRef, kkEncoding, kkEndian, kkEnum, kkId,
@@ -265,18 +265,20 @@ proc `$`*(k: Key): string =
     result &= $k.items
   else:
     result &= $k.expr
-proc `$`*(keys: Keys): string =
+
+proc `$`(keys: Keys): string =
   result &= "KEYS("
   for k in keys.keys:
     result &= $keys[k] & " "
   result &= ")"
-proc `$`*(i: Inst): string =
-  result &= i.name & "("
-  let keys = i.keys
-  for k in keys.keys:
-    result &= $keys[k] & " "
+
+proc `$`(insts: Insts): string =
+  result &= "INSTS("
+  for (name, keys) in insts.pairs:
+    result &= name & "(" & $keys & ")"
   result &= ")"
-proc `$`*(s: Sect): string =
+
+proc `$`(s: Sect): string =
   result &= $s.kind & "("
   case s.kind
   of skMeta:
@@ -294,13 +296,13 @@ proc `$`*(s: Sect): string =
   of skEnums:
     result &= "ENUM"
   result &= ")"
-proc `$`*(t: Sects): string =
+
+proc `$`(t: Sects): string =
   for k in t.keys:
     result &= $t[k] & "\n"
 
 proc debugParser*(path: string) =
   let tokens = tokenizeKsy(path)
   let ast = parseKsy(tokens)
-
   echo "=== AST ==="
   echo ast

@@ -211,5 +211,3 @@ proc debug*(s: string) =
   echo "=== EXPRESSION ==="
   echo $expr
   echo ""
-
-#debug("1 + 2")
