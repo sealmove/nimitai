@@ -166,6 +166,7 @@ proc parseKsy(tokens: seq[Token]): Sects =
         types[t.name] = t.sects
       let last = s.sectsStack.len - 1
       s.sectsStack[last][skTypes] = Sect(kind: skTypes, types: types)
+      s.typeStack.setlen(0)
     Instances <- [tkInstances] * i(+Inst):
       var insts: Insts
       for i in s.instStack:
@@ -255,51 +256,69 @@ proc parseKsy(tokens: seq[Token]): Sects =
 
 proc parse*(path: string): Table[SectKind, Sect] = path.tokenizeKsy.parseKsy
 
+
+var indentCnt: int
+proc indent(): string =
+  ' '.repeat(indentCnt * 2)
+
 proc `$`(k: Key): string =
-  result = $k.kind
+  result = indent() & ($k.kind)[2..^1] & ": "
   case k.kind
   of kkApplication, kkDoc, kkDocRef, kkEncoding, kkEndian, kkEnum, kkId,
      kkKsVersion, kkLicense, kkTitle, kkType, kkRepeat:
-    result &= "(" & k.item & ")"
+    result &= k.item
   of kkFileExtension, kkImports, kkProcess:
-    result &= $k.items
+    result &= "\n"
+    inc indentCnt
+    for i in k.items:
+      result &= indent() & i
+    dec indentCnt
   else:
-    result &= $k.expr
+    result &= indent() & $k.expr
 
 proc `$`(keys: Keys): string =
-  result &= "KEYS("
-  for k in keys.keys:
-    result &= $keys[k] & " "
-  result &= ")"
+  for v in keys.values:
+    result &= "\n" & $v
 
 proc `$`(insts: Insts): string =
-  result &= "INSTS("
   for (name, keys) in insts.pairs:
-    result &= name & "(" & $keys & ")"
-  result &= ")"
+    result &= name & "\n"
+    inc indentCnt
+    result &= indent() & $keys
+    dec indentCnt
+
+proc `$`(types: Types): string # forward decl needed
 
 proc `$`(s: Sect): string =
-  result &= $s.kind & "("
+  result &= indent() & ($s.kind)[2..^1] & ":"
+  inc indentCnt
   case s.kind
   of skMeta:
     result &= $s.meta
   of skDoc:
-    result &= s.doc
+    result &= indent() & s.doc
   of skDocRef:
-    result &= s.`doc-ref`
+    result &= indent() & s.`doc-ref`
   of skSeq:
-    result &= $s.`seq`
+    for k in s.`seq`:
+      result &= $k
   of skTypes:
     result &= $s.types
   of skInstances:
     result &= $s.instances
-  of skEnums:
-    result &= "ENUM"
-  result &= ")"
+  of skEnums: discard
+  dec indentCnt
 
 proc `$`(t: Sects): string =
-  for k in t.keys:
-    result &= $t[k] & "\n"
+  for v in t.values:
+    result &= "\n" & $v
+
+proc `$`(types: Types): string =
+  for (name, sects) in types.pairs:
+    result &= "\n" & indent() & name & ":"
+    inc indentCnt
+    result &= $sects
+    dec indentCnt
 
 proc debugParser*(path: string) =
   let tokens = tokenizeKsy(path)

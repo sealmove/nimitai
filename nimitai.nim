@@ -1,4 +1,4 @@
-import macros, tables
+import macros, tables, strutils
 import nimitai/[parser, exprlang]
 
 var roott {.compileTime.}: NimNode
@@ -48,22 +48,21 @@ proc typeDecl(t: Type, parentt: NimNode): seq[NimNode] =
   obj.add(fields)
   result[1].add(obj)
 
-proc addTypeDecl(ts: var NimNode, ct: Type, p: NimNode) =
-  if skTypes in ct.sects:
-    let types = ct.sects[skTypes].types
-    for t in types.keys:
-      ts.addTypeDecl((t, types[t]), ident(ct.name))
-  ts.add typeDecl(ct, p)
+proc addTypeDecl(ts: var NimNode, h: seq[string], sects: Sects) =
+  ts.add typeDecl((h.join, sects), ident(h[0..^2].join))
+  if skTypes in sects:
+    let types = sects[skTypes].types
+    for (t, s) in types.pairs:
+      ts.addTypeDecl(h & t.capitalizeAscii, s)
 
 macro injectParser*(path: static[string]) =
   result = newStmtList()
   var typeSection = newTree(nnkTypeSection)
   let
     mt = parse(path)
-    id = mt[skMeta].meta[kkId].item
-    parentt = nnkRefTy.newTree(ident"RootObj")
+    id = mt[skMeta].meta[kkId].item.capitalizeAscii
   roott = ident(id)
-  typeSection.add typeDecl((id, mt), parentt)
-  for t in mt[skTypes].types.pairs:
-    typeSection.addTypeDecl(t, ident(id))
+  typeSection.add typeDecl((id, mt), nnkRefTy.newTree(ident"RootObj"))
+  for (t, s) in mt[skTypes].types.pairs:
+    typeSection.addTypeDecl(@[id, t.capitalizeAscii], s)
   result.add typeSection
