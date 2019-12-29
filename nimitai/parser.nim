@@ -109,18 +109,14 @@ proc parseKsy(tokens: seq[Token]): Type =
     NL <- 0:
       s.typeStack.add newSeq[Type]()
     NT <- 0:
-      let last = s.typeStack.len - 1
-      s.typeStack[last].add Type()
+      s.typeStack[^1].add Type()
     Doc <- [tkDoc] * (Item | [tkDocMark] * i(+Item))
     DocRef <- [tkDocRef] * Item
     LabeledType <- >[tkName] * NT * i(+Sect):
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].name = ($1).value
+      let i = s.typeStack.len - 1
+      s.typeStack[i][^1].name = ($1).value
       if i > 0:
-        let k = s.typeStack[i-1].len - 1
-        s.typeStack[i][j].parent = s.typeStack[i-1][k]
+        s.typeStack[i][^1].parent = s.typeStack[i-1][^1]
     Inst <- >[tkName] * i(+Key):
       var inst: Keys
       for key in s.keyStack:
@@ -155,47 +151,26 @@ proc parseKsy(tokens: seq[Token]): Type =
       for key in s.keyStack:
         meta[key.kind] = key
       s.keyStack.setlen(0)
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skMeta] = Sect(kind: skMeta, meta: meta)
+      s.typeStack[^1][^1].sects[skMeta] = Sect(kind: skMeta, meta: meta)
     DocSect <- Doc:
       var doc = s.itemStack.join(" ")
       s.itemStack.setlen(0)
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skDoc] = Sect(kind: skDoc, doc: doc)
+      s.typeStack[^1][^1].sects[skDoc] = Sect(kind: skDoc, doc: doc)
     DocRefSect <- DocRef:
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skDocRef] =
+      s.typeStack[^1][^1].sects[skDocRef] =
         Sect(kind: skDocRef, `doc-ref`: s.itemStack.pop)
     Seq <- [tkSeq] * i(+Keys):
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skSeq] = Sect(kind: skSeq, `seq`: s.keysStack)
+      s.typeStack[^1][^1].sects[skSeq] = Sect(kind: skSeq, `seq`: s.keysStack)
       s.keysStack.setlen(0)
     Types <- [tkTypes] * NL * i(+LabeledType):
-      let
-        i = s.typeStack.len - 2
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skTypes] =
+      s.typeStack[^2][^1].sects[skTypes] =
         Sect(kind: skTypes, types: s.typeStack.pop)
     Instances <- [tkInstances] * i(+Inst):
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skInstances] =
+      s.typeStack[^1][^1].sects[skInstances] =
         Sect(kind: skInstances, instances: s.instStack)
       s.instStack.setlen(0)
     Enums <- [tkEnums] * i(+Enum):
-      let
-        i = s.typeStack.len - 1
-        j = s.typeStack[i].len - 1
-      s.typeStack[i][j].sects[skEnums] =
+      s.typeStack[^1][^1].sects[skEnums] =
         Sect(kind: skEnums, enums: s.enumStack)
       s.enumStack.setlen(0)
     Application <- [tkApplication] * >[tkItem]:
