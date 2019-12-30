@@ -16,17 +16,20 @@ proc nim(e: Expr): NimNode =
   of ekInfix:   result = infix(nim(e.left), e.infix, nim(e.right))
   of ekPrefix:  result = prefix(nim(e.operant), e.prefix)
 
-proc hierarchy(t: Type): seq[string] =
-  var t = t
+proc id(t: Type): string =
+  var
+    t = t
+    res: seq[string]
   while t != nil:
-    result.insert(t.name.capitalizeAscii)
+    res.insert(t.name.capitalizeAscii)
     t = t.parent
+  res.join
 
 proc parentType(t: Type): NimNode =
   if t.parent == nil:
     nnkRefTy.newTree(ident"RootObj")
   else:
-    ident(hierarchy(t.parent).join)
+    ident(id(t.parent))
 
 proc attributes(t: Type): seq[NimNode] =
   for attr in t.sects[skSeq].`seq`:
@@ -81,7 +84,7 @@ proc attributes(t: Type): seq[NimNode] =
           while skTypes in t.sects and
                 ksType notin t.sects[skTypes].types.mapIt(it.name):
             t = t.parent
-          typ = ident(hierarchy(t).join & ksType.capitalizeAscii)
+          typ = ident(id(t) & ksType.capitalizeAscii)
 
     result.add(
       nnkIdentDefs.newTree(
@@ -92,7 +95,7 @@ proc attributes(t: Type): seq[NimNode] =
 proc typeDecl(t: Type): seq[NimNode] =
   result = newSeq[NimNode](2)
 
-  let name = hierarchy(t).join
+  let name = id(t)
 
   result[0] = nnkTypeDef.newTree(
     ident(name),
@@ -135,13 +138,79 @@ proc addTypeDecl(ts: var NimNode, t: Type) =
       ts.addTypeDecl(typ)
   ts.add typeDecl(t)
 
-macro injectParser*(path: static[string]) =
-  result = newStmtList()
-  var typeSection = newTree(nnkTypeSection)
-  mt = parse(path)
+proc types(): NimNode =
+  result = newTree(nnkTypeSection)
   rootType = ident(mt.name.capitalizeAscii)
   if skTypes in mt.sects:
     for t in mt.sects[skTypes].types:
-      typeSection.addTypeDecl(t)
-  typeSection.add typeDecl(mt)
-  result.add typeSection
+      result.addTypeDecl(t)
+  result.add typeDecl(mt)
+
+# Template for pythonic @property behavior
+proc property(): NimNode =
+  nnkTemplateDef.newTree(
+    nnkAccQuoted.newTree(
+      ident"."),
+    newEmptyNode(),
+    newEmptyNode(),
+    nnkFormalParams.newTree(
+      ident"untyped",
+      newIdentDefs(
+        ident"a",
+        rootType),
+      newIdentDefs(
+        ident"b",
+        ident"untyped")),
+    newEmptyNode(),
+    newEmptyNode(),
+    newStmtList(
+      newCall(
+        newPar(
+          newDotExpr(
+            ident"a",
+            nnkAccQuoted.newTree(
+              ident"b",
+              ident"inst"))))))
+
+#proc read(t: Type): NimNode =
+#proc addRead() =
+#proc reads(): NimNode =
+
+proc destructor(t: Type): NimNode =
+  let tObj = newIdentDefs(
+    ident"x",
+    nnkVarTy.newTree(
+      ident(id(t) & "Obj")))
+  result = newProc(
+    ident"destroy=",
+    @[newEmptyNode(),
+      tObj])
+  result.body = newCall(
+    ident"close",
+    newDotExpr(
+      ident"x",
+      ident"io"))
+
+proc addDestructor(sl: var NimNode, t: Type) =
+  if skTypes in t.sects:
+    for typ in t.sects[skTypes].types:
+      sl.addDestructor(typ)
+  sl.add destructor(t)
+
+proc destructors(): NimNode =
+  result = newStmtList()
+  if skTypes in mt.sects:
+    for t in mt.sects[skTypes].types:
+      result.addDestructor(t)
+  result.add destructor(mt)
+  
+#proc api(t: Type): NimNode =
+
+macro injectParser*(path: static[string]) =
+  mt = parse(path)
+  result = newStmtList()
+  result.add types()
+  result.add property()
+#  result.add reads()
+  result.add destructors()
+#  result.add api()
