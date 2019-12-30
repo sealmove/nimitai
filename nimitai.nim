@@ -31,65 +31,64 @@ proc parentType(t: Type): NimNode =
   else:
     ident(id(t.parent))
 
+proc nimType(t: Type, a: Keys): NimNode =
+  if kkType notin a:
+    result = nnkBracketExpr.newTree(
+               ident"seq",
+               ident"byte")
+  else:
+    let ksType = a[kkType].item
+    case ksType
+    of "u1":
+      result = ident"uint8"
+    of "u2", "u2le", "u2be":
+      result = ident"uint16"
+    of "u4", "u4le", "u4be":
+      result = ident"uint32"
+    of "u8", "u8le", "u8be":
+      result = ident"uint64"
+    of "s1":
+      result = ident"int8"
+    of "s2", "s2le", "s2be":
+      result = ident"int16"
+    of "s4", "s4le", "s4be":
+      result = ident"int32"
+    of "s8", "s8le", "s8be":
+      result = ident"int64"
+    of "f4", "f4le", "f4be":
+      result = ident"float32"
+    of "f8", "f8le", "f8be":
+      result = ident"float64"
+    of "str", "strz":
+      result = ident"string"
+    of "b1":
+      result = ident"bool"
+    else:
+      var bits: int
+      let parsedChars = ksType[1..^1].parseInt(bits)
+      if ksType.startsWith("b") and parsedChars == ksType.len - 1:
+        case bits
+        of  1 ..  8: result = ident"uint8"
+        of  9 .. 16: result = ident"uint16"
+        of 17 .. 32: result = ident"uint32"
+        of 33 .. 64: result = ident"uint64"
+        else:        result = nnkBracketExpr.newTree(
+                              ident"seq",
+                              ident"byte")
+      else:
+        # User type
+        var t = t
+        while skTypes in t.sects and
+              ksType notin t.sects[skTypes].types.mapIt(it.name):
+          t = t.parent
+        result = ident(id(t) & ksType.capitalizeAscii)
+
 proc attributes(t: Type): seq[NimNode] =
   for attr in t.sects[skSeq].`seq`:
-    # Translate type
-    var typ: NimNode
-    if kkType notin attr:
-      typ = nnkBracketExpr.newTree(
-              ident"seq",
-              ident"byte")
-    else:
-      let ksType = attr[kkType].item
-      case ksType
-      of "u1":
-        typ = ident"uint8"
-      of "u2", "u2le", "u2be":
-        typ = ident"uint16"
-      of "u4", "u4le", "u4be":
-        typ = ident"uint32"
-      of "u8", "u8le", "u8be":
-        typ = ident"uint64"
-      of "s1":
-        typ = ident"int8"
-      of "s2", "s2le", "s2be":
-        typ = ident"int16"
-      of "s4", "s4le", "s4be":
-        typ = ident"int32"
-      of "s8", "s8le", "s8be":
-        typ = ident"int64"
-      of "f4", "f4le", "f4be":
-        typ = ident"float32"
-      of "f8", "f8le", "f8be":
-        typ = ident"float64"
-      of "str", "strz":
-        typ = ident"string"
-      of "b1":
-        typ = ident"bool"
-      else:
-        var bits: int
-        let parsedChars = ksType[1..^1].parseInt(bits)
-        if ksType.startsWith("b") and parsedChars == ksType.len - 1:
-          case bits
-          of  1 ..  8: typ = ident"uint8"
-          of  9 .. 16: typ = ident"uint16"
-          of 17 .. 32: typ = ident"uint32"
-          of 33 .. 64: typ = ident"uint64"
-          else:        typ = nnkBracketExpr.newTree(
-                                ident"seq",
-                                ident"byte")
-        else:
-          # User type
-          var t = t
-          while skTypes in t.sects and
-                ksType notin t.sects[skTypes].types.mapIt(it.name):
-            t = t.parent
-          typ = ident(id(t) & ksType.capitalizeAscii)
-
     result.add(
       nnkIdentDefs.newTree(
         ident(attr[kkId].item),
-        typ,
+        t.nimType(attr),
         newEmptyNode()))
 
 proc typeDecl(t: Type): seq[NimNode] =
@@ -172,7 +171,32 @@ proc property(): NimNode =
               ident"b",
               ident"inst"))))))
 
-#proc read(t: Type, a: Keys): NimNode =
+proc callApi(t: Type, a: Keys): NimNode =
+  if kkType notin a:
+    return newCall(
+      ident"read_bytes",
+      ident"io",
+      a[kkSize].expr.nim)
+  let typ = a[kkType].item
+  case typ
+  of "u1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be",
+     "s1", "s2le", "s2be", "s4le", "s4be", "s8le", "s8be":
+    return newCall(
+      ident("read" & typ),
+      ident"io")
+  else: discard
+
+proc read(t: Type, a: Keys): NimNode =
+  let name = ident(a[kkId].item)
+  newStmtList(
+    newLetStmt(
+      name,
+      t.callApi(a)),
+    newAssignment(
+      newDotExpr(
+        ident"result",
+        name),
+      name))
 
 proc read(t: Type): NimNode =
   let
@@ -229,8 +253,8 @@ proc read(t: Type): NimNode =
         ident"root"),
       ident"root"))
 
-#  for attr in t.sects[skSeq].`seq`:
-#    result.body.add(t.read(attr))
+  for attr in t.sects[skSeq].`seq`:
+    result.body.add(t.read(attr))
 
 proc addRead(sl: var NimNode, t: Type) =
   if skTypes in t.sects:
@@ -275,8 +299,8 @@ proc destructors(): NimNode =
   
 macro injectParser*(path: static[string]) =
   mt = parse(path)
-  result = newStmtList()
-  result.add types()
-  result.add property()
-  result.add reads()
-  result.add destructors()
+  result = newStmtList(
+    types(),
+    property(),
+    reads(),
+    destructors())
