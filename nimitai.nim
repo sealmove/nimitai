@@ -172,9 +172,78 @@ proc property(): NimNode =
               ident"b",
               ident"inst"))))))
 
-#proc read(t: Type): NimNode =
-#proc addRead() =
-#proc reads(): NimNode =
+#proc read(t: Type, a: Keys): NimNode =
+
+proc read(t: Type): NimNode =
+  let
+    tIo = newIdentDefs(
+      ident"io",
+      ident"KaitaiStream")
+    tRoot = newIdentDefs(
+      ident"root",
+      rootType)
+    tParent = newIdentDefs(
+      ident"parent",
+      parentType(t))
+    tThis = ident(t.id)
+    tDesc = newIdentDefs(
+      ident"_",
+      nnkBracketExpr.newTree(
+        ident"typedesc",
+        tThis))
+
+  result = newProc(
+    ident"read",
+    @[tThis,
+      tDesc,
+      tIo,
+      tRoot,
+      tParent])
+  result.body = newStmtList(
+    newAssignment(
+      ident"result",
+      nnkObjConstr.newTree(
+        tThis,
+        newColonExpr(
+          ident"io",
+          ident"io"),
+        newColonExpr(
+          ident"parent",
+          ident"parent"))),
+    newLetStmt(
+      ident"root",
+      nnkIfExpr.newTree(
+        nnkElifExpr.newTree(
+          infix(
+            ident"root",
+            "==",
+            newNilLit()),
+          nnkCast.newTree(
+            rootType,
+            ident"result")),
+        nnkElseExpr.newTree(
+          ident"root"))),
+    newAssignment(
+      newDotExpr(
+        ident"result",
+        ident"root"),
+      ident"root"))
+
+#  for attr in t.sects[skSeq].`seq`:
+#    result.body.add(t.read(attr))
+
+proc addRead(sl: var NimNode, t: Type) =
+  if skTypes in t.sects:
+    for typ in t.sects[skTypes].types:
+      sl.addRead(typ)
+  sl.add read(t)
+
+proc reads(): NimNode =
+  result = newStmtList()
+  if skTypes in mt.sects:
+    for t in mt.sects[skTypes].types:
+      result.addRead(t)
+  result.add read(mt)
 
 proc destructor(t: Type): NimNode =
   let tObj = newIdentDefs(
@@ -204,13 +273,10 @@ proc destructors(): NimNode =
       result.addDestructor(t)
   result.add destructor(mt)
   
-#proc api(t: Type): NimNode =
-
 macro injectParser*(path: static[string]) =
   mt = parse(path)
   result = newStmtList()
   result.add types()
   result.add property()
-#  result.add reads()
+  result.add reads()
   result.add destructors()
-#  result.add api()
