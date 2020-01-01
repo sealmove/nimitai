@@ -184,7 +184,18 @@ proc callApi(t: Type, a: Keys): NimNode =
     return newCall(
       ident("read" & typ),
       ident"io")
-  else: discard
+  #XXX These ones should be checked; was a default endian provided?
+  of "u2", "u4", "u8", "s2", "s4", "s8":
+    return newCall(
+      ident("read" & typ & "le"),
+      ident"io")
+  else:
+    return newCall(
+      ident"read",
+      ident(id(t)),
+      ident"io",
+      ident"root",
+      ident"parent")
 
 proc read(t: Type, a: Keys): NimNode =
   let name = ident(a[kkId].item)
@@ -200,34 +211,34 @@ proc read(t: Type, a: Keys): NimNode =
 
 proc read(t: Type): NimNode =
   let
-    tIo = newIdentDefs(
+    idIo = newIdentDefs(
       ident"io",
       ident"KaitaiStream")
-    tRoot = newIdentDefs(
+    idRoot = newIdentDefs(
       ident"root",
       rootType)
-    tParent = newIdentDefs(
+    idParent = newIdentDefs(
       ident"parent",
       parentType(t))
-    tThis = ident(t.id)
-    tDesc = newIdentDefs(
+    idThis = ident(id(t))
+    idDesc = newIdentDefs(
       ident"_",
       nnkBracketExpr.newTree(
         ident"typedesc",
-        tThis))
+        idThis))
 
   result = newProc(
     ident"read",
-    @[tThis,
-      tDesc,
-      tIo,
-      tRoot,
-      tParent])
+    @[idThis,
+      idDesc,
+      idIo,
+      idRoot,
+      idParent])
   result.body = newStmtList(
     newAssignment(
       ident"result",
       nnkObjConstr.newTree(
-        tThis,
+        idThis,
         newColonExpr(
           ident"io",
           ident"io"),
@@ -296,6 +307,31 @@ proc destructors(): NimNode =
     for t in mt.sects[skTypes].types:
       result.addDestructor(t)
   result.add destructor(mt)
+
+proc api(): NimNode =
+  let
+    idThis = ident(id(mt))
+    idDesc = newIdentDefs(
+      ident"td",
+      nnkBracketExpr.newTree(
+        ident"typedesc",
+        idThis))
+    idPath = newIdentDefs(
+        ident"path",
+        ident"string")
+  result = newProc(
+    ident"fromFile",
+    @[idThis,
+      idDesc,
+      idPath])
+  result.body = newCall(
+    ident"read",
+    idThis,
+    newCall(
+      ident"newKaitaiStream",
+      ident"path"),
+    newNilLit(),
+    newNilLit())
   
 macro injectParser*(path: static[string]) =
   mt = parse(path)
@@ -303,4 +339,5 @@ macro injectParser*(path: static[string]) =
     types(),
     property(),
     reads(),
-    destructors())
+    destructors(),
+    api())
