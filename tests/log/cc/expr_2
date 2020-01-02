@@ -1,6 +1,0 @@
-newIdentNode("Token")
-newIdentNode("Token")
-/home/sealmove/Github/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
-/home/sealmove/Github/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
-/home/sealmove/Github/nimitai/tests/tooling/temp.nim(9, 17) template/generic instantiation of `injectParser` from here
-/home/sealmove/Github/nimitai/nimitai.nim(101, 23) Error: undeclared identifier: 'Expr_2Mod_strTuple'
