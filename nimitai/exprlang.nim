@@ -44,7 +44,7 @@ type
     of ekBoolean:
       boolVal*: bool
     of ekArray:
-      arrayVal*: seq[byte]
+      arrayVal*: seq[Expr]
     of ekString, ekId:
       strVal*: string
     of ekInfix:
@@ -141,7 +141,7 @@ proc parseExpr(tokens: seq[Token]): Expr =
         b = s.stackCnt
         f = s.stack.len - 1
         expr = Expr(kind: ekArray,
-                    arrayVal: s.stack[b .. f].mapIt(it.intval.byte))
+                    arrayVal: s.stack[b .. f])
       s.stack.setlen(b)
       s.stack.add expr
     Float <- [tkFloat]:

@@ -45,6 +45,7 @@ type
     tkIndent
     tkDedent
     tkItem
+    tkApostrophe
 
 const keys = [
   "meta"            ,
@@ -98,7 +99,7 @@ proc tokenizeKsy*(path: string): seq[Token] =
   let lexer = peg G:
     k(item) <- item * B * ':' * B
     B <- *Blank
-    G <- +((Dent | Key | Dash | DocMark | Item) * B) * !1
+    G <- +((Dent | Key | Dash | DocMark | Apostrophe | Item) * B) * !1
     Dent <- +'\n' * >*' ':
       let s = len($1)
       var idx = indents.len - 1
@@ -119,6 +120,8 @@ proc tokenizeKsy*(path: string): seq[Token] =
       tokens.add (tkDash, $0)
     DocMark <- '|':
       tokens.add (tkDocMark, $0)
+    Apostrophe <- '\'':
+      tokens.add (tkApostrophe, $0)
     Item <- +(Print - '\n'):
       tokens.add (tkItem, $0)
       

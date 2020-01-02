@@ -85,27 +85,16 @@ There is a seperate program -`testgenerator`- which compiles the official `.kst`
                    |             / \
                    |            ✔️ G ✗
 132 total          |           /     \
-  ✔️ 130 generate   |         130      2
-    ✔️ 11 compile   |         / \
-      ✔️ 10 pass    |        ✔️ C ✗
-      ✗ 0 fail     |       /     \
-    ✗ 116 error    |      6      125
-  ✗ 2 crash        |     / \
+  ✔️ 105 generate   |         105     27      
+    ✔️ 9 compile    |         / \
+      ✔️ 2 pass     |        ✔️ C ✗
+      ✗ 7 fail     |       /     \
+    ✗ 96 error     |      9      96
+  ✗ 27 crash       |     / \
                    |    ✔️ P ✗
                    |   /     \
-                   |  6       0
+                   |  2       7
 </pre>
-
-## Internals
-- The `.ksy` file gets parsed into an hierarchical nimm object (with [npeg)](https://github.com/zevv/npeg)
-- The object is transformed into a sequence of nodes -each one representing a concrete type-
-- For each concrete type the following are generated:
-  - type declaration
-  - `read` procedure (reads data from file)
-  - destructor
-- Lastly, `fromFile` proc is generated
-
-*Everything is done at compile-time*
 
 ## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?
 **YES**. The official KSY grammar is supported 100%.  

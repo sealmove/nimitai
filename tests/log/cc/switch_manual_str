@@ -1,0 +1,3 @@
+newIdentNode("Token")
+newIdentNode("Token")
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(13, 49) Error: invalid indentation

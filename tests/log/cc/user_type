@@ -1,0 +1,15 @@
+newIdentNode("Token")
+newIdentNode("Token")
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(10, 21) template/generic instantiation of `fromFile` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(9, 18) Error: type mismatch: got <type User_typeHeader, KaitaiStream, User_type, ref RootObj>
+but expected one of: 
+proc read(_: typedesc[User_typeHeader]; io: KaitaiStream; root: User_type;
+         parent: User_type): User_typeHeader
+  first type mismatch at position: 4
+  required type for parent: User_type
+  but expression 'parent' is of type: ref RootObj
+1 other mismatching symbols have been suppressed; compile with --showAllMismatches:on to see them
+
+expression: read(User_typeHeader, io, root, parent)

@@ -1,0 +1,15 @@
+newIdentNode("Token")
+newIdentNode("Token")
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(10, 21) template/generic instantiation of `fromFile` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(9, 18) Error: type mismatch: got <type Repeat_eos_structChunk, KaitaiStream, Repeat_eos_struct, ref RootObj>
+but expected one of: 
+proc read(_: typedesc[Repeat_eos_structChunk]; io: KaitaiStream;
+         root: Repeat_eos_struct; parent: Repeat_eos_struct): Repeat_eos_structChunk
+  first type mismatch at position: 4
+  required type for parent: Repeat_eos_struct
+  but expression 'parent' is of type: ref RootObj
+1 other mismatching symbols have been suppressed; compile with --showAllMismatches:on to see them
+
+expression: read(Repeat_eos_structChunk, io, root, parent)

@@ -5,16 +5,40 @@ var
   rootType {.compileTime.}: NimNode
   mt {.compileTime.}: Type
 
-proc nim(e: Expr): NimNode =
+proc nim*(e: Expr): NimNode =
   case e.kind
   of ekId:      result = ident(e.strVal)
   of ekInteger: result = newLit(e.intVal)
   of ekFloat:   result = newLit(e.floatVal)
   of ekBoolean: result = newLit(e.boolVal)
-  of ekArray:   result = newLit[byte](e.arrayVal)
+  of ekArray:
+    let elems = newTree(nnkBracket)
+    for expr in e.arrayVal:
+      elems.add(nim(expr))
+    result = prefix(
+      elems,
+      "@")
   of ekString:  result = newLit(e.strVal)
   of ekInfix:   result = infix(nim(e.left), e.infix, nim(e.right))
   of ekPrefix:  result = prefix(nim(e.operant), e.prefix)
+
+proc getBitType(s: string): tuple[isBitType: bool, bits: int, typ: NimNode] =
+  var bits: int
+  let parsedChars = s[1..^1].parseInt(bits)
+  if s.startsWith("b") and parsedChars == s.len - 1:
+    var typ: NimNode
+    case bits:
+    of  1 ..  8: typ = ident"uint8"
+    of  9 .. 16: typ = ident"uint16"
+    of 17 .. 32: typ = ident"uint32"
+    of 33 .. 64: typ = ident"uint64"
+    else:        typ = ident"string"
+#    else:        typ = nnkBracketExpr.newTree(
+#                         ident"seq",
+#                         ident"byte")
+    result = (true, bits, typ)
+
+
 
 proc id(t: Type): string =
   var
@@ -33,9 +57,10 @@ proc parentType(t: Type): NimNode =
 
 proc nimType(t: Type, a: Keys): NimNode =
   if kkType notin a:
-    result = nnkBracketExpr.newTree(
-               ident"seq",
-               ident"byte")
+    result = ident"string"
+    #result = nnkBracketExpr.newTree(
+    #           ident"seq",
+    #           ident"byte")
   else:
     let ksType = a[kkType].item
     case ksType
@@ -64,17 +89,9 @@ proc nimType(t: Type, a: Keys): NimNode =
     of "b1":
       result = ident"bool"
     else:
-      var bits: int
-      let parsedChars = ksType[1..^1].parseInt(bits)
-      if ksType.startsWith("b") and parsedChars == ksType.len - 1:
-        case bits
-        of  1 ..  8: result = ident"uint8"
-        of  9 .. 16: result = ident"uint16"
-        of 17 .. 32: result = ident"uint32"
-        of 33 .. 64: result = ident"uint64"
-        else:        result = nnkBracketExpr.newTree(
-                              ident"seq",
-                              ident"byte")
+      let x = getBitType(ksType)
+      if x.isBitType:
+        result = x.typ
       else:
         # User type
         var t = t
@@ -84,12 +101,13 @@ proc nimType(t: Type, a: Keys): NimNode =
         result = ident(id(t) & ksType.capitalizeAscii)
 
 proc attributes(t: Type): seq[NimNode] =
-  for attr in t.sects[skSeq].`seq`:
-    result.add(
-      nnkIdentDefs.newTree(
-        ident(attr[kkId].item),
-        t.nimType(attr),
-        newEmptyNode()))
+  if skSeq in t.sects:
+    for attr in t.sects[skSeq].`seq`:
+      result.add(
+        nnkIdentDefs.newTree(
+          ident(attr[kkId].item),
+          t.nimType(attr),
+          newEmptyNode()))
 
 proc typeDecl(t: Type): seq[NimNode] =
   result = newSeq[NimNode](2)
@@ -176,7 +194,9 @@ proc callApi(t: Type, a: Keys): NimNode =
     return newCall(
       ident"read_bytes",
       ident"io",
-      a[kkSize].expr.nim)
+      newCall(
+        ident"int",
+        a[kkSize].expr.nim))
   let typ = a[kkType].item
   case typ
   of "u1", "u2le", "u2be", "u4le", "u4be", "u8le", "u8be",
@@ -189,13 +209,41 @@ proc callApi(t: Type, a: Keys): NimNode =
     return newCall(
       ident("read" & typ & "le"),
       ident"io")
-  else:
+  of "str":
     return newCall(
-      ident"read",
-      ident(id(t)),
+      ident"read_bytes",
       ident"io",
-      ident"root",
-      ident"parent")
+      newCall(
+        ident"int",
+        nim(a[kkSize].expr)))
+  of "strz":
+    return newCall(
+      ident"read_bytes_full",
+      ident"io")
+  of "b1":
+    return newCall(
+      ident"bool",
+      newCall(
+        ident"read_bits_int",
+        ident"io",
+        newLit(1)))
+  else:
+    let x = typ.getBitType
+    if x.isBitType:
+      let `cast` = x.typ
+      return newCall(
+        `cast`,
+        newCall(
+          ident"read_bits_int",
+          ident"io",
+          newLit(x.bits)))
+    else: # User-type
+      return newCall(
+        ident"read",
+        nimType(t, a),
+        ident"io",
+        ident"root",
+        ident"parent")
 
 proc read(t: Type, a: Keys): NimNode =
   let name = ident(a[kkId].item)
@@ -264,8 +312,9 @@ proc read(t: Type): NimNode =
         ident"root"),
       ident"root"))
 
-  for attr in t.sects[skSeq].`seq`:
-    result.body.add(t.read(attr))
+  if skSeq in t.sects:
+    for attr in t.sects[skSeq].`seq`:
+      result.body.add(t.read(attr))
 
 proc addRead(sl: var NimNode, t: Type) =
   if skTypes in t.sects:
@@ -326,7 +375,7 @@ proc api(): NimNode =
       idPath])
   result.body = newCall(
     ident"read",
-    idThis,
+    ident"td",
     newCall(
       ident"newKaitaiStream",
       ident"path"),

@@ -94,9 +94,10 @@ proc parseKsy(tokens: seq[Token]): Type =
     s = State()
   let parser = peg(G, Token, s: State):
     i(item) <- [tkIndent] * item * [tkDedent]
+    a(item) <- [tkApostrophe] * item * [tkApostrophe]
     Item <- [tkItem]:
       s.itemStack.add ($0).value
-    Expr <- Item | i(+Item) * Item:
+    Expr <- Item | Item * i(+Item) | a(Item):
       let e = s.itemstack.join(" ")
       s.itemStack.setLen(0)
       s.exprStack.add expr(e)
@@ -111,7 +112,7 @@ proc parseKsy(tokens: seq[Token]): Type =
     NT <- 0:
       s.typeStack[^1].add Type()
     Doc <- [tkDoc] * (Item | [tkDocMark] * i(+Item))
-    DocRef <- [tkDocRef] * Item
+    DocRef <- [tkDocRef] * (Item | [tkDocMark] * i(+Item))
     LabeledType <- >[tkName] * NT * i(+Sect):
       let i = s.typeStack.len - 1
       s.typeStack[i][^1].name = ($1).value
@@ -157,8 +158,10 @@ proc parseKsy(tokens: seq[Token]): Type =
       s.itemStack.setlen(0)
       s.typeStack[^1][^1].sects[skDoc] = Sect(kind: skDoc, doc: doc)
     DocRefSect <- DocRef:
+      var `doc-ref` = s.itemStack.join(" ")
+      s.itemStack.setlen(0)
       s.typeStack[^1][^1].sects[skDocRef] =
-        Sect(kind: skDocRef, `doc-ref`: s.itemStack.pop)
+        Sect(kind: skDocRef, `doc-ref`: `doc-ref`)
     Seq <- [tkSeq] * i(+Keys):
       s.typeStack[^1][^1].sects[skSeq] = Sect(kind: skSeq, `seq`: s.keysStack)
       s.keysStack.setlen(0)
@@ -185,7 +188,9 @@ proc parseKsy(tokens: seq[Token]): Type =
       s.itemStack.setlen(0)
       s.keyStack.add Key(kind: kkDoc, item: doc)
     DocRefKey <- DocRef:
-      s.keyStack.add Key(kind: kkDocRef, item: s.itemStack.pop)
+      var `doc-ref` = s.itemStack.join(" ")
+      s.itemStack.setlen(0)
+      s.keyStack.add Key(kind: kkDocRef, item: `doc-ref`)
     Encoding <- [tkEncoding] * >[tkItem]:
       s.keyStack.add Key(kind: kkEncoding, item: ($1).value)
     Endian <- [tkEndian] * >[tkItem]:

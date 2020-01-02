@@ -1,0 +1,26 @@
+newIdentNode("Token")
+newIdentNode("Token")
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(7, 7) template/generic instantiation of `suite` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(8, 8) template/generic instantiation of `test` from here
+/home/sealmove/Github/nimitai/tests/tooling/temp.nim(11, 11) template/generic instantiation of `check` from here
+/home/sealmove/Github/Nim/lib/pure/unittest.nim(665, 14) Error: type mismatch: got <uint32, seq[int64]>
+but expected one of: 
+proc `==`(x, y: uint32): bool
+  first type mismatch at position: 2
+  required type for y: uint32
+  but expression ':c2' is of type: seq[int64]
+proc `==`(x, y: uint): bool
+  first type mismatch at position: 2
+  required type for y: uint
+  but expression ':c2' is of type: seq[int64]
+proc `==`(x, y: uint64): bool
+  first type mismatch at position: 2
+  required type for y: uint64
+  but expression ':c2' is of type: seq[int64]
+proc `==`[T: SomeInteger; U: SomeInteger](x: T; y: U): bool
+  first type mismatch at position: 2
+  required type for y: U: SomeInteger
+  but expression ':c2' is of type: seq[int64]
+27 other mismatching symbols have been suppressed; compile with --showAllMismatches:on to see them
+
+expression: :c1 == :c2
