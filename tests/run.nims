@@ -1,4 +1,4 @@
-#!/usr/bin/env nim
+#!/usr/bin/env -S nim --hints:off
 cd "tooling"
 try:
   exec "nim c -r --hints:off testsuite"

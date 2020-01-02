@@ -76,7 +76,7 @@ Block1, number2: 45
 
 ## Progress
 Nimitai is tested against the same material as Kaitai Struct.  
-There is a seperate program -`testgenerator`- which compiles the official `.kst` files into a unittest module.
+There is a (nim)script which compiles the official `.kst` files into a unittest module.
 
 <pre>
    List view       |         Tree view
@@ -85,11 +85,11 @@ There is a seperate program -`testgenerator`- which compiles the official `.kst`
                    |             / \
                    |            ✔️ G ✗
 132 total          |           /     \
-  ✔️ 105 generate   |         105     27      
+  ✔️ 105 generate   |         119     13
     ✔️ 9 compile    |         / \
       ✔️ 2 pass     |        ✔️ C ✗
       ✗ 7 fail     |       /     \
-    ✗ 96 error     |      9      96
+    ✗ 96 error     |      9      110
   ✗ 27 crash       |     / \
                    |    ✔️ P ✗
                    |   /     \
