@@ -1,5 +1,5 @@
 import macros, strutils
-import ../../nimitai/exprlang, ../../nimitai, kstparser
+import ../../nimitai/exprlang, ../../nimitai, parser
 
 proc test*(kst: Kst): NimNode =
   var asserts = newStmtList()
@@ -37,7 +37,7 @@ proc suite*(tests: varargs[NimNode], errorCode = -1): string =
     nnkImportStmt.newTree(
       ident"../../nimitai",
       ident"../../../kaitai_struct_nim_runtime/kaitai_struct_nim_runtime",
-      ident"loose_match",
+      ident"matcher",
       ident"unittest",
       ident"options"),
     nnkPragma.newTree(

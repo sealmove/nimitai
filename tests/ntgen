@@ -1,7 +1,0 @@
-#!/bin/sh
-
-./ntclrlog
-cd tooling
-nim c -r --hints:off suite
-rm -f suite temp temp.nim
-cd ..

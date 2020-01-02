@@ -11,3 +11,5 @@ proc `==`*[T: SomeInteger](x: string, y: seq[T]): bool =
     if c1 != c2.char:
       return false
   return true
+
+proc `+`*(x, y: string): string = x & y

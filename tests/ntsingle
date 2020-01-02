@@ -1,6 +1,0 @@
-#!/bin/sh
-
-cd tooling
-nim c -r --hints:off single
-rm -f single temp temp.nim
-cd ..

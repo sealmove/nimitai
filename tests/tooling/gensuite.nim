@@ -1,5 +1,5 @@
 import strutils, strformat, oswalkdir
-import kstparser, generator
+import parser, generator
 from os import extractFilename
 
 const

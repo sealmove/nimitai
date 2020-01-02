@@ -5,6 +5,20 @@ var
   rootType {.compileTime.}: NimNode
   mt {.compileTime.}: Type
 
+proc nimInfix(left: NimNode, op: string, right: NimNode): NimNode =
+  case op
+  of "+", "-", "*", "/", ">=", ">", "<=", "<", "==", "!=", "and", "or":
+    result = infix(left, op, right)
+  of "%"  : result = infix(left, "mod", right)
+  of "<<" : result = infix(left, "shr", right)
+  of ">>" : result = infix(left, "shl", right)
+  of "&"  : result = infix(left, "and", right)
+  of "|"  : result = infix(left, "or" , right)
+  of "^"  : result = infix(left, "xor", right)
+  of "."  : result = newDotExpr(left, right)
+  of "::" : result = ident(left.strval & right.strval)
+  else: discard
+
 proc nim*(e: Expr): NimNode =
   case e.kind
   of ekId:      result = ident(e.strVal)
@@ -19,7 +33,7 @@ proc nim*(e: Expr): NimNode =
       elems,
       "@")
   of ekString:  result = newLit(e.strVal)
-  of ekInfix:   result = infix(nim(e.left), e.infix, nim(e.right))
+  of ekInfix:   result = nimInfix(nim(e.left), e.infix, nim(e.right))
   of ekPrefix:  result = prefix(nim(e.operant), e.prefix)
 
 proc getBitType(s: string): tuple[isBitType: bool, bits: int, typ: NimNode] =

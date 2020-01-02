@@ -109,7 +109,7 @@ proc tokenizeExpr(str: string): seq[Token] =
       tokens.add Token(kind: tkArrayClose)
     Op         <- "+" | "-"  | "*" | "/"  | "%" | "<<" | ">>" |  "&"  | "|"  |
                   "^" | ">=" | ">" | "<=" | "<" | "==" | "!=" | "and" | "or" |
-                  ".":
+                  "." | "::":
       tokens.add Token(kind: tkOp, strVal: $0)
     Id         <- (Lower | '_') * *(Alnum | '_'):
       tokens.add Token(kind: tkId, strVal: $0)
