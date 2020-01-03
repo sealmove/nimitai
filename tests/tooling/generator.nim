@@ -26,9 +26,7 @@ proc test*(kst: Kst): NimNode =
         ident"r",
         newCall(
           ident"fromFile",
-          newCall(
-            ident"typeof",
-            ident(kst.id.capitalizeAscii)),
+          ident(kst.id.capitalizeAscii),
           newLit("../material/bin/" & kst.data))),
       asserts))
 

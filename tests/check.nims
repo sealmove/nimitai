@@ -19,12 +19,12 @@ static:
 
   try:
     var test: NimNode
-    writeFile("temp.nim", suite(parseKst(path).test, 2))
-    let (ccOut, ccCode) = gorgeEx("nim c --hints:off temp")
+    writeFile("test.nim", suite(parseKst(path).test, 2))
+    let (ccOut, ccCode) = gorgeEx("nim c --hints:off test")
     if ccCode != 0:
       echo &"{Y}[CC]{D} {name}\n{ccOut}"
     else:
-      let (rcOut, rcCode) = gorgeEx("./temp")
+      let (rcOut, rcCode) = gorgeEx("./test")
       if rcCode == 2:
         test = parseKst(path).test
         echo &"{G}[OK]{D} {name}"
@@ -35,6 +35,9 @@ static:
     echo getCurrentExceptionMsg()""")
 
 exec "nim c -r --hints:off temp"
+echo readFile("test.nim")
 
 rmFile "temp"
 rmFile "temp.nim"
+rmFile "test"
+rmFile "test.nim"

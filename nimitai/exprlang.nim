@@ -135,7 +135,7 @@ proc parseExpr(tokens: seq[Token]): Expr =
                        prefix: ($1).strval,
                        operant: s.stack.pop)
     ParenExpr <- [tkParenOpen] * Expr * [tkParenClose]
-    Array <- [tkArrayOpen] * CS * Integer * *([tkComma] * Integer) *
+    Array <- [tkArrayOpen] * CS * Expr * *([tkComma] * Expr) *
              [tkArrayClose]:
       let
         b = s.stackCnt

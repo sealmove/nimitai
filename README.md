@@ -85,15 +85,15 @@ There is a (nim)script which compiles the official `.kst` files into a unittest 
                    |             / \
                    |            ✔️ G ✗
 132 total          |           /     \
-  ✔️ 105 generate   |         119     13
-    ✔️ 9 compile    |         / \
+  ✔️ 127 generate   |         127      5
+    ✔️ 13 compile   |         / \
       ✔️ 2 pass     |        ✔️ C ✗
       ✗ 7 fail     |       /     \
-    ✗ 96 error     |      9      110
-  ✗ 27 crash       |     / \
+    ✗ 114 error    |      13     114
+  ✗ 5 crash        |     / \
                    |    ✔️ P ✗
                    |   /     \
-                   |  2       7
+                   |  4       9
 </pre>
 
 ## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?

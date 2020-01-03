@@ -257,7 +257,7 @@ proc callApi(t: Type, a: Keys): NimNode =
         nimType(t, a),
         ident"io",
         ident"root",
-        ident"parent")
+        ident"result")
 
 proc read(t: Type, a: Keys): NimNode =
   let name = ident(a[kkId].item)

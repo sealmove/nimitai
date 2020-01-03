@@ -97,7 +97,7 @@ proc parseKsy(tokens: seq[Token]): Type =
     a(item) <- [tkApostrophe] * item * [tkApostrophe]
     Item <- [tkItem]:
       s.itemStack.add ($0).value
-    Expr <- Item | Item * i(+Item) | a(Item):
+    Expr <- Item * ?i(+Item) | a(Item):
       let e = s.itemstack.join(" ")
       s.itemStack.setLen(0)
       s.exprStack.add expr(e)
