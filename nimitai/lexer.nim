@@ -99,7 +99,8 @@ proc tokenizeKsy*(path: string): seq[Token] =
   let lexer = peg G:
     k(item) <- item * B * ':' * B
     B <- *Blank
-    G <- +((Dent | Key | Dash | DocMark | Apostrophe | Item) * B) * !1
+    G <- +((Hash | Dent | Key | Dash | DocMark | Apostrophe | Item) * B) * !1
+    Hash <- '#' * +(Print - '\n')
     Dent <- +'\n' * >*' ':
       let s = len($1)
       var idx = indents.len - 1
@@ -122,12 +123,10 @@ proc tokenizeKsy*(path: string): seq[Token] =
       tokens.add (tkDocMark, $0)
     Apostrophe <- '\'':
       tokens.add (tkApostrophe, $0)
-    Item <- +(Print - '\n'):
-      tokens.add (tkItem, $0)
+    Item <- >+(Print - {'\n', '#'}):
+      tokens.add (tkItem, $1)
       
-  let file = readFile(path).splitLines
-                           .filterIt(not it.strip.startsWith('#'))
-                           .join("\n")
+  let file = readFile(path)
   assert lexer.match(file).ok
   tokens
 

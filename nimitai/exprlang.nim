@@ -20,7 +20,7 @@ type
     of tkFloat:
       floatVal: BiggestFloat
     of tkInteger:
-      intVal: BiggestInt
+      intVal: BiggestUInt
     of tkBoolean:
       boolVal: bool
     of tkString, tkOp, tkId:
@@ -38,7 +38,7 @@ type
   Expr* = ref object
     case kind*: ExprKind
     of ekInteger:
-      intVal*: BiggestInt
+      intVal*: BiggestUInt
     of ekFloat:
       floatVal*: BiggestFloat
     of ekBoolean:
@@ -67,7 +67,7 @@ proc tokenizeExpr(str: string): seq[Token] =
     B <- *Blank
     G <- *((Float | Integer | Boolean | String | Comma | ParenOpen |
             ParenClose | ArrayOpen | ArrayClose | Op | Id) * B) * !1
-    Float      <- Int * '.' * Int * ?('e' * Integer):
+    Float      <- Int * '.' * Int * ?('e' * ?{'+', '-'} * Int):
       var x: BiggestFloat
       assert len($0) == parseBiggestFloat($0, x)
       tokens.add Token(kind: tkFloat, floatVal: x)
@@ -78,20 +78,20 @@ proc tokenizeExpr(str: string): seq[Token] =
     Bin        <- "0b" * +{'0', '1', '_'}
     Dec        <- +(Digit | '_')
     HexR     <- Hex:
-      var x: BiggestInt
-      assert len($0) == parseHex[BiggestInt]($0, x)
+      var x: BiggestUInt
+      assert len($0) == parseHex[BiggestUInt]($0, x)
       tokens.add Token(kind: tkInteger, intVal: x)
     OctR     <- Oct:
-      var x: BiggestInt
-      assert len($0) == parseOct[BiggestInt]($0, x)
+      var x: BiggestUInt
+      assert len($0) == parseOct[BiggestUInt]($0, x)
       tokens.add Token(kind: tkInteger, intVal: x)
     BinR     <- Bin:
-      var x: BiggestInt
-      assert len($0) == parseBin[BiggestInt]($0, x)
+      var x: BiggestUInt
+      assert len($0) == parseBin[BiggestUInt]($0, x)
       tokens.add Token(kind: tkInteger, intVal: x)
     DecR     <- Dec:
-      var x: BiggestInt
-      assert len($0) == parseBiggestInt($0, x)
+      var x: BiggestUInt
+      assert len($0) == parseBiggestUInt($0, x)
       tokens.add Token(kind: tkInteger, intVal: x)
     Boolean    <- "true" | "false":
       tokens.add Token(kind: tkBoolean, boolval: parseBool($0))
