@@ -1,3 +1,18 @@
+# XXX: For resolving type of calculated ("value") instances we need a type
+# algebra mechanism. In order to reuse Nim's instead of implementing one, the
+# following *trick* can be used:
+#
+# 11:38:23    lqdev[m] | so what you can do in this case is to split the macro
+#                        into two, I'll call them `parsePeg`
+#                      | and `genObject`. `parsePeg` handles the parsing and
+#                        expression generation, `genObject`
+#                      | handles the object declaration generation
+# 11:38:42    lqdev[m] | the trick is to make `genObject`'s parameters typed
+# 11:39:03    lqdev[m] | and call it indirectly by generating an nnkCall from
+#                       `parsePeg`
+#
+# This will probably require a redesigning of codegen architecture (this file)
+
 import macros, tables, strutils, sequtils, parseutils
 import nimitai/[parser, exprlang]
 
@@ -47,12 +62,7 @@ proc getBitType(s: string): tuple[isBitType: bool, bits: int, typ: NimNode] =
     of 17 .. 32: typ = ident"uint32"
     of 33 .. 64: typ = ident"uint64"
     else:        typ = ident"string"
-#    else:        typ = nnkBracketExpr.newTree(
-#                         ident"seq",
-#                         ident"byte")
     result = (true, bits, typ)
-
-
 
 proc id(t: Type): string =
   var
@@ -72,9 +82,6 @@ proc parentType(t: Type): NimNode =
 proc nimType(t: Type, a: Keys): NimNode =
   if kkType notin a:
     result = ident"string"
-    #result = nnkBracketExpr.newTree(
-    #           ident"seq",
-    #           ident"byte")
   else:
     let ksType = a[kkType].item
     case ksType
@@ -118,10 +125,19 @@ proc attributes(t: Type): seq[NimNode] =
   if skSeq in t.sects:
     for attr in t.sects[skSeq].`seq`:
       result.add(
-        nnkIdentDefs.newTree(
+        newIdentDefs(
           ident(attr[kkId].item),
-          t.nimType(attr),
-          newEmptyNode()))
+          t.nimType(attr)))
+
+proc instances(t: Type): seq[NimNode] =
+  if skInstances in t.sects:
+    for inst in t.sects[skInstances].instances:
+      result.add(
+        newIdentDefs(
+          ident(inst.name & "Inst"),
+          nnkProcTy.newTree(
+          nnkFormalParams.newTree(t.nimType(inst.keys)),
+            newEmptyNode())))
 
 proc typeDecl(t: Type): seq[NimNode] =
   result = newSeq[NimNode](2)
@@ -159,6 +175,7 @@ proc typeDecl(t: Type): seq[NimNode] =
       newEmptyNode()))
 
   fields.add t.attributes
+  fields.add t.instances
 
   obj.add(fields)
   result[1].add(obj)
@@ -259,7 +276,7 @@ proc callApi(t: Type, a: Keys): NimNode =
         ident"root",
         ident"result")
 
-proc read(t: Type, a: Keys): NimNode =
+proc read(t: Type, a: Attr): NimNode =
   let name = ident(a[kkId].item)
   newStmtList(
     newLetStmt(

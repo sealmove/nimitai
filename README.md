@@ -79,21 +79,21 @@ Nimitai is tested against the same material as Kaitai Struct.
 There is a (nim)script which compiles the official `.kst` files into a unittest module.
 
 <pre>
-   List view       |         Tree view
--------------------|----------------------------
-                   |             132
-                   |             / \
-                   |            ✔️ G ✗
-132 total          |           /     \
-  ✔️ 127 generate   |         127      5
-    ✔️ 13 compile   |         / \
-      ✔️ 2 pass     |        ✔️ C ✗
-      ✗ 7 fail     |       /     \
-    ✗ 114 error    |      13     114
-  ✗ 5 crash        |     / \
-                   |    ✔️ P ✗
-                   |   /     \
-                   |  4       9
+   List view            |         Tree view
+------------------------|----------------------------
+                        |             132
+                        |             / \
+                        |            ✔️   ✗
+132 total               |           /     \
+  ✔️ 127 generate        |         127      5
+    ✔️ 15 compile        |         /|\
+      ✔️ 2 pass          |        ✔️ ❗️✗
+      ✗ 7 fail          |       /  |  \
+    ❗️2 runtime error   |      13  2  112
+    ✗ 112 compile error |     / \
+  ✗ 5 codegen error     |    ✔️   ✗
+                        |   /     \
+                        |  4       9
 </pre>
 
 ## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?

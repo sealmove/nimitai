@@ -74,6 +74,7 @@ type
       items*: seq[string]
     else:
       expr*: Expr
+  Attr* = Keys
   Inst* = tuple[name: string, keys: Keys]
   Enum* = tuple[name: string, es: Table[string, int]]
   State = ref object
