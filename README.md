@@ -83,15 +83,15 @@ There is a (nim)script which compiles the official `.kst` files into a unittest 
 -------------------------|----------------------------
                          |             132
                          |             / \
-                         |            ✔️   ✗
+                         |           🙂  🙁 
 132 total                |           /     \
   🙂 127 generate        |         127      5
     🙂 15 compile        |         /|\
-      🙂 2 pass          |        ✔️ ❗️✗
+      🙂 2 pass          |       🙂😐🙁 
       🙁 7 fail          |       /  |  \
     😐 2 runtime error   |      13  2  112
     🙁 112 compile error |     / \
-  🙁 5 codegen error     |    ✔️   ✗
+  🙁 5 codegen error     |   🙂  🙁 
                          |   /     \
                          |  4       9
 </pre>
