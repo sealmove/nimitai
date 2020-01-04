@@ -16,7 +16,7 @@ type
     skTypes
     skInstances
     skEnums
-  Sect* = ref object
+  Sect* = object
     case kind*: SectKind
     of skMeta:
       meta*: Keys
@@ -65,7 +65,7 @@ type
     kkTitle
     kkType
     kkValue
-  Key* = ref object
+  Key* = object
     case kind*: KeyKind
     of kkApplication, kkDoc, kkDocRef, kkEncoding, kkEndian, kkEnum, kkId,
        kkKsVersion, kkLicense, kkTitle, kkType, kkRepeat:
@@ -77,7 +77,7 @@ type
   Attr* = Keys
   Inst* = tuple[name: string, keys: Keys]
   Enum* = tuple[name: string, es: Table[string, int]]
-  State = ref object
+  State = object
     itemStack: seq[string]
     exprStack: seq[Expr]
     keyStack:  seq[Key]
