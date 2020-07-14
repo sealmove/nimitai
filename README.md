@@ -4,8 +4,9 @@
 Nimitai is a parser generator implemented as a native Nim library.  
 It accepts [ksy grammars](https://doc.kaitai.io/ksy_reference.html) which work best for describing binary data structures.  
 
-## Note
-Due to the lack of a compile-time yaml parser, instead of the ksy file itself, nimitai uses the json equivalent of it as input for now -let's call this **ksj**-. Any yaml -> json converter should do.
+## Missing components
+- **compile-time yaml parser:** Due to the lack of this Nim component, instead of the ksy file itself, nimitai uses the json equivalent of it as input for now (let's call this **ksj**). Any yaml -> json converter should do.
+- **json schema validator:** Ideally, the syntax error reporting should be handled by this component, but a Nim implementation of it is currently missing.
 
 | Exported symbol | Production |
 |-----------------|------------|
