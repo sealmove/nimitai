@@ -1,16 +1,17 @@
-# <p align="center">nimitai [STALLED]</p>
+# <p align="center">nimitai [WIP]</p>
 
 ## Introduction
 Nimitai is a parser generator implemented as a native Nim library.  
-It accepts [KSY grammars](https://doc.kaitai.io/ksy_reference.html) which work best for describing binary data structures.  
+It accepts [ksy grammars](https://doc.kaitai.io/ksy_reference.html) which work best for describing binary data structures.  
 
-###### The word *binary* in this context means hard-for-human-to-read
+## Note
+Due to the lack of a compile-time yaml parser, instead of the ksy file itself, nimitai uses the json equivalent of it as input for now -let's call this **ksj**-. Any yaml -> json converter should do.
 
 | Exported symbol | Production |
 |-----------------|------------|
-| `proc writeModule(ksy, module: string)` | nim module (source code) |
-| `proc writeDll(ksy, dll: string)` | dynamic library |
-| `macro injectParser(ksy: static[string])` | static library (compile time code embedding) |
+| `proc writeModule(ksj, module: string)` | nim module (source code) |
+| `proc writeDll(ksj, dll: string)` | dynamic library |
+| `macro injectParser(ksj: static[string])` | static library (compile time code embedding) |
 
 ## Example
 
@@ -49,7 +50,7 @@ ee 00 00 00
 test_nimitai.nim
 ```nim
 import nimitai, kaitai_struct_nim_runtime
-injectParser("buffered_struct.ksy")
+injectParser("buffered_struct.ksj")
 let x = BufferedStruct.fromFile("buffered_struct.bin")
 
 echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
@@ -75,7 +76,7 @@ Block1, number2: 45
   - `parent`: holds a reference to the parent object
 
 ## Progress
-Nimitai is stalled indefinately, mainly due to the lack of a compile-time yaml parser for Nim.
+Nimitai is only an idea for now; implementation is missing.
 
 ## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?
 **YES**. The official KSY grammar is supported 100%.  
