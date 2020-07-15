@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "id": "cast_to_top"
+  },
+  "seq": [
+    {
+      "id": "code",
+      "type": "u1"
+    }
+  ],
+  "instances": {
+    "header": {
+      "pos": 1,
+      "type": "cast_to_top"
+    },
+    "header_casted": {
+      "value": "header.as<cast_to_top>"
+    }
+  }
+}

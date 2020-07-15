@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "id": "valid_fail_expr"
+  },
+  "seq": [
+    {
+      "id": "foo",
+      "type": "u1",
+      "valid": {
+        "expr": "_ == 1"
+      }
+    },
+    {
+      "id": "bar",
+      "type": "s2le",
+      "valid": {
+        "expr": "_ < -190 or _ > -190"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "id": "user_type",
+    "endian": "le"
+  },
+  "seq": [
+    {
+      "id": "one",
+      "type": "header"
+    }
+  ],
+  "types": {
+    "header": {
+      "seq": [
+        {
+          "id": "width",
+          "type": "u4"
+        },
+        {
+          "id": "height",
+          "type": "u4"
+        }
+      ]
+    }
+  }
+}
