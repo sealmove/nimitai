@@ -1,0 +1,5 @@
+/home/sealmove/Git/sealmove/nimyaml2json/nimyaml2json.nim(6) nimyaml2json
+/home/sealmove/.nimble/pkgs/yaml-0.14.0/yaml/tojson.nim(205) loadToJson
+/home/sealmove/.nimble/pkgs/yaml-0.14.0/yaml/tojson.nim(136) constructJson
+/home/sealmove/.nimble/pkgs/yaml-0.14.0/yaml/tojson.nim(73) jsonFromScalar
+Error: unhandled exception: Cannot parse numeric value [YamlConstructionError]

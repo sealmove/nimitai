@@ -1,0 +1,10 @@
+{
+  "id": "instance_std",
+  "data": "str_encodings.bin",
+  "asserts": [
+    {
+      "actual": "header",
+      "expected": "\"Some \""
+    }
+  ]
+}
