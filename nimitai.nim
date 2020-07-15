@@ -32,31 +32,37 @@ proc nativeType(ksyType: string): string =
   else: # TODO: implement look-up here
     result = ksyType
 
-proc typeSection(json: JsonNode): NimNode =
-  result = newTree(nnkTypeSection)
+proc field(json: JsonNode): NimNode =
+  newIdentDefs(
+    ident(json["id"].getStr),
+    ident(nativeType(json["type"].getStr)))
 
+proc type(name: string, json: JsonNode): NimNode =
   var fields = newTree(nnkRecList)
 
   for f in json["seq"]:
-    fields.add(
-      newIdentDefs(
-        ident(f["id"].getStr),
-        ident(nativeType(f["type"].getStr))))
+    fields.add(field(f))
 
   fields.add(
     newIdentDefs(
       ident"parent",
       ident(rootTypeName)))
 
-  result.add(nnkTypeDef.newTree(
-    ident(json["meta"]["id"].getStr),
+  result = nnkTypeDef.newTree(
+    ident(name),
     newEmptyNode(),
     nnkRefTy.newTree(
       nnkObjectTy.newTree(
         newEmptyNode(),
         nnkOfInherit.newTree(
           ident(rootTypeName)),
-        fields))))
+        fields)))
+
+proc typeSection(json: JsonNode): NimNode =
+  result = newTree(nnkTypeSection)
+  result.add(type(json["meta"]["id"].getStr, json))
+  for n, c in types(json):
+    result.add(type(n, c))
 
 proc readForwardDeclaration(typeName: string): NimNode =
   result = nnkProcDef.newTree(
@@ -87,6 +93,9 @@ proc readForwardDeclarations(json: JsonNode): NimNode =
   result = newStmtList()
   result.add(
     readForwardDeclaration(json["meta"]["id"].getStr))
+  for n, c in types(json):
+    result.add(
+      readForwardDeclaration(n))
 
 proc readProc(typeName: string, json: JsonNode): NimNode =
   result = newProc(name = ident"read")
@@ -123,7 +132,7 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
         ident"this",
         newCall(
           ident"new",
-          ident"HelloWorld")),
+          ident(typeName))),
       newLetStmt(
         ident"root",
         nnkIfExpr.newTree(
@@ -133,11 +142,11 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
               ident"root",
               newNilLit()),
             nnkCast.newTree(
-              ident"HelloWorld",
+              ident(typeName),
               ident"this")),
           nnkElseExpr.newTree(
             nnkCast.newTree(
-              ident"HelloWorld",
+              ident(typeName),
               ident"root")))),
       newAssignment(
         newDotExpr(
@@ -157,16 +166,12 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
 
 proc readProcs(json: JsonNode): NimNode =
   result = newStmtList()
-  for t in json["types"].pairs:
+  for n, c in types(json):
     result.add(
-      readProc(t.key, t.val))
+      readProc(n, c))
 
 proc generateParser(ksj: string): NimNode =
   let json = parseJson(readFile(ksj))
-  for k, c in json.types():
-    echo k
-    echo "--------"
-    echo pretty(c)
 
   result = newStmtList(
     typeSection(json),
@@ -174,7 +179,7 @@ proc generateParser(ksj: string): NimNode =
     readProcs(json))
 
   # debugging
-  #echo repr result
+  echo repr result
 
 macro injectParser(ksj: static[string]) =
   result = generateParser(ksj)
