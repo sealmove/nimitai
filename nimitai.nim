@@ -6,15 +6,15 @@ const
 iterator types(json: JsonNode): tuple[name: string, contents: JsonNode] =
   var
     hierarchy = @[json["meta"]["id"].getStr]
-    stack = @[(json, hierarchy)]
+    stack = @[(hierarchy, json)]
   while stack.len != 0:
-    let (curr, h) = pop(stack)
-    for t in curr["types"].pairs:
-      if t.val.contains("types"):
+    let (h, curr) = pop(stack)
+    if curr.contains("types"):
+      for t in curr["types"].pairs:
         hierarchy.add(t.key)
-        stack.add((t.val, hierarchy))
+        stack.add((hierarchy, t.val))
         discard pop(hierarchy)
-      yield (h.join("_") & "_" & t.key, t.val)
+    yield (h.join("_"), curr)
 
 proc nativeType(ksyType: string): string =
   case ksyType
@@ -60,7 +60,6 @@ proc type(name: string, json: JsonNode): NimNode =
 
 proc typeSection(json: JsonNode): NimNode =
   result = newTree(nnkTypeSection)
-  result.add(type(json["meta"]["id"].getStr, json))
   for n, c in types(json):
     result.add(type(n, c))
 
@@ -91,8 +90,6 @@ proc readForwardDeclaration(typeName: string): NimNode =
 
 proc readForwardDeclarations(json: JsonNode): NimNode =
   result = newStmtList()
-  result.add(
-    readForwardDeclaration(json["meta"]["id"].getStr))
   for n, c in types(json):
     result.add(
       readForwardDeclaration(n))
@@ -164,11 +161,41 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
           ident"parent"),
         ident"parent"))
 
-proc readProcs(json: JsonNode): NimNode =
+proc fromFileProc(typeName: string): NimNode =
+  newStmtList(
+    nnkProcDef.newTree(
+      ident"fromFile",
+      newEmptyNode(),
+      newEmptyNode(),
+      nnkFormalParams.newTree(
+        ident(typeName),
+        newIdentDefs(
+          ident"_",
+          nnkBracketExpr.newTree(
+            ident"typedesc",
+            ident(typeName))),
+        newIdentDefs(
+          ident"filename",
+          ident"string")),
+      newEmptyNode(),
+      newEmptyNode(),
+      newStmtList(
+        newCall(
+          newDotExpr(
+            ident(typeName),
+            ident"read"),
+          newCall(
+            ident"newKaitaiFileStream",
+            ident"filename"),
+          newNilLit(),
+          newNilLit()))))
+
+proc procs(json: JsonNode): NimNode =
   result = newStmtList()
   for n, c in types(json):
     result.add(
-      readProc(n, c))
+      readProc(n, c),
+      fromFileProc(n))
 
 proc generateParser(ksj: string): NimNode =
   let json = parseJson(readFile(ksj))
@@ -176,7 +203,7 @@ proc generateParser(ksj: string): NimNode =
   result = newStmtList(
     typeSection(json),
     readForwardDeclarations(json),
-    readProcs(json))
+    procs(json))
 
   # debugging
   echo repr result
