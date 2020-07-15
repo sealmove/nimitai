@@ -1,4 +1,4 @@
-# <p align="center">nimitai [WIP]</p>
+# <p align="center">nimitai</p>
 
 ## Introduction & motivation
 Nimitai is a parser generator implemented as a native Nim library.  
