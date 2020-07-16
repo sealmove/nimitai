@@ -1,1 +1,1 @@
-*.ksj linguist-language=json
+*.ksj, *.kst linguist-language=json
