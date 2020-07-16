@@ -71,22 +71,19 @@ Block1, number2: 45
 - One procedure -called `fromFile`- is generated.
 - The procedure is namespaced under the file format type as written in the top-level meta section.
 - The procedure accepts a file path and returns an object.
-- The object have one field for each attribute described in the `.ksy` file.
-- The object have the following additional fields:
+- The object has one field for each attribute described in the `.ksy` file.
+- The object has the following additional fields:
   - `io`: holds the parsing stream
   - `root`: holds a reference to the root object
   - `parent`: holds a reference to the parent object
 
 ## Progress, missing components & plans
-Nimitai is only an idea for now; implementation is missing.
+Nimitai is a work in progress. Even the most basic features are not implemented yet.
 
-The following components are currently missing:
+The following components are currently missing -I plan to implement these after nimitai is functional enough on a practical level-:
 - **compile-time yaml parser:** Due to the lack of this Nim component, instead of the ksy file itself, nimitai uses the json equivalent of it as input for now (let's call this **ksj**). Any yaml -> json converter should do.
 - **json schema validator:** Ideally, the syntax error reporting should be handled by this component, but a Nim implementation of it is currently missing.
 
-
 ## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?
-**YES**. The official KSY grammar is supported 100%.  
-Alternatively, nimitai can be set to accept Nim expressions and types instead of Kaitai Struct ones.
-
-*Toggling this setting will be described in future documentation*
+**YES**. The official KSY grammar will be supported 100%.  
+Alternatively, you will be able to configure nimitai so that it accepts Nim expressions and types instead of Kaitai Struct ones.
