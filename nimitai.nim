@@ -202,7 +202,7 @@ proc generateParser(ksj: string): NimNode =
 
   result = newStmtList(
     typeSection(json),
-    readForwardDeclarations(json),
+    #readForwardDeclarations(json),
     procs(json))
 
   # debugging
@@ -218,4 +218,4 @@ proc writeDll(ksj, dll: string) = discard
 
 # debugging
 static:
-  discard generateParser("ksj/nested_types.ksj")
+  discard generateParser("testing/specs/hello_world.ksj")
