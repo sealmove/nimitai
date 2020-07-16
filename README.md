@@ -11,9 +11,9 @@ Essentially it's an alternative [Kaitai Struct](https://kaitai.io/) compiler imp
 
 | Exported symbol | Production |
 |-----------------|------------|
-| `proc writeModule(ksj, module: string)`{:.nim} | nim module (source code) |
-| `proc writeDll(ksj, dll: string)`{:.nim} | dynamic library |
-| `macro injectParser(ksj: static[string])`{:.nim} | static library (compile time code embedding) |
+| `proc writeModule(ksj, module: string)` | nim module (source code) |
+| `proc writeDll(ksj, dll: string)` | dynamic library |
+| `macro injectParser(ksj: static[string])` | static library (compile time code embedding) |
 
 ## Example
 
