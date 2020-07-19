@@ -33,18 +33,18 @@ proc nativeType(ksyType: string): string =
   else: # TODO: implement look-up here
     result = ksyType
 
-proc field(json: JsonNode): NimNode =
+proc attribute(json: JsonNode): NimNode =
   newIdentDefs(
     ident(json["id"].getStr),
     ident(nativeType(json["type"].getStr)))
 
 proc type(name: string, json: JsonNode): NimNode =
-  var fields = newTree(nnkRecList)
+  var attributes = newTree(nnkRecList)
 
   for f in json["seq"]:
-    fields.add(field(f))
+    attributes.add(attribute(f))
 
-  fields.add(
+  attributes.add(
     newIdentDefs(
       ident"parent",
       ident(rootTypeName)))
@@ -57,7 +57,7 @@ proc type(name: string, json: JsonNode): NimNode =
         newEmptyNode(),
         nnkOfInherit.newTree(
           ident(rootTypeName)),
-        fields)))
+        attributes)))
 
 proc typeSection(json: JsonNode): NimNode =
   result = newTree(nnkTypeSection)
@@ -95,6 +95,9 @@ proc readForwardDeclarations(json: JsonNode): NimNode =
     result.add(
       readForwardDeclaration(n))
 
+#proc attributeRead(typeName: string): NimNode =
+
+
 proc readProc(typeName: string, json: JsonNode): NimNode =
   result = newProc(name = ident"read")
 
@@ -115,52 +118,67 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
       ident"parent",
       ident(rootTypeName)))
 
-  result.body =
-    newStmtList(
-      nnkTemplateDef.newTree(
-        ident"this",
-        newEmptyNode(),
-        newEmptyNode(),
-        nnkFormalParams.newTree(
-          ident"untyped"),
-        newEmptyNode(),
-        newEmptyNode(),
-        ident"result"),
-      newAssignment(
-        ident"this",
-        newCall(
-          ident"new",
-          ident(typeName))),
-      newLetStmt(
-        ident"root",
-        nnkIfExpr.newTree(
-          nnkElifExpr.newTree(
-            nnkInfix.newTree(
-              ident"==",
-              ident"root",
-              newNilLit()),
-            nnkCast.newTree(
-              ident(typeName),
-              ident"this")),
-          nnkElseExpr.newTree(
-            nnkCast.newTree(
-              ident(typeName),
-              ident"root")))),
+  var calls = newStmtList()
+  for a in json["seq"]:
+    let
+      id = a["id"].getStr
+      typ = a["type"].getStr
+
+    var call: NimNode
+    case typ
+    of "u1":
+      call = newCall(
+        newDotExpr(
+          newDotExpr(
+            ident"result",
+            ident"io"),
+          ident"readU1"))
+    else: discard
+
+    calls.add(
       newAssignment(
         newDotExpr(
-          ident"this",
-          ident"io"),
+          ident"result",
+          ident(id)),
+        call))
+
+  result.body = newStmtList(
+    newAssignment(
+      ident"result",
+      newCall(
+        ident"new",
+        ident(typeName))),
+    newLetStmt(
+      ident"root",
+      nnkIfExpr.newTree(
+        nnkElifExpr.newTree(
+          nnkInfix.newTree(
+            ident"==",
+            ident"root",
+            newNilLit()),
+          nnkCast.newTree(
+            ident(typeName),
+            ident"result")),
+        nnkElseExpr.newTree(
+          nnkCast.newTree(
+            ident(typeName),
+            ident"root")))),
+    newAssignment(
+      newDotExpr(
+        ident"result",
         ident"io"),
-      newAssignment(
-        newDotExpr(
-          ident"this",
-          ident"root"),
+      ident"io"),
+    newAssignment(
+      newDotExpr(
+        ident"result",
         ident"root"),
-      newAssignment(
-        newDotExpr(
-          ident"this",
-          ident"parent"),
-        ident"parent"))
+      ident"root"),
+    newAssignment(
+      newDotExpr(
+        ident"result",
+        ident"parent"),
+      ident"parent"),
+    calls)
 
 proc fromFileProc(typeName: string): NimNode =
   newStmtList(
@@ -206,9 +224,6 @@ proc generateParser(ksj: string): NimNode =
     #readForwardDeclarations(json),
     procs(json))
 
-  # debugging
-  # echo repr result
-
 macro injectParser*(ksj: static[string]) =
   result = generateParser(ksj)
 
@@ -218,5 +233,7 @@ proc writeModule(ksj, module: string) =
 proc writeDll(ksj, dll: string) = discard
 
 # debugging
-#static:
-#  discard generateParser("testing/specs/hello_world.ksj")
+static:
+  const t = "testing/specs/hello_world.ksj"
+  echo parseJson(readFile(t)).pretty
+  echo repr generateParser(t)

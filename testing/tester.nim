@@ -11,14 +11,14 @@ proc test(json: JsonNode): NimNode =
   var stmts = newStmtList(
     newCall(
       ident"injectParser",
-      newLit(&"specs/{id}.ksj")),
+      newLit(&"testing/specs/{id}.ksj")),
     newLetStmt(
       newIdentNode("r"),
       newCall(
         newDotExpr(
           ident(id),
           newIdentNode("fromFile")),
-        newLit(&"subjects/{data}"))))
+        newLit(&"testing/subjects/{data}"))))
 
   for a in json["asserts"]:
     stmts.add(
@@ -36,13 +36,13 @@ proc test(json: JsonNode): NimNode =
     newLit(id),
     stmts)
 
-proc suite(): NimNode =
+macro suite() =
   var tests = newStmtList()
-  for a, f in walkDir("tests/working_tests"):
+  for a, f in walkDir("testing/tests/working_tests"):
     let json = parseJson(readFile(f))
     tests.add(test(json))
 
-  newStmtList(
+  result = newStmtList(
     nnkImportStmt.newTree(
       ident"nimitai",
       ident"kaitai_struct_nim_runtime",
@@ -52,7 +52,6 @@ proc suite(): NimNode =
       newLit"Nimitai test suite",
       tests))
 
-macro runSuite() =
-  suite()
+  echo repr result
 
-runSuite()
+suite()
