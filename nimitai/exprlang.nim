@@ -70,7 +70,7 @@ proc tokenize(str: string): seq[Token] =
     Boolean    <- "true" | "false":
       tokens.add Token(kind: tkBoolean, boolval: parseBool($0))
     String     <- '\"' * >*(Print - '\"') * '\"':
-      tokens.add Token(kind: tkString, strval: $0)
+      tokens.add Token(kind: tkString, strval: ($0)[1..^2])
     Comma      <- ',':
       tokens.add Token(kind: tkComma)
     ParenOpen  <- '(':
@@ -99,9 +99,12 @@ proc parse(tokens: seq[Token]): NimNode =
     G <- Expr * !1
     Expr <- Term * *Infix
     Infix <- >[tkOp] * Term:
+      let
+        right = s.stack.pop
+        left = s.stack.pop
       case ($1).strval
-      of ".": s.stack.add newDotExpr(s.stack.pop, s.stack.pop)
-      else: s.stack.add infix(s.stack.pop, ($1).strval, s.stack.pop)
+      of ".": s.stack.add newDotExpr(left, right)
+      else: s.stack.add infix(left, ($1).strval, right)
     Term <- ParenExpr | Array | Float | Integer | Boolean | String | Id | Prefix
     Prefix <- >[tkOp] * Term:
       s.stack.add prefix(s.stack.pop, ($1).strval)
