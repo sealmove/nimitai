@@ -129,6 +129,18 @@ proc instanceProcsFD(json: JsonNode): NimNode =
       for k, v in c["instances"].pairs:
         result.add(instanceProcFD(n, k, v))
 
+proc instanceProc(typeName, key: string; val: JsonNode): NimNode =
+  result = newProc(name = ident(key))
+
+  result.params = nnkFormalParams.newTree(
+    ident(inferInstanceType(val)),
+    newIdentDefs(
+      ident"this",
+      ident(typeName)))
+
+  if val.contains("value"):
+    result.body = expr(val["value"].getStr)
+
 proc readProc(typeName: string, json: JsonNode): NimNode =
   result = newProc(name = ident"read")
 
@@ -155,16 +167,18 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
       id = a["id"].getStr
       typ = a["type"].getStr
 
-    var call: NimNode
+    var procedure: string
     case typ
-    of "u1":
-      call = newCall(
+    of "u1": procedure = "readU1"
+    of "u2": procedure = "readU2Le"
+    else: procedure = "XXX"
+
+    let call = newCall(
+      newDotExpr(
         newDotExpr(
-          newDotExpr(
-            ident"result",
-            ident"io"),
-          ident"readU1"))
-    else: discard
+          ident"result",
+          ident"io"),
+        ident(procedure)))
 
     calls.add(
       newAssignment(
@@ -246,6 +260,10 @@ proc procs(json: JsonNode): NimNode =
     result.add(
       readProc(n, c),
       fromFileProc(n))
+    if c.contains("instances"):
+      for k, v in c["instances"].pairs:
+        result.add(
+          instanceProc(n, k, v))
 
 proc generateParser(ksj: string): NimNode =
   let json = parseJson(readFile(ksj))
@@ -253,7 +271,7 @@ proc generateParser(ksj: string): NimNode =
   result = newStmtList(
     typeSection(json),
     readProcsFD(json),
-    instanceProcsFD(json),
+#    instanceProcsFD(json),
     procs(json))
 
 macro injectParser*(ksj: static[string]) =
@@ -266,9 +284,8 @@ proc writeModule(ksj, module: string) =
 proc writeDll(ksj, dll: string) = discard
 
 
-#[ debugging
+# debugging
 static:
   const t = "testing/specs/expr_0.ksj"
   echo parseJson(readFile(t)).pretty
   echo repr generateParser(t)
-]#
