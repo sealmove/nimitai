@@ -58,14 +58,14 @@ let x = BufferedStruct.fromFile("buffered_struct.bin")
 echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
 echo "Block1, number2: " & toHex(x.block1.number2.int64, 2)
 echo "Block2, number1: " & toHex(x.block2.number1.int64, 2)
-echo "Block1, number2: " & toHex(x.block2.number2.int64, 2)
+echo "Block2, number2: " & toHex(x.block2.number2.int64, 2)
 ```
 output:
 ```
 Block1, number1: 42
 Block1, number2: 43
 Block2, number1: 44
-Block1, number2: 45
+Block2, number2: 45
 ```
 ## API
 - One procedure -called `fromFile`- is generated.
