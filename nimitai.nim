@@ -2,6 +2,7 @@ import macros, json, strutils
 
 const
   rootTypeName = "KaitaiStruct"
+  streamTypeName = "KaitaiStream"
 
 iterator types(json: JsonNode): tuple[name: string, contents: JsonNode] =
   var
@@ -77,7 +78,7 @@ proc readForwardDeclaration(typeName: string): NimNode =
           ident(typeName))),
       newIdentDefs(
         ident"io",
-        ident"KaitaiStream"),
+        ident(streamTypeName)),
       newIdentDefs(
         ident"root",
         ident(rootTypeName)),
@@ -106,7 +107,7 @@ proc readProc(typeName: string, json: JsonNode): NimNode =
         ident(typeName))),
     newIdentDefs(
       ident"io",
-      ident(rootTypeName)),
+      ident(streamTypeName)),
     newIdentDefs(
       ident"root",
       ident(rootTypeName)),
@@ -206,9 +207,9 @@ proc generateParser(ksj: string): NimNode =
     procs(json))
 
   # debugging
-  echo repr result
+  # echo repr result
 
-macro injectParser(ksj: static[string]) =
+macro injectParser*(ksj: static[string]) =
   result = generateParser(ksj)
 
 proc writeModule(ksj, module: string) =
@@ -217,5 +218,5 @@ proc writeModule(ksj, module: string) =
 proc writeDll(ksj, dll: string) = discard
 
 # debugging
-static:
-  discard generateParser("testing/specs/hello_world.ksj")
+#static:
+#  discard generateParser("testing/specs/hello_world.ksj")

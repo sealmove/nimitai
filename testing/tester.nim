@@ -9,6 +9,9 @@ proc test(json: JsonNode): NimNode =
     data = json["data"].getStr
 
   var stmts = newStmtList(
+    newCall(
+      ident"injectParser",
+      newLit(&"specs/{id}.ksj")),
     newLetStmt(
       newIdentNode("r"),
       newCall(
@@ -42,11 +45,14 @@ proc suite(): NimNode =
   newStmtList(
     nnkImportStmt.newTree(
       ident"nimitai",
-      ident"kaitai_struct_nim_runtime"),
+      ident"kaitai_struct_nim_runtime",
+      ident"unittest"),
     nnkCommand.newTree(
       ident"suite",
       newLit"Nimitai test suite",
       tests))
 
-static:
-  echo repr suite()
+macro runSuite() =
+  suite()
+
+runSuite()
