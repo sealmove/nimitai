@@ -31,7 +31,7 @@ proc test(json: JsonNode): NimNode =
           "==",
           expr(a["expected"].getStr))))
 
-  result = nnkCommand.newTree(
+  nnkCommand.newTree(
     newIdentNode("test"),
     newLit(id),
     stmts)
@@ -42,16 +42,14 @@ macro suite() =
     let json = parseJson(readFile(f))
     tests.add(test(json))
 
-  result = newStmtList(
+  newStmtList(
     nnkImportStmt.newTree(
       ident"nimitai",
       ident"kaitai_struct_nim_runtime",
       ident"unittest"),
     nnkCommand.newTree(
       ident"suite",
-      newLit"Nimitai test suite",
+      newLit"Nimitai Test Suite",
       tests))
-
-  echo repr result
 
 suite()

@@ -99,7 +99,9 @@ proc parse(tokens: seq[Token]): NimNode =
     G <- Expr * !1
     Expr <- Term * *Infix
     Infix <- >[tkOp] * Term:
-      s.stack.add infix(s.stack.pop, ($1).strval, s.stack.pop)
+      case ($1).strval
+      of ".": s.stack.add newDotExpr(s.stack.pop, s.stack.pop)
+      else: s.stack.add infix(s.stack.pop, ($1).strval, s.stack.pop)
     Term <- ParenExpr | Array | Float | Integer | Boolean | String | Id | Prefix
     Prefix <- >[tkOp] * Term:
       s.stack.add prefix(s.stack.pop, ($1).strval)
@@ -154,7 +156,7 @@ proc debug(s: string) =
   echo ""
   let expr = parse(tokens)
   echo "=== EXPRESSION ==="
-  echo repr expr
+  echo treeRepr expr
   echo ""
 
-#static: debug("3.5 + 3")
+#static: debug("sdfda.as_int")

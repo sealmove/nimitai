@@ -1,4 +1,5 @@
 import macros, json, strutils
+import nimitai/exprlang
 
 const
   rootTypeName = "KaitaiStruct"
@@ -33,21 +34,33 @@ proc nativeType(ksyType: string): string =
   else: # TODO: implement look-up here
     result = ksyType
 
+proc inferInstanceType(json: JsonNode): string =
+  if json.contains("type"): nativeType(json["type"].getStr)
+  else: "auto"
+
 proc attribute(json: JsonNode): NimNode =
   newIdentDefs(
     ident(json["id"].getStr),
     ident(nativeType(json["type"].getStr)))
 
+proc instance(name: string, json: JsonNode): NimNode =
+  newIdentDefs(
+    ident(name),
+    ident(inferInstanceType(json)))
+
 proc type(name: string, json: JsonNode): NimNode =
-  var attributes = newTree(nnkRecList)
+  var fields = newTree(nnkRecList)
 
-  for f in json["seq"]:
-    attributes.add(attribute(f))
-
-  attributes.add(
+  fields.add(
     newIdentDefs(
       ident"parent",
       ident(rootTypeName)))
+
+  for a in json["seq"]:
+    fields.add(attribute(a))
+
+  #for k, v in json["instances"].pairs:
+  #  fields.add(instance(k, v))
 
   result = nnkTypeDef.newTree(
     ident(name),
@@ -57,15 +70,15 @@ proc type(name: string, json: JsonNode): NimNode =
         newEmptyNode(),
         nnkOfInherit.newTree(
           ident(rootTypeName)),
-        attributes)))
+        fields)))
 
 proc typeSection(json: JsonNode): NimNode =
   result = newTree(nnkTypeSection)
   for n, c in types(json):
     result.add(type(n, c))
 
-proc readForwardDeclaration(typeName: string): NimNode =
-  result = nnkProcDef.newTree(
+proc readFD(typeName: string): NimNode =
+  nnkProcDef.newTree(
     ident"read",
     newEmptyNode(),
     newEmptyNode(),
@@ -89,14 +102,32 @@ proc readForwardDeclaration(typeName: string): NimNode =
     newEmptyNode(),
     newEmptyNode())
 
-proc readForwardDeclarations(json: JsonNode): NimNode =
+proc readProcsFD(json: JsonNode): NimNode =
   result = newStmtList()
   for n, c in types(json):
-    result.add(
-      readForwardDeclaration(n))
+    result.add(readFD(n))
 
-#proc attributeRead(typeName: string): NimNode =
+proc instanceProcFD(typeName, key: string; val: JsonNode): NimNode =
+  nnkProcDef.newTree(
+    ident(key),
+    newEmptyNode(),
+    newEmptyNode(),
+    nnkFormalParams.newTree(
+      #expr(val["value"].getStr),
+      ident(inferInstanceType(val)),
+      newIdentDefs(
+        ident"this",
+        ident(typeName))),
+    newEmptyNode(),
+    newEmptyNode(),
+    newEmptyNode())
 
+proc instanceProcsFD(json: JsonNode): NimNode =
+  result = newStmtList()
+  for n, c in types(json):
+    if c.contains("instances"):
+      for k, v in c["instances"].pairs:
+        result.add(instanceProcFD(n, k, v))
 
 proc readProc(typeName: string, json: JsonNode): NimNode =
   result = newProc(name = ident"read")
@@ -221,19 +252,23 @@ proc generateParser(ksj: string): NimNode =
 
   result = newStmtList(
     typeSection(json),
-    #readForwardDeclarations(json),
+    readProcsFD(json),
+    instanceProcsFD(json),
     procs(json))
 
 macro injectParser*(ksj: static[string]) =
   result = generateParser(ksj)
+#  echo repr result
 
 proc writeModule(ksj, module: string) =
   writeFile(module, generateParser(ksj).repr)
 
 proc writeDll(ksj, dll: string) = discard
 
-# debugging
+
+#[ debugging
 static:
-  const t = "testing/specs/hello_world.ksj"
+  const t = "testing/specs/expr_0.ksj"
   echo parseJson(readFile(t)).pretty
   echo repr generateParser(t)
+]#
