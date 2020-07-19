@@ -157,4 +157,4 @@ proc debug(s: string) =
   echo repr expr
   echo ""
 
-static: debug("3.5 + 3")
+#static: debug("3.5 + 3")

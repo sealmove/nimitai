@@ -1,11 +1,7 @@
 ## Compiles and runs a unittest suite using the kst files
 
-import macros, json, strformat
-
-proc imports(): NimNode =
-  nnkImportStmt.newTree(
-    ident"nimitai",
-    ident"kaitai_struct_nim_runtime")
+import macros, json, strformat, oswalkdir
+import ../nimitai/exprlang
 
 proc test(json: JsonNode): NimNode =
   let
@@ -23,14 +19,14 @@ proc test(json: JsonNode): NimNode =
 
   for a in json["asserts"]:
     stmts.add(
-      nnkCall.newTree(
+      newCall(
         ident"check",
         infix(
           newDotExpr(
             ident"r",
             ident(a["actual"].getStr)),
           "==",
-          newLit(a["expected"].getStr))))
+          expr(a["expected"].getStr))))
 
   result = nnkCommand.newTree(
     newIdentNode("test"),
@@ -38,10 +34,19 @@ proc test(json: JsonNode): NimNode =
     stmts)
 
 proc suite(): NimNode =
-  let json = parseJson(readFile("tests/hello_world.kst"))
+  var tests = newStmtList()
+  for a, f in walkDir("tests/working_tests"):
+    let json = parseJson(readFile(f))
+    tests.add(test(json))
+
   newStmtList(
-    imports(),
-    test(json))
+    nnkImportStmt.newTree(
+      ident"nimitai",
+      ident"kaitai_struct_nim_runtime"),
+    nnkCommand.newTree(
+      ident"suite",
+      newLit"Nimitai test suite",
+      tests))
 
 static:
   echo repr suite()
