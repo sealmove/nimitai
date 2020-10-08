@@ -2,11 +2,10 @@
 
 version       = "0.1.0"
 author        = "Stefanos Mandalas"
-description   = "Implementation of Kaitai Struct as a macro"
+description   = "Parser generator for binary data"
 license       = "MIT"
 
 # Dependencies
 
-requires "nim >= 1.1.1"
 requires "kaitai_struct_nim_runtime"
 requires "npeg"

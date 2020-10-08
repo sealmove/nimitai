@@ -1,59 +1,73 @@
 # <p align="center">nimitai</p>
 
-## Introduction & motivation
-Nimitai is a parser generator implemented as a native Nim library.  
-It accepts [ksy grammars](https://doc.kaitai.io/ksy_reference.html) which work best for describing binary data structures.
+## Introduction
+Nimitai is a parser generator for binary data implemented as a native Nim library.  
+It accepts nginx-like files that describe how the binary data will be parsed.
 
-Essentially it's an alternative [Kaitai Struct](https://kaitai.io/) compiler implementation only for Nim. There are multiple justification for spending time on this:
-- **Nim doesn't fit in:** Kaitai Struct's implementation assumes an object oriented language with class nesting. Nim doesn't fit this model, so using Kaitai Struct's code architecture is very tedious and the resulting code is not satisfactory.
-- **AST codegen:** The code is generated on AST level instead of string level (source code), which is safer, easier to maintain, and of higher quality overall.
-- **No compiler:** The whole implementation is one macro (instead of an external tool/compiler). This means you don't have to run any program or maintain generated modules. All you have to do is import nimitai and call a macro; then you have your parsing proc.
+* **Inspiration:** Nimitai is 100% inspired by [Kaitai Struct](https://kaitai.io/). Sadly Nim didn't fit in well with it
+* **Goal:** Being limited to Nim, Nimitai has much more pragmatic aims compared to Kaitai Struct
+* **Justification:** see section 'Update & Retrospection'
 
 | Exported symbol | Production |
 |-----------------|------------|
-| `proc writeModule(ksj, module: string)` | nim module (source code) |
-| `proc writeDll(ksj, dll: string)` | dynamic library |
-| `macro injectParser(ksj: static[string])` | static library (compile time code embedding) |
+| `proc writeModule(uclPath, module: string)` | nim module (source code) |
+| `proc writeDll(uclPath, dll: string)` | dynamic library |
+| `macro injectParser(uclPath: static[string])` | static library (compile time code embedding) |
 
 ## Example
 
-hello_world.ksy
+hello_world.ucl
 ```yaml
-meta:
-  id: buffered_struct
-  endian: le
-seq:
-  - id: len1
-    type: u4
-  - id: block1
-    type: block
-    size: len1
-  - id: len2
-    type: u4
-  - id: block2
-    type: block
-    size: len2
-  - id: finisher
-    type: u4
-types:
-  block:
-    seq:
-      - id: number1
-        type: u4
-      - id: number2
-        type: u4
+endian = le;
+
+seq = {
+  id: len1;
+  type: u4;
+}
+seq = {
+  id: block1;
+  type: block;
+  size: len1;
+}
+seq = {
+  id: len2;
+  type: u4;
+}
+seq = {
+  id: block2;
+  type: block;
+  size: len2;
+}
+seq = {
+  id: finisher;
+  type: u4;
+}
+
+types = {
+  block {
+    seq = {
+      id = number1;
+      type = u4;
+    }
+    seq = {
+      id: number2;
+      type: u4;
+    }
+  }
+}
 ```
-buffered_struct.bin (hex view)
+
+hello_world.bin (hex view)
 ```bin
 10 00 00 00 42 00 00 00 43 00 00 00 ff ff ff ff
 ff ff ff ff 08 00 00 00 44 00 00 00 45 00 00 00
 ee 00 00 00
 ```
-test_nimitai.nim
+hello_world.nim
 ```nim
 import nimitai, kaitai_struct_nim_runtime
-injectParser("buffered_struct.ksj")
-let x = BufferedStruct.fromFile("buffered_struct.bin")
+injectParser("hello_world.ucl")
+let x = BufferedStruct.fromFile("hello_world.bin")
 
 echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
 echo "Block1, number2: " & toHex(x.block1.number2.int64, 2)
@@ -67,23 +81,35 @@ Block1, number2: 43
 Block2, number1: 44
 Block2, number2: 45
 ```
+
+## 8/10/2020: Update & Retrospection
+### Retrospection
+To start off, let's remember what Nimitai is supposted to bring to the table:
+1. **High quality idiomatic Nim code generation at the AST level**  
+Something I couldn't achieve for Nim with Kaitai Struct because it's made with Java-like languages in mind. After all, Kaitai Struct is not as language-agnostic as it claims to be.
+2. **Pluggable spec-as-compiler**  
+The main selling point. Instead of being an external compiler, Nimitai is a CT library which means you don't have to mess with makefiles or similar mechanisms - everything is done within the language. The moment you tweak your spec, your project that links to it has a brand new compiler! No scripts needed at all.
+3. **Compatibility with Kaitai Struct specs**  
+This is less important, but still counts, mainly because neglecting it means moving away from the Kaitai Struct community.  
+Leveraging the already existing specs is not a problem though, since conversion between formats is simple.
+
+That being said, it's been almost a year since the birth of Nimitai and it's still only an idea with zero implementation results. And you know what? The problem is YAML. Screw YAML!
+
+At this point breaking compatibility with Kaitai Struct is a sane compromise. Although it cancels objective 3, good things come out of it:
+- Much simpler parsing
+- Nim expressions (instead of ad-hoc DSL)
+
+### The obvious question
+:unamused: Okay, so which format then if not YAML?  
+:neckbeard: The answer is obvious: JSON.  
+:unamused: Wut...? Writing the specs is supposed to be convenient! No thanks!  
+:neckbeard: Well, stay with me for a moment; We can pour some sugar to it, namely [UCL](https://github.com/vstakhov/libucl)!  
+
+### tl;dr
+The new plan is to give up YAML for good and use [UCL](https://github.com/vstakhov/libucl) instead. This breaks compatibility with Kaitai Struct, but it radically simplifies parsing, brings greater compatibility with JSON, and the syntax is almost as convenient.
+
 ## API
-- One procedure -called `fromFile`- is generated.
-- The procedure is namespaced under the file format type as written in the top-level meta section.
-- The procedure accepts a file path and returns an object.
-- The object has one field for each attribute described in the `.ksy` file.
-- The object has the following additional fields:
-  - `io`: holds the parsing stream
-  - `root`: holds a reference to the root object
-  - `parent`: holds a reference to the parent object
+**TODO**
 
-## Progress, missing components & plans
-Nimitai is a work in progress. Even the most basic features are not implemented yet.
-
-The following components are currently missing -I plan to implement these after nimitai is functional enough on a practical level-:
-- **compile-time yaml parser:** Due to the lack of this Nim component, instead of the ksy file itself, nimitai uses the json equivalent of it as input for now (let's call this **ksj**). Any yaml -> json converter should do.
-- **json schema validator:** Ideally, the syntax error reporting should be handled by this component, but a Nim implementation of it is currently missing.
-
-## Will a `.ksy` file found in the [official KS gallery](https://formats.kaitai.io/) work as is?
-**YES**. The official KSY grammar will be supported 100%.  
-Alternatively, you will be able to configure nimitai so that it accepts Nim expressions and types instead of Kaitai Struct ones.
+## How to leverage [Kaitai Struct's gallery](https://formats.kaitai.io/)
+**TODO**
