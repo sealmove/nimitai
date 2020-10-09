@@ -1,2 +1,1 @@
-*.ksj linguist-language=json
-*.kst linguist-language=json
+*.ucl linguist-language=yaml
