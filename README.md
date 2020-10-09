@@ -19,6 +19,9 @@ Sadly we don't have such a parser for Nim currently. In fact, this is the very r
 
 Since Nimitai _now_ uses JSON as its input format, it can progress independently of a YAML parser implementation. Moreover, I believe working on such an implementation is bad idea, given how complex YAML is. Currently the plan is to implement a **[UCL](https://github.com/vstakhov/libucl) parser instead**, which is a fair compromise. UCL looks like nginx configuration syntax. Work towards this is in progress at a seperate [repo](https://github.com/sealmove/ucl).
 
+## Data flow
+![Data flow](flow.svg)
+
 ## Advantages over Kaitai Struct
 1. **High quality idiomatic Nim code generation at the AST level**  
 Something I couldn't achieve for Nim with Kaitai Struct because it's made with Java-like languages in mind. After all, Kaitai Struct is not as language-agnostic as it claims to be.
