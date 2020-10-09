@@ -7,7 +7,7 @@ The library exposes the following symbols:
 | Exported symbol | Production |
 |-----------------|------------|
 | `macro injectParser(spec: JsonNode)` | static library (compile time code embedding) |
-| `proc writeDll(spec: JsonNode, path: string)` | dynamic library |
+| `proc createDynlib(spec: JsonNode, path: string)` | dynamic library |
 | `proc outputModule(spec: JsonNode): string` | nim module (source code) |
 
 ## Writing specs
@@ -30,6 +30,7 @@ The main selling point. Instead of being an external compiler, Nimitai is a CT l
 hello_world.ucl
 ```yaml
 meta {
+  id: hello_world
   endian: le;
 }
 
@@ -78,9 +79,9 @@ ee 00 00 00
 ```
 hello_world.nim
 ```nim
-import nimitai, kaitai_struct_nim_runtime
-injectParser("hello_world.ucl")
-let x = BufferedStruct.fromFile("hello_world.bin")
+import json, ucl, nimitai, kaitai_struct_nim_runtime
+injectParser(parseUcl(readFile"hello_world.ucl"))
+let x = HelloWorld.fromFile("hello_world.bin")
 
 echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
 echo "Block1, number2: " & toHex(x.block1.number2.int64, 2)
