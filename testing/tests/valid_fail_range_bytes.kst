@@ -1,5 +1,0 @@
-{
-  "id": "valid_fail_range_bytes",
-  "data": "fixed_struct.bin",
-  "exception": "ValidationGreaterThanError<bytes>"
-}

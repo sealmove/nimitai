@@ -8,4 +8,4 @@ license       = "MIT"
 # Dependencies
 
 requires "kaitai_struct_nim_runtime"
-requires "npeg"
+requires "ucl"

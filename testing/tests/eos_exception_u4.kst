@@ -1,5 +1,0 @@
-{
-  "id": "eos_exception_u4",
-  "data": "term_strz.bin",
-  "exception": "EndOfStreamError"
-}

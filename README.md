@@ -2,7 +2,7 @@
 
 ## Introduction
 Nimitai is a parser generator for binary data implemented as a native Nim library.  
-It accepts nginx-like files that describe how the binary data will be parsed.
+It accept some [UCL](https://github.com/vstakhov/libucl) file that describe how the binary data will be parsed, and produces a parser out of it at compile-time.
 
 * **Inspiration:** Nimitai is 100% inspired by [Kaitai Struct](https://kaitai.io/). Sadly Nim didn't fit in well with it
 * **Goal:** Being limited to Nim, Nimitai has much more pragmatic aims compared to Kaitai Struct
@@ -14,45 +14,48 @@ It accepts nginx-like files that describe how the binary data will be parsed.
 | `proc writeDll(uclPath, dll: string)` | dynamic library |
 | `macro injectParser(uclPath: static[string])` | static library (compile time code embedding) |
 
+### Note
+Currently we don't have a UCL parser for Nim. An implementation is being developed seperately at [this repo](https://github.com/sealmove/ucl).  
+However, UCL is a superset of JSON, so Nimitai can progress concurrently.
+
 ## Example
 
 hello_world.ucl
 ```yaml
-endian = le;
-
-seq = {
-  id: len1;
-  type: u4;
-}
-seq = {
-  id: block1;
-  type: block;
-  size: len1;
-}
-seq = {
-  id: len2;
-  type: u4;
-}
-seq = {
-  id: block2;
-  type: block;
-  size: len2;
-}
-seq = {
-  id: finisher;
-  type: u4;
+meta {
+  endian: le;
 }
 
-types = {
+type {
   block {
-    seq = {
-      id = number1;
-      type = u4;
+    attr {
+      number1 {
+        type: u4;
+      }
+      number2 {
+        type: u4;
+      }
     }
-    seq = {
-      id: number2;
-      type: u4;
-    }
+  }
+}
+
+attr {
+  len1 {
+    type: u4;
+  }
+  block1 {
+    type: block;
+    size: len1;
+  }
+  len2 {
+    type: u4;
+  }
+  block2 {
+    type: block;
+    size: len2;
+  }
+  finisher {
+    type: u4;
   }
 }
 ```

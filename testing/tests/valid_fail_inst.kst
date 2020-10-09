@@ -1,5 +1,0 @@
-{
-  "id": "valid_fail_inst",
-  "data": "fixed_struct.bin",
-  "exception": "ValidationNotEqualError<u1>"
-}
