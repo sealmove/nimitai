@@ -35,6 +35,4 @@ digraph G {
     style=filled;
     color=lightgrey;
   }
-
-//  { rank=same ucl json ast obj bin }
 }

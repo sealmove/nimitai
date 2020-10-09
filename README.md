@@ -1,9 +1,9 @@
 # <p align="center">nimitai</p>
 
 ## Introduction
-Nimitai is a compile-time parser generator for binary data. It transforms a JSON object into parsing procedures. The input object describes how the binary data will be parsed based on [Kaitai Struct](https://kaitai.io/) conventions.
+Nimitai is a compile-time parser generator for binary data. It transforms JSON objects into parsing procedures.  
+Each input object should describe a binary format according to [Kaitai Struct](https://kaitai.io/) conventions.
 
-The library exposes the following symbols:
 | Exported symbol | Production |
 |-----------------|------------|
 | `macro injectParser(spec: JsonNode)` | static library (compile time code embedding) |
@@ -19,7 +19,6 @@ Sadly we don't have such a parser for Nim currently. In fact, this is the very r
 
 Since Nimitai _now_ uses JSON as its input format, it can progress independently of a YAML parser implementation. Moreover, I believe working on such an implementation is bad idea, given how complex YAML is. Currently the plan is to implement a **[UCL](https://github.com/vstakhov/libucl) parser instead**, which is a fair compromise. UCL looks like nginx configuration syntax. Work towards this is in progress at a seperate [repo](https://github.com/sealmove/ucl).
 
-## Data flow
 ![Data flow](flow.svg)
 
 ## Advantages over Kaitai Struct
