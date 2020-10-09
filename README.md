@@ -1,24 +1,31 @@
 # <p align="center">nimitai</p>
 
 ## Introduction
-Nimitai is a parser generator for binary data implemented as a native Nim library.  
-It accept some [UCL](https://github.com/vstakhov/libucl) file that describe how the binary data will be parsed, and produces a parser out of it at compile-time.
+Nimitai is a compile-time parser generator for binary data. It transforms a JSON object into parsing procedures. The input object describes how the binary data will be parsed based on [Kaitai Struct](https://kaitai.io/) conventions.
 
-* **Inspiration:** Nimitai is 100% inspired by [Kaitai Struct](https://kaitai.io/). Sadly Nim didn't fit in well with it
-* **Goal:** Being limited to Nim, Nimitai has much more pragmatic aims compared to Kaitai Struct
-* **Justification:** see section 'Update & Retrospection'
-
+The library exposes the following symbols:
 | Exported symbol | Production |
 |-----------------|------------|
-| `proc writeModule(uclPath, module: string)` | nim module (source code) |
-| `proc writeDll(uclPath, dll: string)` | dynamic library |
-| `macro injectParser(uclPath: static[string])` | static library (compile time code embedding) |
+| `macro injectParser(spec: JsonNode)` | static library (compile time code embedding) |
+| `proc writeDll(spec: JsonNode, path: string)` | dynamic library |
+| `proc outputModule(spec: JsonNode): string` | nim module (source code) |
 
-### Note
-Currently we don't have a UCL parser for Nim. An implementation is being developed seperately at [this repo](https://github.com/sealmove/ucl).  
-However, UCL is a superset of JSON, so Nimitai can progress concurrently.
+## Writing specs
+Being ubiquitous and easily parsable, JSON is a great base format, and there is even a CT parser [in Nim stdlib](https://nim-lang.org/docs/json.html).
 
-## Example
+However, writing in JSON is not appealing at all. Luckily there are a couple of nice JSON superset, and Nimitai can work in conjuction with any CT parser that outputs `JsonNode`, ideally YAML for compatibility with [Kaitai Struct specs](https://formats.kaitai.io/).
+
+Sadly we don't have such a parser for Nim currently. In fact, this is the very reason this project has been completely stuck, making zero progress for almost a year now. Screw you YAML!  
+
+Since Nimitai _now_ uses JSON as its input format, it can progress independently of a YAML parser implementation. Moreover, I believe working on such an implementation is bad idea, given how complex YAML is. Currently the plan is to implement a **[UCL](https://github.com/vstakhov/libucl) parser instead**, which is a fair compromise. UCL looks like nginx configuration syntax. Work towards this is in progress at a seperate [repo](https://github.com/sealmove/ucl).
+
+## Advantages over Kaitai Struct
+1. **High quality idiomatic Nim code generation at the AST level**  
+Something I couldn't achieve for Nim with Kaitai Struct because it's made with Java-like languages in mind. After all, Kaitai Struct is not as language-agnostic as it claims to be.
+2. **Pluggable spec-as-compiler**  
+The main selling point. Instead of being an external compiler, Nimitai is a CT library which means you don't have to mess with makefiles or similar mechanisms - everything is done within the language. The moment you tweak your spec, your project that links to it has a brand new compiler! No scripts needed at all.
+
+## Example with UCL
 
 hello_world.ucl
 ```yaml
@@ -26,36 +33,39 @@ meta {
   endian: le;
 }
 
-type {
-  block {
-    attr {
-      number1 {
-        type: u4;
-      }
-      number2 {
-        type: u4;
-      }
-    }
-  }
+seq {
+  id: len1;
+  type: u4;
+}
+seq {
+  id: block1;
+  type: block;
+  size: len1;
+}
+seq {
+  id: len2;
+  type: u4;
+}
+seq {
+  id: block2;
+  type: block;
+  size: len2;
+}
+seq {
+  id: finisher;
+  type: u4;
 }
 
-attr {
-  len1 {
-    type: u4;
-  }
-  block1 {
-    type: block;
-    size: len1;
-  }
-  len2 {
-    type: u4;
-  }
-  block2 {
-    type: block;
-    size: len2;
-  }
-  finisher {
-    type: u4;
+types {
+  block {
+    seq {
+      id: number1;
+      type: u4;
+    }
+    seq {
+      id: number2;
+      type: u4;
+    }
   }
 }
 ```
@@ -84,35 +94,3 @@ Block1, number2: 43
 Block2, number1: 44
 Block2, number2: 45
 ```
-
-## 8/10/2020: Update & Retrospection
-### Retrospection
-To start off, let's remember what Nimitai is supposted to bring to the table:
-1. **High quality idiomatic Nim code generation at the AST level**  
-Something I couldn't achieve for Nim with Kaitai Struct because it's made with Java-like languages in mind. After all, Kaitai Struct is not as language-agnostic as it claims to be.
-2. **Pluggable spec-as-compiler**  
-The main selling point. Instead of being an external compiler, Nimitai is a CT library which means you don't have to mess with makefiles or similar mechanisms - everything is done within the language. The moment you tweak your spec, your project that links to it has a brand new compiler! No scripts needed at all.
-3. **Compatibility with Kaitai Struct specs**  
-This is less important, but still counts, mainly because neglecting it means moving away from the Kaitai Struct community.  
-Leveraging the already existing specs is not a problem though, since conversion between formats is simple.
-
-That being said, it's been almost a year since the birth of Nimitai and it's still only an idea with zero implementation results. And you know what? The problem is YAML. Screw YAML!
-
-At this point breaking compatibility with Kaitai Struct is a sane compromise. Although it cancels objective 3, good things come out of it:
-- Much simpler parsing
-- Nim expressions (instead of ad-hoc DSL)
-
-### The obvious question
-:unamused: Okay, so which format then if not YAML?  
-:neckbeard: The answer is obvious: JSON.  
-:unamused: Wut...? Writing the specs is supposed to be convenient! No thanks!  
-:neckbeard: Well, stay with me for a moment; We can pour some sugar to it, namely [UCL](https://github.com/vstakhov/libucl)!  
-
-### tl;dr
-The new plan is to give up YAML for good and use [UCL](https://github.com/vstakhov/libucl) instead. This breaks compatibility with Kaitai Struct, but it radically simplifies parsing, brings greater compatibility with JSON, and the syntax is almost as convenient.
-
-## API
-**TODO**
-
-## How to leverage [Kaitai Struct's gallery](https://formats.kaitai.io/)
-**TODO**

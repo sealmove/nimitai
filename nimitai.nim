@@ -1,3 +1,5 @@
-import ucl
+import json
 
-echo isValid(readFile"/home/sealmove/Desktop/Misc/nimitai_tmp/ucl")
+macro injectParser(spec: JsonNode) = discard # static library
+proc writeDll(spec: JsonNode, path: string) = discard # dynamic library
+proc outputModule(spec: JsonNode): string = discard # source code
