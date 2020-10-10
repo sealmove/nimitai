@@ -1,4 +1,4 @@
-import json
+import json, strutils
 
 type KsNode* = ref object
   name*: string
@@ -22,11 +22,11 @@ proc toKsNode*(json: JsonNode): KsNode =
     instances: json.getOrDefault("instances"),
     enums: json.getOrDefault("enums"))
   if json.hasKey("meta") and json["meta"].hasKey("id"):
-    result.name = json["meta"]["id"].getStr
+    result.name = json["meta"]["id"].getStr.capitalizeAscii
   if json.hasKey("types"):
     for k, v in json["types"].pairs:
       let node = v.toKsNode
-      node.name = k
+      node.name = k.capitalizeAscii
       node.parent = result
       result.children.add(node)
 
