@@ -6,7 +6,7 @@ Each input object should describe a binary format according to [Kaitai Struct](h
 
 | Exported symbol | Production |
 |-----------------|------------|
-| `macro injectParser(spec: JsonNode)` | static library (compile time code embedding) |
+| `macro injectParser(spec: static[JsonNode])` | static library (compile time code embedding) |
 | `proc createDynlib(spec: JsonNode, path: string)` | dynamic library |
 | `proc outputModule(spec: JsonNode): string` | nim module (source code) |
 
@@ -27,7 +27,7 @@ Something I couldn't achieve for Nim with Kaitai Struct because it's made with J
 2. **Pluggable spec-as-compiler**  
 The main selling point. Instead of being an external compiler, Nimitai is a CT library which means you don't have to mess with makefiles or similar mechanisms - everything is done within the language. The moment you tweak your spec, your project that links to it has a brand new compiler! No scripts needed at all.
 
-## Example with UCL
+## UCL example
 
 hello_world.ucl
 ```yaml

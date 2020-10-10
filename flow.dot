@@ -3,25 +3,25 @@ digraph G {
   splines=ortho;
   node [shape=box];
 
-  ucl  [label="UCL" fontcolor=white color="#6666ff" fillcolor="#6666ff"
-        style=filled shape=rarrow]
-  json [label="JSON" fontcolor=white color="#6666ff" fillcolor="#6666ff"
-        style=filled shape=rarrow]
-  ast  [label="AST" fontcolor=white color="#6666ff" fillcolor="#6666ff"
-        style=filled]
-  obj  [label="User-defined\nNim Object" fontcolor=white color="#b266ff"
-        fillcolor="#b266ff" style=filled]
-  bin  [label="Binary" fontcolor=white color="#b266ff" fillcolor="#b266ff"
-        style=filled shape=larrow]
+  json  [label="JSON" fontcolor=white color="#6666ff" fillcolor="#6666ff"
+         style=filled shape=rarrow]
+  ksast [label="KS AST" fontcolor=white color="#6666ff" fillcolor="#6666ff"
+         style=filled shape=rarrow]
+  nast  [label="Nim AST" fontcolor=white color="#6666ff" fillcolor="#6666ff"
+         style=filled]
+  obj   [label="User-defined\nNim Object" fontcolor=white color="#b266ff"
+         fillcolor="#b266ff" style=filled]
+  bin   [label="Binary" fontcolor=white color="#b266ff" fillcolor="#b266ff"
+         style=filled shape=larrow]
 
-  ucl  -> json [style=invis];
-  json -> ast  [style=invis];
-  ast  -> obj  [arrowhead=vee];
-  obj  -> bin  [style=invis];
-  bin  -> ast  [arrowhead=vee constraint=false];
+  json  -> ksast [style=invis];
+  ksast -> nast  [style=invis];
+  nast  -> obj   [arrowhead=vee];
+  obj   -> bin   [style=invis];
+  bin   -> nast  [arrowhead=vee constraint=false];
 
   subgraph cluster_ct {
-    ucl json ast;
+    json ksast nast;
 
     label="Spec transformation (compile-time)";
     style=filled;
