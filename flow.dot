@@ -1,29 +1,25 @@
 digraph G {
   rankdir="LR"
-  splines=ortho;
   node [shape=box];
 
   json  [label="JSON" fontcolor=white color="#6666ff" fillcolor="#6666ff"
          style=filled shape=rarrow]
-  ksast [label="KS AST" fontcolor=white color="#6666ff" fillcolor="#6666ff"
-         style=filled shape=rarrow]
-  nast  [label="Nim AST" fontcolor=white color="#6666ff" fillcolor="#6666ff"
+  ast   [label="AST" fontcolor=white color="#6666ff" fillcolor="#6666ff"
          style=filled]
   obj   [label="User-defined\nNim Object" fontcolor=white color="#b266ff"
          fillcolor="#b266ff" style=filled]
   bin   [label="Binary" fontcolor=white color="#b266ff" fillcolor="#b266ff"
          style=filled shape=larrow]
 
-  json  -> ksast [style=invis];
-  ksast -> nast  [style=invis];
-  nast  -> obj   [arrowhead=vee];
-  obj   -> bin   [style=invis];
-  bin   -> nast  [arrowhead=vee constraint=false];
+  json -> ast  [style=invis];
+  ast  -> obj  [arrowhead=vee];
+  obj  -> bin  [style=invis];
+  bin  -> ast [arrowhead=vee constraint=false];
 
   subgraph cluster_ct {
-    json ksast nast;
+    json ast;
 
-    label="Spec transformation (compile-time)";
+    label="Spec (compile-time)";
     style=filled;
     color=lightgrey;
   }
@@ -31,7 +27,7 @@ digraph G {
   subgraph cluster_rt {
     obj bin;
 
-    label="Data transformation (runtime)";
+    label="Data (runtime)";
     style=filled;
     color=lightgrey;
   }
