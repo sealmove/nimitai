@@ -5,3 +5,4 @@ license       = "MIT"
 
 requires "kaitai_struct_nim_runtime"
 requires "regex"
+requires "npeg"
