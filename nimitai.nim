@@ -1,9 +1,19 @@
-import nimitai/ksast
-import json, macros, regex
+import nimitai/[ksast, exprlang]
+import json, macros, regex, strutils
 
 const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
+
+type
+  attrKey {.pure.} = enum
+    id, doc, `doc-ref`, contents, `type`, repeat, `repeat-expr`, `repeat-until`,
+    `if`, size, `size-eos`, process, `enum`, encoding, terminator, consume,
+    `include`, `eos-error`, pos, io, value
+
+proc attrKeySet(json: JsonNode): set[attrKey] =
+  for key in json.keys:
+    result.incl(parseEnum[attrKey](key))
 
 proc nativeType(ksyType: string): string =
   case ksyType
@@ -19,9 +29,12 @@ proc nativeType(ksyType: string): string =
   of "f8": result = "float64"
   of "str", "strz": result = "string"
   else: # TODO: implement look-up here
-    result = ksyType
+    result = ksyType.capitalizeAscii
 
-proc attribute(json: JsonNode): NimNode =
+proc parentType(node: KsNode): string =
+  if node.parent == nil: rootTypeName else: node.parent.name
+
+proc attr(json: JsonNode): NimNode =
   newIdentDefs(
     ident(json["id"].getStr),
     ident(nativeType(json["type"].getStr)))
@@ -32,10 +45,10 @@ proc type(node: KsNode): NimNode =
   fields.add(
     newIdentDefs(
       ident"parent",
-      ident(rootTypeName)))
+      ident(parentType(node))))
 
   for a in node.seq:
-    fields.add(attribute(a))
+    fields.add(attr(a))
 
   result = nnkTypeDef.newTree(
     ident(node.name),
@@ -47,19 +60,88 @@ proc type(node: KsNode): NimNode =
           ident(rootTypeName)),
         fields)))
 
-proc call(json: JsonNode): NimNode =
-  let t = json["type"].getStr
-  if t.match(re"[us][1248]|f[48]"):
-    var procName = "read" & t
-    if not t.match(re"[us][1]"):
-      procName &= "le" # XXX
-    result = newCall(
-      procName,
-      newDotExpr(
-        ident"result",
-        ident"io"))
-  else:
-    result = nil # XXX
+proc parseAttrExprUser(json: JsonNode, fromRaw: bool): NimNode =
+  let
+    t = json["type"].getStr.capitalizeAscii
+    io = if fromRaw: ident(t & "Raw")
+         else: newDotExpr(ident"result", ident"io")
+  result = newCall(
+    newDotExpr(
+      ident(t),
+      ident"read"),
+    io,
+    newDotExpr(
+      ident"result",
+      ident"root"),
+    ident"result")
+
+# A series of assignments of parsing calls to local variables or object fields
+proc parseAttr(json: JsonNode): NimNode =
+  result = newStmtList()
+  let
+    s = attrKeySet(json)
+    id = json["id"].getStr
+
+  if attrKey.`type` in s:
+    let t = json["type"].getStr
+
+    # Integer type
+    if t.match(re"[us][1248]|f[48]"):
+      var procName = "read" & t
+      if not t.match(re"[us][1]"):
+        procName &= "le" # XXX
+      result.add(
+        newAssignment(
+          newDotExpr(
+            ident"result",
+            ident(json["id"].getStr)),
+            newCall(
+              procName,
+              newDotExpr(
+                ident"result",
+                ident"io"))))
+    # User-defined type
+    else:
+      let userT = t.capitalizeAscii
+      if attrKey.`size` in s:
+        let
+          size = expr(json["size"].getStr)
+          raw = ident(id & "Raw")
+          substream = ident(id & "Io")
+        result.add(
+          newLetStmt(
+            raw,
+            newCall(
+              newDotExpr(
+                newDotExpr(
+                  ident"result",
+                  ident"io"),
+                ident"readBytes"),
+              newCall(
+                ident"int",
+                newDotExpr(
+                  ident"result",
+                  size)))))
+        result.add(
+          newLetStmt(
+            substream,
+            newCall(
+              ident"newKaitaiStream",
+              raw)))
+        result.add(
+          newAssignment(
+            newDotExpr(
+              ident"result",
+              ident(id)),
+            newCall(
+              newDotExpr(
+                ident(userT),
+                ident"read"),
+              substream,
+              newDotExpr(
+                ident"result",
+                ident"root"),
+              ident"result")))
 
 proc typeSection(node: KsNode): NimNode =
   result = newTree(nnkTypeSection)
@@ -86,17 +168,12 @@ proc readProc(node: KsNode): NimNode =
       newNilLit()),
     newIdentDefs(
       ident"parent",
-      ident(rootTypeName),
+      ident(parentType(node)),
       newNilLit()))
 
-  var fieldAsgns = newStmtList()
+  var parseAttrs = newStmtList()
   for a in node.seq:
-    fieldAsgns.add(
-      newAssignment(
-        newDotExpr(
-          ident"result",
-          ident(a["id"].getStr)),
-          call(a)))
+    parseAttrs.add(parseAttr(a))
 
   result.body = newStmtList(
     newAssignment(
@@ -122,7 +199,14 @@ proc readProc(node: KsNode): NimNode =
           ident"result"),
         nnkElseExpr.newTree(
           ident"root"))),
-    fieldAsgns)
+    parseAttrs)
+
+proc readProcs(node: KsNode): NimNode =
+  result = newStmtList()
+  if node.children != @[]:
+    for c in node.children:
+      result.add(readProcs(c))
+  result.add(readProc(node))
 
 proc fromFileProc(node: KsNode): NimNode =
   newStmtList(
@@ -150,12 +234,20 @@ proc fromFileProc(node: KsNode): NimNode =
             ident"newKaitaiFileStream",
             ident"filename")))))
 
+proc fromFileProcs(node: KsNode): NimNode =
+  result = newStmtList()
+  if node.children != @[]:
+    for c in node.children:
+      result.add(fromFileProcs(c))
+  result.add(fromFileProc(node))
+
 proc generateParser*(spec: JsonNode): NimNode =
   let spec = spec.toKsNode
   result = newStmtList(
     typeSection(spec),
-    readProc(spec),
-    fromFileProc(spec))
+    readProcs(spec),
+    fromFileProcs(spec))
+  echo repr result
 
 # static library
 macro injectParser*(spec: static[JsonNode]) =
