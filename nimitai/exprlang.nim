@@ -45,13 +45,13 @@ proc tokenize(str: string): seq[Token] =
       var x: BiggestFloat
       assert len($0) == parseBiggestFloat($0, x)
       tokens.add Token(kind: tkFloat, floatVal: x)
-    Int        <- Hex | Oct | Bin | Dec
-    Integer    <- HexR | OctR | BinR | DecR
-    Hex        <- "0x" * +(Xdigit | '_')
-    Oct        <- "0o" * +{'0' .. '7', '_'}
-    Bin        <- "0b" * +{'0', '1', '_'}
-    Dec        <- +(Digit | '_')
-    HexR     <- Hex:
+    Int     <- Hex | Oct | Bin | Dec
+    Integer <- HexR | OctR | BinR | DecR
+    Hex     <- "0x" * +(Xdigit | '_')
+    Oct     <- "0o" * +{'0' .. '7', '_'}
+    Bin     <- "0b" * +{'0', '1', '_'}
+    Dec     <- +(Digit | '_')
+    HexR    <- Hex:
       var x: BiggestUInt
       assert len($0) == parseHex[BiggestUInt]($0, x)
       tokens.add Token(kind: tkInteger, intVal: x)
@@ -161,5 +161,3 @@ proc debug(s: string) =
   echo "=== EXPRESSION ==="
   echo treeRepr expr
   echo ""
-
-#static: debug("sdfda.as_int")

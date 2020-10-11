@@ -247,7 +247,6 @@ proc generateParser*(spec: JsonNode): NimNode =
     typeSection(spec),
     readProcs(spec),
     fromFileProcs(spec))
-  echo repr result
 
 # static library
 macro injectParser*(spec: static[JsonNode]) =
