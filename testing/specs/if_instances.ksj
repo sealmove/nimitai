@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "id": "if_instances"
+  },
+  "instances": {
+    "never_happens": {
+      "pos": 100500,
+      "type": "u1",
+      "if": "false"
+    }
+  }
+}

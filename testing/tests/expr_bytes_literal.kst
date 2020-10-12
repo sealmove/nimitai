@@ -1,0 +1,18 @@
+{
+  "id": "expr_bytes_literal",
+  "data": "enum_negative.bin",
+  "asserts": [
+    {
+      "actual": "literal.size",
+      "expected": 2
+    },
+    {
+      "actual": "literal[0]",
+      "expected": -1
+    },
+    {
+      "actual": "literal[1]",
+      "expected": 1
+    }
+  ]
+}

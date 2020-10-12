@@ -1,0 +1,11 @@
+{
+  "meta": {
+    "id": "eof_exception_bytes"
+  },
+  "seq": [
+    {
+      "id": "buf",
+      "size": 13
+    }
+  ]
+}

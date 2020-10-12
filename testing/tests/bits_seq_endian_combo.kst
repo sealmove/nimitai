@@ -1,0 +1,38 @@
+{
+  "id": "bits_seq_endian_combo",
+  "data": "process_xor_4.bin",
+  "asserts": [
+    {
+      "actual": "be1",
+      "expected": "0b111011"
+    },
+    {
+      "actual": "be2",
+      "expected": "0b00_10111011"
+    },
+    {
+      "actual": "le3",
+      "expected": "0xA3"
+    },
+    {
+      "actual": "be4",
+      "expected": "0x14"
+    },
+    {
+      "actual": "le5",
+      "expected": "0b01010"
+    },
+    {
+      "actual": "le6",
+      "expected": "0b100100"
+    },
+    {
+      "actual": "le7",
+      "expected": "0b11010"
+    },
+    {
+      "actual": "be8",
+      "expected": true
+    }
+  ]
+}

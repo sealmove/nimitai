@@ -1,0 +1,42 @@
+{
+  "id": "bits_byte_aligned",
+  "data": "fixed_struct.bin",
+  "asserts": [
+    {
+      "actual": "one",
+      "expected": "0b010100"
+    },
+    {
+      "actual": "byte_1",
+      "expected": "0x41"
+    },
+    {
+      "actual": "two",
+      "expected": "0b010"
+    },
+    {
+      "actual": "three",
+      "expected": false
+    },
+    {
+      "actual": "byte_2",
+      "expected": "0x4b"
+    },
+    {
+      "actual": "four",
+      "expected": "0b00101101_001100"
+    },
+    {
+      "actual": "byte_3",
+      "expected": "[0xff]"
+    },
+    {
+      "actual": "full_byte",
+      "expected": "0xff"
+    },
+    {
+      "actual": "byte_4",
+      "expected": "0x50"
+    }
+  ]
+}

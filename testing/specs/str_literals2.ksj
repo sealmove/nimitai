@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "id": "str_literals2"
+  },
+  "instances": {
+    "dollar1": {
+      "value": "\"$foo\""
+    },
+    "dollar2": {
+      "value": "\"${foo}\""
+    },
+    "hash": {
+      "value": "\"#{foo}\""
+    },
+    "at_sign": {
+      "value": "\"@foo\""
+    }
+  }
+}

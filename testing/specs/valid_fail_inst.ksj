@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "id": "valid_fail_inst"
+  },
+  "seq": [
+    {
+      "id": "a",
+      "type": "u1",
+      "if": "inst >= 0"
+    }
+  ],
+  "instances": {
+    "inst": {
+      "pos": 5,
+      "type": "u1",
+      "valid": "0x50"
+    }
+  }
+}

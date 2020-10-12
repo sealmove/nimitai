@@ -1,0 +1,5 @@
+{
+  "id": "valid_fail_anyof_int",
+  "data": "fixed_struct.bin",
+  "exception": "ValidationNotAnyOfError<u1>"
+}

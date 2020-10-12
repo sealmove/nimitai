@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "id": "valid_fail_range_bytes"
+  },
+  "seq": [
+    {
+      "id": "foo",
+      "size": 2,
+      "valid": {
+        "min": "[72, 64]",
+        "max": "[79, 126]"
+      }
+    }
+  ]
+}

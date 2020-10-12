@@ -1,0 +1,10 @@
+{
+  "id": "repeat_eos_bit",
+  "data": "enum_0.bin",
+  "asserts": [
+    {
+      "actual": "nibbles.size",
+      "expected": 16
+    }
+  ]
+}

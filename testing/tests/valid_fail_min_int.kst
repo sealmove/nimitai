@@ -1,0 +1,5 @@
+{
+  "id": "valid_fail_min_int",
+  "data": "fixed_struct.bin",
+  "exception": "ValidationLessThanError<u1>"
+}
