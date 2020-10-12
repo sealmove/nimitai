@@ -69,7 +69,7 @@ proc tokenize(str: string): seq[Token] =
       tokens.add Token(kind: tkInteger, intVal: x)
     Boolean    <- "true" | "false":
       tokens.add Token(kind: tkBoolean, boolval: parseBool($0))
-    String     <- '\"' * >*(Print - '\"') * '\"':
+    String     <- '\"' * *(Print - '\"') * '\"':
       tokens.add Token(kind: tkString, strval: ($0)[1..^2])
     Comma      <- ',':
       tokens.add Token(kind: tkComma)

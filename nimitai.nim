@@ -15,31 +15,53 @@ proc attrKeySet(json: JsonNode): set[attrKey] =
   for key in json.keys:
     result.incl(parseEnum[attrKey](key))
 
-proc nativeType(ksyType: string): string =
+proc nativeType(ksyType: string): NimNode =
   case ksyType
-  of "u1": result = "uint8"
-  of "s1": result = "int8"
-  of "u2": result = "uint16"
-  of "s2": result = "int16"
-  of "u4": result = "uint32"
-  of "s4": result = "int32"
-  of "u8": result = "uint64"
-  of "s8": result = "int64"
-  of "f4": result = "float32"
-  of "f8": result = "float64"
-  of "str", "strz": result = "string"
-  else: # TODO: implement look-up here
-    result = ksyType.capitalizeAscii
+  of "b1": result = ident"bool"
+  of "u1": result = ident"uint8"
+  of "s1": result = ident"int8"
+  of "u2", "u2le", "u2be": result = ident"uint16"
+  of "s2", "s2le", "s2be": result = ident"int16"
+  of "u4", "u4le", "u4be": result = ident"uint32"
+  of "s4", "s4le", "s4be": result = ident"int32"
+  of "u8", "u8le", "u8be": result = ident"uint64"
+  of "s8", "s8le", "s8be": result = ident"int64"
+  of "f4", "f4be", "f4le": result = ident"float32"
+  of "f8", "f8be", "f8le": result = ident"float64"
+  of "str", "strz": result = ident"string"
+  elif ksyType.match(re"b[2-9]|b[1-9][0-9]*"):
+    result = ident"uint64"
+  else:
+    # TODO: implement look-up here
+    result = ident(ksyType.capitalizeAscii)
+
+proc inferType(json: JsonNode): NimNode =
+  ident"int"
 
 proc parentType(node: KsNode): string =
   if node.parent == nil: rootTypeName else: node.parent.name
 
-proc attr(json: JsonNode): NimNode =
+proc attrDecl(json: JsonNode): NimNode =
   newIdentDefs(
     ident(json["id"].getStr),
-    ident(nativeType(json["type"].getStr)))
+    nativeType(json["type"].getStr))
 
-proc type(node: KsNode): NimNode =
+proc instType(attr: JsonNode): NimNode =
+  if attr.hasKey("type"):
+    nativeType(attr["type"].getStr)
+  else:
+    inferType(attr["value"])
+
+proc instDecl(key: string, value: JsonNode): NimNode =
+  let t = instType(value)
+
+  newIdentDefs(
+    ident(key & "Inst"),
+    nnkBracketExpr.newTree(
+      ident"Option",
+      t))
+
+proc typeDecl(node: KsNode): NimNode =
   var fields = newTree(nnkRecList)
 
   fields.add(
@@ -47,8 +69,13 @@ proc type(node: KsNode): NimNode =
       ident"parent",
       ident(parentType(node))))
 
-  for a in node.seq:
-    fields.add(attr(a))
+  if node.seq != nil:
+    for a in node.seq:
+      fields.add(attrDecl(a))
+
+  if node.instances != nil:
+    for k, v in node.instances.pairs:
+      fields.add(instDecl(k, v))
 
   result = nnkTypeDef.newTree(
     ident(node.name),
@@ -82,72 +109,149 @@ proc parseAttr(json: JsonNode): NimNode =
     s = attrKeySet(json)
     id = json["id"].getStr
 
+  # This should be used for both size and sizeless attributes
+  var stream, size: NimNode
+
+  # Size key means we get a substream
+  if attrKey.`size` in s:
+    stream = ident(id & "Io")
+    size = expr(json["size"].getStr)
+    let raw = ident(id & "Raw")
+    result.add(
+      newLetStmt(
+        raw,
+        newCall(
+          newDotExpr(
+            newDotExpr(
+              ident"result",
+              ident"io"),
+            ident"readBytes"),
+          newCall(
+            ident"int",
+            newDotExpr(
+              ident"result",
+              size)))))
+    result.add(
+      newLetStmt(
+        stream,
+        newCall(
+          ident"newKaitaiStream",
+          raw)))
+
   if attrKey.`type` in s:
     let t = json["type"].getStr
 
-    # Integer type
-    if t.match(re"[us][1248]|f[48]"):
+    # Number
+    if t.match(re"([us][1248]|f[48])(be|le)?"):
       var procName = "read" & t
-      if not t.match(re"[us][1]"):
+      if not t.match(re"([us][1])|(.*(be|le))"):
         procName &= "le" # XXX
       result.add(
         newAssignment(
           newDotExpr(
             ident"result",
-            ident(json["id"].getStr)),
+            ident(id)),
             newCall(
               procName,
               newDotExpr(
                 ident"result",
                 ident"io"))))
-    # User-defined type
-    else:
-      let userT = t.capitalizeAscii
-      if attrKey.`size` in s:
-        let
-          size = expr(json["size"].getStr)
-          raw = ident(id & "Raw")
-          substream = ident(id & "Io")
-        result.add(
-          newLetStmt(
-            raw,
+
+    # Bool
+    elif t == "b1":
+      result.add(
+        newAssignment(
+          newDotExpr(
+            ident"result",
+            ident(id)),
+          newCall(
+            ident"bool",
             newCall(
-              newDotExpr(
-                newDotExpr(
-                  ident"result",
-                  ident"io"),
-                ident"readBytes"),
-              newCall(
-                ident"int",
-                newDotExpr(
-                  ident"result",
-                  size)))))
-        result.add(
-          newLetStmt(
-            substream,
-            newCall(
-              ident"newKaitaiStream",
-              raw)))
-        result.add(
-          newAssignment(
-            newDotExpr(
-              ident"result",
-              ident(id)),
-            newCall(
-              newDotExpr(
-                ident(userT),
-                ident"read"),
-              substream,
+              "readBitsIntBe",
               newDotExpr(
                 ident"result",
-                ident"root"),
-              ident"result")))
+                ident"io"),
+              newLit(1)))))
+
+    # Number from bits
+    elif t.match(re"b[2-9]|b[1-9][0-9]*"):
+      let bits = parseInt(t[1..^1])
+      result.add(
+        newAssignment(
+          newDotExpr(
+            ident"result",
+            ident(id)),
+          newCall(
+            "readBitsIntBe",
+            newDotExpr(
+              ident"result",
+              ident"io"),
+            newLit(bits))))
+
+    # User-defined type
+    else:
+      result.add(
+        newAssignment(
+          newDotExpr(
+            ident"result",
+            ident(id)),
+          newCall(
+            newDotExpr(
+              ident(t.capitalizeAscii),
+              ident"read"),
+            stream,
+            newDotExpr(
+              ident"result",
+              ident"root"),
+            ident"result")))
+
+  # Typeless
+  else:
+    result.add(
+      newAssignment(
+        newDotExpr(
+          ident"result",
+          ident(id)),
+        newDotExpr(
+          stream,
+          newCall(
+            ident"readBytes",
+            size))))
 
 proc typeSection(node: KsNode): NimNode =
   result = newTree(nnkTypeSection)
-  result.add(type(node))
+  result.add(typeDecl(node))
   for t in node.children:
-    result.add(type(t))
+    result.add(typeDecl(t))
+
+proc instanceProc(attrName, objName: string; attr: JsonNode): NimNode =
+  let inst = ident(attrName & "Inst")
+  result = newProc(
+    ident(attrName),
+    @[instType(attr),
+      newIdentDefs(
+        ident"this",
+        ident(objName))])
+  result.body = newStmtList(
+    newIfStmt(
+      (newCall(
+        ident"isNone",
+        newDotExpr(
+          ident"this",
+          inst)),
+       newAssignment(
+         newDotExpr(
+           ident"this",
+           inst),
+         newCall(
+           ident"some",
+           newLit(attr["value"].getInt))))),
+    nnkReturnStmt.newTree(
+      newCall(
+        ident"get",
+        newDotExpr(
+          ident"this",
+          inst))))
 
 proc readProc(node: KsNode): NimNode =
   result = newProc(name = ident"read")
@@ -201,11 +305,14 @@ proc readProc(node: KsNode): NimNode =
           ident"root"))),
     parseAttrs)
 
-proc readProcs(node: KsNode): NimNode =
+proc procs(node: KsNode): NimNode =
   result = newStmtList()
   if node.children != @[]:
     for c in node.children:
-      result.add(readProcs(c))
+      result.add(procs(c))
+  if node.instances != nil:
+    for k, v in node.instances.pairs:
+      result.add(instanceProc(k, node.name, v))
   result.add(readProc(node))
 
 proc fromFileProc(node: KsNode): NimNode =
@@ -245,7 +352,7 @@ proc generateParser*(spec: JsonNode): NimNode =
   let spec = spec.toKsNode
   result = newStmtList(
     typeSection(spec),
-    readProcs(spec),
+    procs(spec),
     fromFileProcs(spec))
 
 # static library
