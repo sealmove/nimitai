@@ -5,97 +5,27 @@ const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
-proc nativeType(ksyType: string): NimNode =
-  case ksyType
-  of "b1": result = ident"bool"
-  of "u1": result = ident"uint8"
-  of "s1": result = ident"int8"
-  of "u2", "u2le", "u2be": result = ident"uint16"
-  of "s2", "s2le", "s2be": result = ident"int16"
-  of "u4", "u4le", "u4be": result = ident"uint32"
-  of "s4", "s4le", "s4be": result = ident"int32"
-  of "u8", "u8le", "u8be": result = ident"uint64"
-  of "s8", "s8le", "s8be": result = ident"int64"
-  of "f4", "f4be", "f4le": result = ident"float32"
-  of "f8", "f8be", "f8le": result = ident"float64"
-  of "str", "strz": result = ident"string"
-  elif ksyType.match(re"b[2-9]|b[1-9][0-9]*"):
-    result = ident"uint64"
-  else:
-    # TODO: implement look-up here
-    result = ident(ksyType.capitalizeAscii)
+proc attrDecl(attr: Attr): NimNode =
+  newIdentDefs(ident(attr.id), attr.`type`.parsed)
 
-proc ksAsJsonToNim(json: JsonNode): NimNode =
-  case json.kind
-  of JString:
-    result = expr(json.getStr)
-  of JInt:
-    result = newLit(json.getInt)
-  of JBool:
-    result = newLit(json.getBool)
-  of JNull:
-    result = newNilLit()
-  else: discard # Should not occur
-
-proc inferType(node: NimNode): NimNode =
-
-proc inferType(json: JsonNode): NimNode =
-  let node = ksAsJsonToNim(json)
-  while 
-  ident"int"
-
-proc attrDecl(json: JsonNode): NimNode =
-  let
-    id = ident(json["id"].getStr)
-    t = nativeType(json["type"].getStr)
-#  register(id, t)
-  newIdentDefs(id, t)
-
-proc instType(attr: JsonNode): NimNode =
-  if attr.hasKey("type"):
-    nativeType(attr["type"].getStr)
-  else:
-    inferType(attr["value"])
-
-proc instDecl(key: string, value: JsonNode): NimNode =
-  let t = instType(value)
-
+proc instDecl(inst: Attr): NimNode =
   newIdentDefs(
-    ident(key & "Inst"),
+    ident(inst.id & "Inst"),
     nnkBracketExpr.newTree(
       ident"Option",
-      t))
-
-proc parseAttrExprUser(json: JsonNode, fromRaw: bool): NimNode =
-  let
-    t = json["type"].getStr.capitalizeAscii
-    io = if fromRaw: ident(t & "Raw")
-         else: newDotExpr(ident"result", ident"io")
-  result = newCall(
-    newDotExpr(
-      ident(t),
-      ident"read"),
-    io,
-    newDotExpr(
-      ident"result",
-      ident"root"),
-    ident"result")
+      inst.`type`.parsed))
 
 # A series of assignments of parsing calls to local variables or object fields
-proc parseAttr(json: JsonNode): NimNode =
+proc parseAttr(attr: Attr): NimNode =
   result = newStmtList()
-  let
-    s = attrKeySet(json)
-    id = json["id"].getStr
 
   # This should be used for both size and sizeless attributes
   var stream, size: NimNode
 
   # Size key means we get a substream
-  if AttrKey.`size` in s:
-    stream = ident(id & "Io")
-    size = expr(json["size"].getStr)
-    let raw = ident(id & "Raw")
+  if AttrKey.`size` in attr.set:
+    stream = ident(attr.id & "Io")
+    let raw = ident(attr.id & "Raw")
     result.add(
       newLetStmt(
         raw,
@@ -109,7 +39,7 @@ proc parseAttr(json: JsonNode): NimNode =
             ident"int",
             newDotExpr(
               ident"result",
-              size)))))
+              attr.size)))))
     result.add(
       newLetStmt(
         stream,
@@ -117,9 +47,8 @@ proc parseAttr(json: JsonNode): NimNode =
           ident"newKaitaiStream",
           raw)))
 
-  if AttrKey.`type` in s:
-    let t = json["type"].getStr
-
+  if AttrKey.`type` in attr.set:
+    let t = attr.`type`.raw
     # Number
     if t.match(re"([us][1248]|f[48])(be|le)?"):
       var procName = "read" & t
@@ -129,7 +58,7 @@ proc parseAttr(json: JsonNode): NimNode =
         newAssignment(
           newDotExpr(
             ident"result",
-            ident(id)),
+            ident(attr.id)),
             newCall(
               procName,
               newDotExpr(
@@ -142,7 +71,7 @@ proc parseAttr(json: JsonNode): NimNode =
         newAssignment(
           newDotExpr(
             ident"result",
-            ident(id)),
+            ident(attr.id)),
           newCall(
             ident"bool",
             newCall(
@@ -159,7 +88,7 @@ proc parseAttr(json: JsonNode): NimNode =
         newAssignment(
           newDotExpr(
             ident"result",
-            ident(id)),
+            ident(attr.id)),
           newCall(
             "readBitsIntBe",
             newDotExpr(
@@ -173,7 +102,7 @@ proc parseAttr(json: JsonNode): NimNode =
         newAssignment(
           newDotExpr(
             ident"result",
-            ident(id)),
+            ident(attr.id)),
           newCall(
             newDotExpr(
               ident(t.capitalizeAscii),
@@ -190,18 +119,18 @@ proc parseAttr(json: JsonNode): NimNode =
       newAssignment(
         newDotExpr(
           ident"result",
-          ident(id)),
+          ident(attr.id)),
         newDotExpr(
           stream,
           newCall(
             ident"readBytes",
-            size))))
+            attr.size))))
 
-proc instanceProc(attrName, objName: string; attr: JsonNode): NimNode =
-  let inst = ident(attrName & "Inst")
+proc instanceProc(inst: Attr, objName: string): NimNode =
+  let field = ident(inst.id & "Inst")
   result = newProc(
-    ident(attrName),
-    @[instType(attr),
+    ident(inst.id),
+    @[inst.`type`.parsed,
       newIdentDefs(
         ident"this",
         ident(objName))])
@@ -211,23 +140,23 @@ proc instanceProc(attrName, objName: string; attr: JsonNode): NimNode =
         ident"isNone",
         newDotExpr(
           ident"this",
-          inst)),
+          field)),
        newAssignment(
          newDotExpr(
            ident"this",
-           inst),
+           field),
          newCall(
            ident"some",
-           ksAsJsonToNim(attr["value"]))))),
+           inst.value)))),
     nnkReturnStmt.newTree(
       newCall(
         ident"get",
         newDotExpr(
           ident"this",
-          inst))))
+          field))))
 
 proc parentType(node: Type): string =
-  if node.parent == nil: rootTypeName else: node.parent.id
+  if node.supertype == nil: rootTypeName else: node.supertype.id
 
 proc typeDecl(node: Type): NimNode =
   var fields = newTree(nnkRecList)
@@ -237,13 +166,11 @@ proc typeDecl(node: Type): NimNode =
       ident"parent",
       ident(parentType(node))))
 
-  if node.seq != nil:
-    for a in node.seq:
-      fields.add(attrDecl(a))
+  for a in node.seq:
+    fields.add(attrDecl(a))
 
-  if node.instances != nil:
-    for k, v in node.instances.pairs:
-      fields.add(instDecl(k, v))
+  for i in node.instances:
+    fields.add(instDecl(i))
 
   result = nnkTypeDef.newTree(
     ident(node.id),
@@ -315,12 +242,10 @@ proc readProc(node: Type): NimNode =
 
 proc procs(node: Type): NimNode =
   result = newStmtList()
-  if node.types != @[]:
-    for c in node.types:
-      result.add(procs(c))
-  if node.instances != nil:
-    for k, v in node.instances.pairs:
-      result.add(instanceProc(k, node.id, v))
+  for c in node.types:
+    result.add(procs(c))
+  for i in node.instances:
+    result.add(instanceProc(i, node.id))
   result.add(readProc(node))
 
 proc fromFileProc(node: Type): NimNode =
@@ -362,6 +287,7 @@ proc generateParser*(spec: JsonNode): NimNode =
     typeSection(spec),
     procs(spec),
     fromFileProcs(spec))
+  echo repr result
 
 # static library
 macro injectParser*(spec: static[JsonNode]) =

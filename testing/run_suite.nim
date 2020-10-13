@@ -69,5 +69,6 @@ macro suite() =
       ident"suite",
       newLit"Nimitai Test Suite",
       tests))
+  echo repr result
 
 suite()
