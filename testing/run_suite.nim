@@ -1,7 +1,7 @@
 ## Compiles and runs a unittest suite using the kst files
 
 import macros, json, strformat, os, strutils
-import ../nimitai_compiler/nimitai/exprlang
+import ../src/nimitai/exprlang
 import json6
 
 proc test(json: JsonNode): NimNode =
@@ -62,8 +62,8 @@ macro suite() =
     nnkImportStmt.newTree(
       ident"json",
       ident"options",
-      ident"../nimitai_compiler/nimitai",
-      ident"../kaitai_struct_nim_runtime/kaitai_struct_nim_runtime",
+      ident"../src/nimitai",
+      ident"../src/nimitai/runtime",
       ident"unittest"),
     nnkCommand.newTree(
       ident"suite",

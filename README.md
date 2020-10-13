@@ -80,8 +80,7 @@ ee 00 00 00
 
 buffered_struct.nim
 ```nim
-# Note that you need make some imports yourself in order for nimitai to work
-import json, nimitai, kaitai_struct_nim_runtime, strutils
+import json, nimitai, nimitai/runtime, strutils
 injectParser(parseJson(readFile"buffered_struct.json"))
 let x = BufferedStruct.fromFile("buffered_struct.bin")
 echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)

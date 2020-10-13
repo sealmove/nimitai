@@ -1,4 +1,4 @@
-import macros, json, strutils, kaitai_struct_nim_runtime
+import macros, json, strutils, runtime
 
 type
   TypeKey* {.pure.} = enum
@@ -8,62 +8,121 @@ type
     supertype*: Type
     id*: string
     types*: seq[Type]
-    meta*: JsonNode
-    doc*: JsonNode
-    `doc-ref`*: JsonNode 
-    params*: JsonNode 
-    seq*: JsonNode 
-    instances*: JsonNode
+    meta*: Meta
+    doc*: string
+    `doc-ref`*: string
+    params*: JsonNode
+    seq*: seq[Attr]
+    instances*: seq[Attr]
     enums*: JsonNode
-  repeatKind = enum
-    rkEos
-    rkExpr
-    rkUntil
+  EndianKind = enum
+    ekLe, ekBe
+  MetaKey* {.pure.} = enum
+    id, title, application, `file-extension`, xref, license, `ks-version`,
+    `ks-debug`, `ks-opaque-types`, imports, encoding, endian
+  Meta = ref object
+    set*: set[MetaKey]
+    id*: string
+    title*: string
+    application*: seq[string]
+    `file-extension`*: seq[string]
+    xref*: JsonNode
+    license*: string
+    `ks-version`*: string
+    `ks-debug`*: bool
+    `ks-opaque-types`*: bool
+    imports*: seq[string]
+    encoding*: string
+    endian*: EndianKind
+  repeatKind* = enum
+    rkEos, rkExpr, rkUntil
   AttrKey* {.pure.} = enum
     id, doc, `doc-ref`, contents, `type`, repeat, `repeat-expr`, `repeat-until`,
     `if`, size, `size-eos`, process, `enum`, encoding, terminator, consume,
     `include`, `eos-error`, pos, io, value
   Attr* = ref object
-    set: set[AttrKey]
-    id: string
-    doc: string
-    `doc-ref`: string
-    contents: seq[byte]
-    `type`: NimNode
-    repeat: repeatKind
-    `repeat-expr`: NimNode
-    `repeat-until`: NimNode
-    `if`: NimNode
-    size: NimNode
-    `size-eos`: bool
-    process: proc()
-    `enum`: string
-    encoding: string
-    `pad-right`: byte
-    terminator: byte
-    consume: bool
-    `include`: bool
-    `eos-error`: bool
-    pos: int
-    io: KaitaiStream
-    value: NimNode
+    set*: set[AttrKey]
+    id*: string
+    doc*: string
+    `doc-ref`*: string
+    contents*: seq[byte]
+    `type`*: NimNode
+    repeat*: repeatKind
+    `repeat-expr`*: NimNode
+    `repeat-until`*: NimNode
+    `if`*: NimNode
+    size*: NimNode
+    `size-eos`*: bool
+    process*: proc()
+    `enum`*: string
+    encoding*: string
+    `pad-right`*: byte
+    terminator*: byte
+    consume*: bool
+    `include`*: bool
+    `eos-error`*: bool
+    pos*: int
+    io*: KaitaiStream
+    value*: NimNode
 
 proc attrKeySet*(json: JsonNode): set[AttrKey] =
   for key in json.keys:
     result.incl(parseEnum[AttrKey](key))
 
 proc toKsType*(json: JsonNode): Type =
-  result = Type(
-    meta: json.getOrDefault("meta"),
-    doc: json.getOrDefault("doc"),
-    `doc-ref`: json.getOrDefault("doc-ref"),
-    params: json.getOrDefault("params"),
-    seq: json.getOrDefault("seq"),
-    instances: json.getOrDefault("instances"),
-    enums: json.getOrDefault("enums"))
+  result = Type()
+  for key in json.keys:
+    result.set.incl(parseEnum[TypeKey](key))
   if json.hasKey("meta") and json["meta"].hasKey("id"):
     result.id = json["meta"]["id"].getStr.capitalizeAscii
-  if json.hasKey("types"):
+  if TypeKey.meta in result.set:
+    var meta = Meta()
+    for key in json["meta"].keys:
+      meta.set.incl(parseEnum[MetaKey](key))
+    if MetaKey.id in meta.set:
+      meta.id = json["meta"]["id"].getStr
+    if MetaKey.title in meta.set:
+      meta.title = json["meta"]["title"].getStr
+    if MetaKey.application in meta.set:
+      case meta.application.kind
+      of JArray:
+        for s in json["meta"]["application"].items:
+          meta.application.add(s)
+      of JString:
+          meta.application.add(json["meta"]["application"].getStr)
+      else discard # should not occur
+    if MetaKey.`file-extension` in meta.set:
+      discard # XXX
+    if MetaKey.xref in meta.set:
+      discard # XXX
+    if MetaKey.license in meta.set:
+      discard # XXX
+    if MetaKey.`ks-version` in meta.set:
+      discard # XXX
+    if MetaKey.`ks-debug` in meta.set:
+      discard # XXX
+    if MetaKey.`ks-opaque-types` in meta.set:
+      discard # XXX
+    if MetaKey.imports in meta.set:
+      discard # XXX
+    if MetaKey.encoding in meta.set:
+      discard # XXX
+    if MetaKey.endian in meta.set:
+      discard # XXX
+    if MetaKey.id in meta.set:
+      discard # XXX
+    if MetaKey.id in meta.set:
+      discard # XXX
+    if MetaKey.id in meta.set:
+      discard # XXX
+    result.meta = meta
+  result.params = json.getOrDefault("params") # XXX
+  result.enums = json.getOrDefault("enums")) # XXX
+  # XXX doc
+  # XXX `doc-ref`
+  # XXX seq
+  # XXX instances
+  if TypeKey.types in result.set:
     for k, v in json["types"].pairs:
       let node = v.toKsType
       node.id = k.capitalizeAscii
