@@ -82,7 +82,7 @@ proc parseAttr(attr: Attr): NimNode =
               newLit(1)))))
 
     # Number from bits
-    elif t.match(re"b[2-9]|b[1-9][0-9]*"):
+    elif t.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
       let bits = parseInt(t[1..^1])
       result.add(
         newAssignment(

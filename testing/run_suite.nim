@@ -1,74 +1,56 @@
-## Compiles and runs a unittest suite using the kst files
+import os, osproc, strformat, strutils
 
-import macros, json, strformat, os, strutils
-import ../src/nimitai/exprlang
-import json6
+# OK: Okay (Test passed)
+# FL: Failed (Failed to pass)
+# CE: Compile Error (Failed to compile)
+# MI: Missing (Test does not exist)
 
-proc test(json: JsonNode): NimNode =
+const
+  R = "\e[31;1m"
+  G = "\e[32;1m"
+  Y = "\e[33;1m"
+  B = "\e[34;1m"
+  D = "\e[0m"
+
+var tests, fl, ce, mi: int
+
+echo &"{B}[Running]{D} Nimitai"
+
+for k, f in walkDir("tests"):
+  if k == pcDir: continue
+  inc(tests)
+
   let
-    id = json["id"].getStr
-    data = json["data"].getStr
+    casename = splitFile(f).name
+    dir = "tests/compiled/bin"
+    exe = dir / casename
+    module = &"tests/compiled/{casename}.nim"
 
-  var stmts = newStmtList(
-    newCall(
-      ident"injectParser",
-      newCall(
-        ident"parseJson",
-        newCall(
-          ident"readFile",
-          newLit(&"specs/{id}.ksj")))),
-    newLetStmt(
-      newIdentNode("r"),
-      newCall(
-        newDotExpr(
-          ident(id.capitalizeAscii),
-          newIdentNode("fromFile")),
-        newLit(&"subjects/{data}"))))
+  # Check if compile exists
+  if not fileExists(module):
+    echo &"  {R}[MI]{D} " & casename
+    inc(mi)
+    continue
 
-  if json.hasKey("asserts"):
-    for a in json["asserts"]:
-      let expected = a["expected"]
-      var nodeExpected: NimNode
-      case expected.kind
-      of JString:
-        nodeExpected = expr(expected.getStr)
-      of JInt:
-        nodeExpected = newLit(expected.getInt)
-      of JBool:
-        nodeExpected = newLit(expected.getBool)
-      of JNull:
-        nodeExpected = newNilLit()
-      else: discard # Should not occur
-      stmts.add(
-        newCall(
-          ident"check",
-          infix(
-            expr("r." & a["actual"].getStr),
-            "==",
-            nodeExpected)))
+  # Try to compile
+  let (co, cc) = execCmdEx(&"nim c --hints:off -w:off --outdir:{dir} {module}")
+  if cc != 0:
+    inc(ce)
+    echo &"  {Y}[CE]{D} " & casename
+    continue
 
-  nnkCommand.newTree(
-    newIdentNode("test"),
-    newLit(id),
-    stmts)
+  # Run
+  let (ro, rc) = execCmdEx(&"{exe}")
+  if rc != 0:
+    echo &"  {B}[FL]{D} " & casename
+    inc(fl)
+    continue
 
-macro suite() =
-  var tests = newStmtList()
-  for a, f in walkDir("tests/working_tests"):
-    let json = parseJson6(readFile(f))
-    tests.add(test(json))
+  echo &"  {G}[OK]{D} " & casename
 
-  result = newStmtList(
-    nnkImportStmt.newTree(
-      ident"json",
-      ident"options",
-      ident"../src/nimitai",
-      ident"../src/nimitai/runtime",
-      ident"unittest"),
-    nnkCommand.newTree(
-      ident"suite",
-      newLit"Nimitai Test Suite",
-      tests))
-  echo repr result
-
-suite()
+echo "----------------------------------------\n" &
+     &"  {G}[OK]{D} {(tests - mi - ce - fl).intToStr(3)}\n" &
+     &"  {B}[FL]{D} {fl.intToStr(3)}\n" &
+     &"  {Y}[CE]{D} {ce.intToStr(3)}\n" &
+     &"  {R}[MI]{D} {mi.intToStr(3)}\n" &
+     "----------------------------------------\n"

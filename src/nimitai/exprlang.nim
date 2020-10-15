@@ -31,6 +31,8 @@ type
   State = ref object
     stack: seq[NimNode]
     stackCnt: int
+  LexingError* = object of CatchableError
+  ParsingError* = object of CatchableError
 
 proc `==`(token: Token, tk: TokenKind): bool =
   token.kind == tk
@@ -88,7 +90,8 @@ proc tokenize(str: string): seq[Token] =
     Id         <- (Lower | '_') * *(Alnum | '_'):
       tokens.add Token(kind: tkId, strVal: $0)
 
-  assert l.match(str).ok
+  if not l.match(str).ok:
+    raise newException(LexingError, "Could not tokenize")
   tokens
 
 proc parse(tokens: seq[Token]): NimNode =
@@ -130,8 +133,11 @@ proc parse(tokens: seq[Token]): NimNode =
     Id <- [tkId]:
       s.stack.add ident(($0).strVal)
 
-  assert p.match(tokens, s).ok
-  assert s.stack.len == 1
+  if not p.match(tokens, s).ok:
+    raise newException(ParsingError, "Could not parse")
+  if not s.stack.len == 1:
+    raise newException(ParsingError, "Got leftover nodes")
+
   s.stack[0]
 
 proc expr*(s: string): NimNode = s.tokenize.parse

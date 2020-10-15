@@ -1,4 +1,5 @@
-import macros, json, strutils, runtime, exprlang
+import macros, json, strutils, tables
+import runtime, exprlang
 
 type
   TypeKey* {.pure.} = enum
@@ -77,9 +78,37 @@ proc ksAsJsonToNim(json: JsonNode): NimNode =
     result = newNilLit()
   else: discard # Should not occur
 
-proc attrKeySet*(json: JsonNode): set[AttrKey] =
-  for key in json.keys:
-    result.incl(parseEnum[AttrKey](key))
+# XXX very sloppy implementation
+proc inferType(expr: NimNode, context: Type): NimNode =
+  case expr.kind
+  of nnkCharLit:
+    result = ident"chat"
+  of nnkIntLit:
+    result = ident"int"
+  of nnkFloatLit:
+    result = ident"float"
+  of nnkStrLit:
+    result = ident"string"
+  of nnkInfix, nnkPrefix:
+    result = inferType(expr[1], context)
+  of nnkSym:
+    result = ident"bool"
+  # of nnkIdent:
+  # XXX
+  # of nnkNilLit:
+  # of nnkCall:
+  # of nnkVarTuple:
+  # of nnkPar:
+  # of nnkBracket:
+  # of nnkBracketExpr:
+  # of nnkDotExpr:
+  # of nnkIfExpr:
+  # of nnkElifExpr:
+  # of nnkElseExpr:
+  else:
+    echo expr.kind
+    echo expr
+    quit("Unexpected NimNodeKind during type inference")
 
 proc toKsType*(json: JsonNode): Type =
   result = Type()
@@ -234,7 +263,7 @@ proc toKsType*(json: JsonNode): Type =
       # XXX if AttrKey.io in a.set:
       if AttrKey.value in a.set:
         a.value = ksAsJsonToNim(v["value"])
-        a.`type` = (ident"int", "int") # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+        a.`type` = (inferType(a.value, result), "")
       result.instances.add(a)
 
 #[ For debugging
