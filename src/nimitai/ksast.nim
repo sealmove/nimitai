@@ -1,4 +1,4 @@
-import macros, json, strutils, tables
+import macros, json, strutils, strformat
 import runtime, exprlang
 
 type
@@ -66,10 +66,10 @@ type
     io*: KaitaiStream
     value*: NimNode
 
-proc ksAsJsonToNim(json: JsonNode): NimNode =
+proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
   case json.kind
   of JString:
-    result = expr(json.getStr)
+    result = expr(json.getStr, context)
   of JInt:
     result = newLit(json.getInt)
   of JBool:
@@ -89,12 +89,36 @@ proc inferType(expr: NimNode, context: Type): NimNode =
     result = ident"float"
   of nnkStrLit:
     result = ident"string"
-  of nnkInfix, nnkPrefix:
-    result = inferType(expr[1], context)
   of nnkSym:
     result = ident"bool"
-  # of nnkIdent:
-  # XXX
+  of nnkIdent:
+    # XXX if eqIdent(expr, "reverse"):
+    # XXX if eqIdent(expr, "min"):
+    # XXX if eqIdent(expr, "max"):
+    # XXX if eqIdent(expr, "first"):
+    # XXX if eqIdent(expr, "last"):
+    if eqIdent(expr, "to_s"):
+      return ident"string"
+    if eqIdent(expr, "to_i"):
+      return ident"int"
+    if eqIdent(expr, "length"):
+      return ident"int"
+    if eqIdent(expr, "substring"):
+      return ident"string"
+    if eqIdent(expr, "size"):
+      return ident"int"
+    for a in context.seq:
+      if eqIdent(expr, a.id):
+        return a.`type`.parsed
+    for i in context.instances:
+      if eqIdent(expr, i.id):
+        return i.`type`.parsed
+    quit(fmt"Identifier {repr(expr)} not found")
+  of nnkInfix, nnkPrefix:
+    result = inferType(expr[1], context)
+  of nnkDotExpr:
+    result = inferType(expr[1], context)
+
   # of nnkNilLit:
   # of nnkCall:
   # of nnkVarTuple:
@@ -106,8 +130,6 @@ proc inferType(expr: NimNode, context: Type): NimNode =
   # of nnkElifExpr:
   # of nnkElseExpr:
   else:
-    echo expr.kind
-    echo expr
     quit("Unexpected NimNodeKind during type inference")
 
 proc toKsType*(json: JsonNode): Type =
@@ -173,7 +195,8 @@ proc toKsType*(json: JsonNode): Type =
   result.params = json.getOrDefault("params") # XXX
   result.enums = json.getOrDefault("enums") # XXX
   for e in json["seq"].items:
-    var a = Attr(id: e["id"].getStr)
+    let id = e["id"].getStr
+    var a = Attr(id: id)
     for key in e.keys:
       a.set.incl(parseEnum[AttrKey](key))
     if AttrKey.doc in a.set:
@@ -184,13 +207,15 @@ proc toKsType*(json: JsonNode): Type =
     if AttrKey.`type` in a.set:
       let t = e["type"].getStr
       a.`type` = (nativeType(t), t)
+    else:
+      a.`type` = (nnkBracketExpr.newTree(ident"seq", ident"byte"), "")
     if AttrKey.repeat in a.set:
       a.repeat = parseEnum[RepeatKind](e["repeat"].getStr)
     # XXX if AttrKey.`repeat-expr` in a.set:
     # XXX if AttrKey.`repeat-until` in a.set:
     # XXX if AttrKey.`if` in a.set:
     if AttrKey.size in a.set:
-      a.size = ksAsJsonToNim(e["size"])
+      a.size = ksAsJsonToNim(e["size"], "result")
     if AttrKey.`size-eos` in a.set:
       a.`size-eos` = e["size-eos"].getBool
     # XXX if AttrKey.process in a.set:
@@ -232,15 +257,13 @@ proc toKsType*(json: JsonNode): Type =
       if AttrKey.`type` in a.set:
         let t = v["type"].getStr
         a.`type` = (nativeType(t), t)
-
-
       if AttrKey.repeat in a.set:
         a.repeat = parseEnum[RepeatKind](v["repeat"].getStr)
       # XXX if AttrKey.`repeat-expr` in a.set:
       # XXX if AttrKey.`repeat-until` in a.set:
       # XXX if AttrKey.`if` in a.set:
       if AttrKey.size in a.set:
-        a.size = ksAsJsonToNim(v["size"])
+        a.size = ksAsJsonToNim(v["size"], "this")
       if AttrKey.`size-eos` in a.set:
         a.`size-eos` = v["size-eos"].getBool
       # XXX if AttrKey.process in a.set:
@@ -262,7 +285,7 @@ proc toKsType*(json: JsonNode): Type =
       # XXX if AttrKey.pos in a.set:
       # XXX if AttrKey.io in a.set:
       if AttrKey.value in a.set:
-        a.value = ksAsJsonToNim(v["value"])
+        a.value = ksAsJsonToNim(v["value"], "this")
         a.`type` = (inferType(a.value, result), "")
       result.instances.add(a)
 

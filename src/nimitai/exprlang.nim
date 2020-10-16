@@ -16,6 +16,8 @@ type
     tkArrayOpen
     tkArrayClose
     tkOp
+    tkDot
+    tkMethod
     tkId
   Token = ref object
     case kind: TokenKind
@@ -25,12 +27,13 @@ type
       intVal: BiggestUInt
     of tkBoolean:
       boolVal: bool
-    of tkString, tkOp, tkId:
+    of tkString, tkOp, tkMethod, tkId:
       strVal: string
     else: discard
   State = ref object
     stack: seq[NimNode]
     stackCnt: int
+    context: string
   LexingError* = object of CatchableError
   ParsingError* = object of CatchableError
 
@@ -42,7 +45,8 @@ proc tokenize(str: string): seq[Token] =
   let l = peg G:
     B <- *Blank
     G <- *((Float | Integer | Boolean | String | Comma | ParenOpen |
-            ParenClose | ArrayOpen | ArrayClose | Op | Id) * B) * !1
+          ParenClose | ArrayOpen | ArrayClose | Op | Dot | Method | Id) * B) *
+          !1
     Float      <- Int * '.' * Int * ?('e' * ?{'+', '-'} * Int):
       var x: BiggestFloat
       assert len($0) == parseBiggestFloat($0, x)
@@ -67,7 +71,7 @@ proc tokenize(str: string): seq[Token] =
       tokens.add Token(kind: tkInteger, intVal: x)
     DecR     <- Dec:
       var x: BiggestUInt
-      assert len($0) == parseBiggestUInt($0, x)
+      #assert len($0) == parseBiggestUInt($0, x)
       tokens.add Token(kind: tkInteger, intVal: x)
     Boolean    <- "true" | "false":
       tokens.add Token(kind: tkBoolean, boolval: parseBool($0))
@@ -85,8 +89,22 @@ proc tokenize(str: string): seq[Token] =
       tokens.add Token(kind: tkArrayClose)
     Op         <- "+" | "-"  | "*" | "/"  | "%" | "<<" | ">>" |  "&"  | "|"  |
                   "^" | ">=" | ">" | "<=" | "<" | "==" | "!=" | "and" | "or" |
-                  "." | "::":
-      tokens.add Token(kind: tkOp, strVal: $0)
+                  "::":
+      var op: string
+      case $0
+      of "%" : op = "mod"
+      of "<<": op = "shl"
+      of ">>": op = "shr"
+      of "&" : op = "and"
+      of "|" : op = "or"
+      of "^" : op = "xor"
+      else   : op = $0
+      tokens.add Token(kind: tkOp, strVal: op)
+    Dot        <- ".":
+      tokens.add Token(kind: tkDot)
+    Method     <- "to_s" | "to_i" | "length" | "reverse" | "substring" |
+                  "first" | "last" | "size" | "min" | "max":
+      tokens.add Token(kind: tkMethod, strVal: $0)
     Id         <- (Lower | '_') * *(Alnum | '_'):
       tokens.add Token(kind: tkId, strVal: $0)
 
@@ -94,21 +112,26 @@ proc tokenize(str: string): seq[Token] =
     raise newException(LexingError, "Could not tokenize")
   tokens
 
-proc parse(tokens: seq[Token]): NimNode =
-  var s = State()
+proc parse(tokens: seq[Token], context: string): NimNode =
+  var s = State(context: context)
   let p = peg(G, Token, s: State):
     CS <- 0:
       s.stackCnt = s.stack.len
     G <- Expr * !1
-    Expr <- Term * *Infix
-    Infix <- >[tkOp] * Term:
+    Expr  <- Term  * *Infix
+    Expr2 <- Term2 * *Infix
+    Infix <- (>[tkOp]  * Expr)  ^ 1 |
+             (>[tkDot] * Expr2) ^ 2:
       let
         right = s.stack.pop
         left = s.stack.pop
-      case ($1).strval
-      of ".": s.stack.add newDotExpr(left, right)
+      case ($1).kind
+      of tkDot: s.stack.add newDotExpr(left, right)
       else: s.stack.add infix(left, ($1).strval, right)
-    Term <- ParenExpr | Array | Float | Integer | Boolean | String | Id | Prefix
+    Term  <- ParenExpr | Array | Float | Integer | Boolean | String | Method |
+             Id | Prefix
+    Term2 <- ParenExpr | Array | Float | Integer | Boolean | String | Method |
+             Id2 | Prefix
     Prefix <- >[tkOp] * Term:
       s.stack.add prefix(s.stack.pop, ($1).strval)
     ParenExpr <- [tkParenOpen] * Expr * [tkParenClose]
@@ -130,7 +153,14 @@ proc parse(tokens: seq[Token]): NimNode =
       s.stack.add newLit(($0).boolVal)
     String <- [tkString]:
       s.stack.add newLit(($0).strVal)
-    Id <- [tkId]:
+    Method <- [tkMethod]:
+      s.stack.add ident(($0).strVal)
+    Id  <- [tkId]:
+      if s.context != "":
+        s.stack.add newDotExpr(ident(s.context), ident(($0).strVal))
+      else:
+        s.stack.add ident(($0).strVal)
+    Id2 <- [tkId]:
       s.stack.add ident(($0).strVal)
 
   if not p.match(tokens, s).ok:
@@ -140,7 +170,7 @@ proc parse(tokens: seq[Token]): NimNode =
 
   s.stack[0]
 
-proc expr*(s: string): NimNode = s.tokenize.parse
+proc expr*(s: string, context: string): NimNode = parse(s.tokenize, context)
 
 proc nativeType*(ksyType: string): NimNode =
   case ksyType
@@ -183,7 +213,11 @@ proc debug(s: string) =
       let s = $t.kind
       echo s[2 .. ^1]
   echo ""
-  let expr = parse(tokens)
+  let expr = parse(tokens, "this")
   echo "=== EXPRESSION ==="
   echo treeRepr expr
   echo ""
+  echo repr expr
+  echo ""
+
+#static: debug"a.b.c.d + e.f.g"

@@ -1,4 +1,4 @@
-import nimitai/[ksast, exprlang]
+import nimitai/ksast
 import json, macros, regex, strutils
 
 const
@@ -37,9 +37,7 @@ proc parseAttr(attr: Attr): NimNode =
             ident"readBytes"),
           newCall(
             ident"int",
-            newDotExpr(
-              ident"result",
-              attr.size)))))
+            attr.size))))
     result.add(
       newLetStmt(
         stream,
@@ -126,14 +124,15 @@ proc parseAttr(attr: Attr): NimNode =
             ident"readBytes",
             attr.size))))
 
-proc instanceProc(inst: Attr, objName: string): NimNode =
+# Only value-instances supported for now
+proc instanceProc(inst: Attr, node: Type): NimNode =
   let field = ident(inst.id & "Inst")
   result = newProc(
     ident(inst.id),
     @[inst.`type`.parsed,
       newIdentDefs(
         ident"this",
-        ident(objName))])
+        ident(node.id))])
   result.body = newStmtList(
     newIfStmt(
       (newCall(
@@ -147,7 +146,9 @@ proc instanceProc(inst: Attr, objName: string): NimNode =
            field),
          newCall(
            ident"some",
-           inst.value)))),
+           newCall(
+             inst.`type`.parsed,
+             inst.value))))),
     nnkReturnStmt.newTree(
       newCall(
         ident"get",
@@ -245,7 +246,7 @@ proc procs(node: Type): NimNode =
   for c in node.types:
     result.add(procs(c))
   for i in node.instances:
-    result.add(instanceProc(i, node.id))
+    result.add(instanceProc(i, node))
   result.add(readProc(node))
 
 proc fromFileProc(node: Type): NimNode =
@@ -287,7 +288,7 @@ proc generateParser*(spec: JsonNode): NimNode =
     typeSection(spec),
     procs(spec),
     fromFileProcs(spec))
-  echo repr result
+  #echo repr result
 
 # static library
 macro injectParser*(spec: static[JsonNode]) =

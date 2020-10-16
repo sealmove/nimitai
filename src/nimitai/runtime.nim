@@ -1,5 +1,6 @@
 import
-  streams, endians, sequtils, bitops, strutils, strformat, options, encodings
+  streams, endians, sequtils, bitops, strutils, strformat, options, encodings,
+  algorithm
 
 type
   KaitaiStruct* {.inheritable.} = ref object
@@ -9,7 +10,7 @@ type
     io*: Stream
     bits*: uint64
     bitsLeft*: int
-  KaitaiError* = object of Exception
+  KaitaiError* = object of Defect
 
 proc toString(bytes: seq[byte]): string =
   result = newStringOfCap(len(bytes))
@@ -40,7 +41,7 @@ proc newKaitaiStream*(data: seq[seq[byte]]): KaitaiStream =
 
 # Stream positioning
 proc close*(ks: KaitaiStream) = close(ks.io)
-proc isEof*(ks: KaitaiStream): bool = atEnd(ks.io) and ks.bitsLeft == 0
+proc eof*(ks: KaitaiStream): bool = atEnd(ks.io) and ks.bitsLeft == 0
 proc seek*(ks: KaitaiStream, n: int) = setPosition(ks.io, n)
 proc pos*(ks: KaitaiStream): int = getPosition(ks.io)
 proc skip*(ks: KaitaiStream, n: int) = ks.seek(pos(ks) + n)
@@ -337,3 +338,44 @@ proc parseInt*(s: string, radix: int): int {.raises: [ValueError].} =
   else:
     raise newException(ValueError,
       fmt"base {radix} is not supported; use base 2, 8, 10 or 16")
+
+# Expression language methods
+# Integers
+proc toS*(i: SomeInteger): string = intToStr(int(i))
+
+# Floating point numbers
+proc toI*(f: float): int = int(f)
+
+# Byte arrays
+proc length*(ba: seq[byte]): int = ba.len
+# proc toS*(ba: seq[byte], encoding: string): string =
+#   XXX
+#   convert(s, srcEncoding = encoding)
+
+# Strings
+proc `+`*(x, y: string): string = x & y
+proc length*(s: string): int = s.len
+proc reverse*(s: string): string =
+  var s = s
+  algorithm.reverse(s)
+  s
+proc substring*(s: string; `from`, to: int): string = substr(s, `from`, to - 1)
+proc toI*(s: string): int = parseInt(s)
+proc toI*(s: string, radix: int): int =
+  case radix
+  of  2: parseBinInt(s)
+  of  8: parseOctInt(s)
+  of 10: parseInt(s)
+  of 16: parseHexInt(s)
+  else: quit("Radix is not supported")
+
+# Enums
+proc toI*(e: enum): int = ord(e)
+
+# Booleans
+proc toI*(b: bool): int = ord(b)
+
+# Array
+proc first*[T](a: openArray[T]): T = a[0]
+proc last*[T](a: openArray[T]): T = a[^1]
+proc size*[T](a: openArray[T]): T = len(a)

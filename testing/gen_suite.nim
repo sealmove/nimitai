@@ -28,7 +28,7 @@ proc test(json: JsonNode): NimNode =
       var nodeExpected: NimNode
       case expected.kind
       of JString:
-        nodeExpected = expr(expected.getStr)
+        nodeExpected = expr(expected.getStr, "")
       of JInt:
         nodeExpected = newLit(expected.getInt)
       of JBool:
@@ -40,7 +40,7 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           infix(
-            expr("r." & a["actual"].getStr),
+            expr("r." & a["actual"].getStr, ""),
             "==",
             nodeExpected)))
 
@@ -65,6 +65,7 @@ const
   G = "\e[32;1m"
   Y = "\e[33;1m"
   B = "\e[34;1m"
+  M = "\e[35;1m"
   D = "\e[0m"
 
 # OK: Test was generated successfully
@@ -73,7 +74,10 @@ const
 # PE: Parsing error (Failed to parse some expression in the test)
 
 static:
+  var ok, je, le, pe: int
+
   echo &"{B}[Generating]{D} Nimitai"
+
   for k, f in walkDir("tests"):
     if k == pcDir: continue
 
@@ -82,23 +86,32 @@ static:
       json: JsonNode
       ast: Nimnode
 
-    echo &"  {G}[OK]{D} " & casename
-
     try:
       json = parseJson(readFile(f))
     except JsonParsingError:
       echo &"  {B}[JE]{D} " & casename
+      inc(je)
       continue
 
     try:
       ast = test(json)
     except LexingError:
       echo &"  {R}[LE]{D} " & casename
+      inc(le)
       continue
 
     except ParsingError:
-      echo &"  {Y}[PE]{D} " & casename
+      echo &"  {M}[PE]{D} " & casename
+      inc(pe)
       continue
 
-    let module = &"tests/compiled/{casename}.nim"
-    writeFile(module, repr(ast))
+    echo &"  {G}[OK]{D} " & casename
+    inc(ok)
+    writeFile(&"tests/compiled/{casename}.nim", repr(ast))
+
+  echo "----------------------------------------\n" &
+       &"  {G}[OK]{D} {ok.intToStr(3)}\n" &
+       &"  {B}[FL]{D} {je.intToStr(3)}\n" &
+       &"  {M}[CE]{D} {le.intToStr(3)}\n" &
+       &"  {R}[MI]{D} {pe.intToStr(3)}\n" &
+       "----------------------------------------\n"

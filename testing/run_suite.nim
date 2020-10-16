@@ -10,15 +10,15 @@ const
   G = "\e[32;1m"
   Y = "\e[33;1m"
   B = "\e[34;1m"
+  M = "\e[35;1m"
   D = "\e[0m"
 
-var tests, fl, ce, mi: int
+var ok, fl, ce, mi: int
 
 echo &"{B}[Running]{D} Nimitai"
 
 for k, f in walkDir("tests"):
   if k == pcDir: continue
-  inc(tests)
 
   let
     casename = splitFile(f).name
@@ -35,8 +35,8 @@ for k, f in walkDir("tests"):
   # Try to compile
   let (co, cc) = execCmdEx(&"nim c --hints:off -w:off --outdir:{dir} {module}")
   if cc != 0:
+    echo &"  {M}[CE]{D} " & casename
     inc(ce)
-    echo &"  {Y}[CE]{D} " & casename
     continue
 
   # Run
@@ -47,10 +47,11 @@ for k, f in walkDir("tests"):
     continue
 
   echo &"  {G}[OK]{D} " & casename
+  inc(ok)
 
 echo "----------------------------------------\n" &
-     &"  {G}[OK]{D} {(tests - mi - ce - fl).intToStr(3)}\n" &
+     &"  {G}[OK]{D} {ok.intToStr(3)}\n" &
      &"  {B}[FL]{D} {fl.intToStr(3)}\n" &
-     &"  {Y}[CE]{D} {ce.intToStr(3)}\n" &
+     &"  {M}[CE]{D} {ce.intToStr(3)}\n" &
      &"  {R}[MI]{D} {mi.intToStr(3)}\n" &
      "----------------------------------------\n"
