@@ -47,9 +47,12 @@ proc test(json: JsonNode): NimNode =
   newStmtList(
     nnkImportStmt.newTree(
       ident"json",
-      ident"options",
-      ident"../../../src/nimitai",
-      ident"../../../src/nimitai/runtime",
+      infix(
+        ident"../../../src",
+        "/",
+        nnkBracket.newTree(
+          ident"nimitai",
+          ident"nimitai/runtime")),
       ident"unittest"),
     nnkCommand.newTree(
       ident"suite",
@@ -107,7 +110,8 @@ static:
 
     echo &"  {G}[OK]{D} " & casename
     inc(ok)
-    writeFile(&"tests/compiled/{casename}.nim", repr(ast))
+    writeFile(&"tests/compiled/{casename}.nim",
+              repr(ast).splitLines[1..^1].join("\n"))
 
   echo "----------------------------------------\n" &
        &"  {G}[OK]{D} {ok.intToStr(3)}\n" &
