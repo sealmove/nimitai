@@ -68,7 +68,8 @@ proc expr*(txt, context: string): NimNode =
                  "first" | "last" | "size" | "min" | "max") * S:
       s.stack.add ident($1)
     tId       <- >((Lower | '_') * *(Alnum | '_')) * S:
-      s.stack.add ident($1)
+      if s.context != "": s.stack.add newDotExpr(ident(s.context), ident($1))
+      else: s.stack.add ident($1)
 
     # Aux
     int       <- hex | oct | bin | dec
