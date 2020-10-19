@@ -378,4 +378,4 @@ proc toI*(b: bool): int = ord(b)
 # Array
 proc first*[T](a: openArray[T]): T = a[0]
 proc last*[T](a: openArray[T]): T = a[^1]
-proc size*[T](a: openArray[T]): T = len(a)
+proc size*[T](a: openArray[T]): int = len(a)
