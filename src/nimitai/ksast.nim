@@ -194,48 +194,49 @@ proc toKsType*(json: JsonNode): Type =
     result.`doc-ref` = json["doc-ref"].getStr
   result.params = json.getOrDefault("params") # XXX
   result.enums = json.getOrDefault("enums") # XXX
-  for e in json["seq"].items:
-    let id = e["id"].getStr
-    var a = Attr(id: id)
-    for key in e.keys:
-      a.set.incl(parseEnum[AttrKey](key))
-    if AttrKey.doc in a.set:
-      a.doc = e["doc"].getStr
-    if AttrKey.`doc-ref` in a.set:
-      a.`doc-ref` = e["doc-ref"].getStr
-    # XXX if AttrKey.contents in a.set:
-    if AttrKey.`type` in a.set:
-      let t = e["type"].getStr
-      a.`type` = (nativeType(t), t)
-    else:
-      a.`type` = (nnkBracketExpr.newTree(ident"seq", ident"byte"), "")
-    if AttrKey.repeat in a.set:
-      a.repeat = parseEnum[RepeatKind](e["repeat"].getStr)
-    # XXX if AttrKey.`repeat-expr` in a.set:
-    # XXX if AttrKey.`repeat-until` in a.set:
-    # XXX if AttrKey.`if` in a.set:
-    if AttrKey.size in a.set:
-      a.size = ksAsJsonToNim(e["size"], "result")
-    if AttrKey.`size-eos` in a.set:
-      a.`size-eos` = e["size-eos"].getBool
-    # XXX if AttrKey.process in a.set:
-    # XXX if AttrKey.`enum` in a.set:
-    if AttrKey.encoding in a.set:
-      a.encoding = e["encoding"].getStr
-    # XXX if AttrKey.`pad-right` in a.set:
-    # XXX if AttrKey.terminator in a.set:
-    if AttrKey.consume in a.set:
-      a.consume = e["consume"].getBool
-    else:
-      a.consume = true
-    if AttrKey.`include` in a.set:
-      a.`include` = e["include"].getBool
-    if AttrKey.`eos-error` in a.set:
-      a.`eos-error` = e["eos-error"].getBool
-    else:
-      a.`eos-error` = true
-    # XXX if AttrKey.io in a.set:
-    result.seq.add(a)
+  if TypeKey.seq in result.set:
+    for e in json["seq"].items:
+      let id = e["id"].getStr
+      var a = Attr(id: id)
+      for key in e.keys:
+        a.set.incl(parseEnum[AttrKey](key))
+      if AttrKey.doc in a.set:
+        a.doc = e["doc"].getStr
+      if AttrKey.`doc-ref` in a.set:
+        a.`doc-ref` = e["doc-ref"].getStr
+      # XXX if AttrKey.contents in a.set:
+      if AttrKey.`type` in a.set:
+        let t = e["type"].getStr
+        a.`type` = (nativeType(t), t)
+      else:
+        a.`type` = (nnkBracketExpr.newTree(ident"seq", ident"byte"), "")
+      if AttrKey.repeat in a.set:
+        a.repeat = parseEnum[RepeatKind](e["repeat"].getStr)
+      # XXX if AttrKey.`repeat-expr` in a.set:
+      # XXX if AttrKey.`repeat-until` in a.set:
+      # XXX if AttrKey.`if` in a.set:
+      if AttrKey.size in a.set:
+        a.size = ksAsJsonToNim(e["size"], "result")
+      if AttrKey.`size-eos` in a.set:
+        a.`size-eos` = e["size-eos"].getBool
+      # XXX if AttrKey.process in a.set:
+      # XXX if AttrKey.`enum` in a.set:
+      if AttrKey.encoding in a.set:
+        a.encoding = e["encoding"].getStr
+      # XXX if AttrKey.`pad-right` in a.set:
+      # XXX if AttrKey.terminator in a.set:
+      if AttrKey.consume in a.set:
+        a.consume = e["consume"].getBool
+      else:
+        a.consume = true
+      if AttrKey.`include` in a.set:
+        a.`include` = e["include"].getBool
+      if AttrKey.`eos-error` in a.set:
+        a.`eos-error` = e["eos-error"].getBool
+      else:
+        a.`eos-error` = true
+      # XXX if AttrKey.io in a.set:
+      result.seq.add(a)
 
   if TypeKey.types in result.set:
     for k, v in json["types"].pairs:
