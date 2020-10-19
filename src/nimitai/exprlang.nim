@@ -30,9 +30,21 @@ proc expr*(txt, context: string): NimNode =
                  >(".")                                   * expr ^ 9 |
                  >("::")                                  * expr ^ 10:
       let (r, l) = (s.stack.pop(), s.stack.pop())
-      case ($1)
-      of ".": s.stack.add newDotExpr(l, r)
-      else: s.stack.add infix(l, $1, r)
+      case $1
+      of ".":
+        s.stack.add newDotExpr(l, r)
+      else:
+        var op: string
+        case $1
+        of "%" : op = "mod"
+        of "<<": op = "shl"
+        of ">>": op = "shr"
+        of "&" : op = "and"
+        of "|" : op = "or"
+        of "^" : op = "xor"
+        else   : op = $1
+        s.stack.add infix(l, op, r)
+
     # Terminal
     tComma    <- "," * S
     tParOpen  <- "(" * S

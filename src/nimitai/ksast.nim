@@ -115,7 +115,7 @@ proc inferType(expr: NimNode, context: Type): NimNode =
         return i.`type`.parsed
     quit(fmt"Identifier {repr(expr)} not found")
   of nnkInfix, nnkPrefix:
-    result = inferType(expr[1], context)
+    result = inferType(expr[2], context)
   of nnkDotExpr:
     result = inferType(expr[1], context)
 
