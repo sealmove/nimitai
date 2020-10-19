@@ -77,7 +77,7 @@ const
 # PE: Parsing error (Failed to parse some expression in the test)
 
 static:
-  var ok, je, le, pe: int
+  var ok, je, pe: int
 
   echo &"{B}[Generating]{D} Nimitai"
 
@@ -92,17 +92,12 @@ static:
     try:
       json = parseJson(readFile(f))
     except JsonParsingError:
-      echo &"  {B}[JE]{D} " & casename
+      echo &"  {R}[JE]{D} " & casename
       inc(je)
       continue
 
     try:
       ast = test(json)
-    except LexingError:
-      echo &"  {R}[LE]{D} " & casename
-      inc(le)
-      continue
-
     except ParsingError:
       echo &"  {M}[PE]{D} " & casename
       inc(pe)
@@ -115,7 +110,6 @@ static:
 
   echo "----------------------------------------\n" &
        &"  {G}[OK]{D} {ok.intToStr(3)}\n" &
-       &"  {B}[FL]{D} {je.intToStr(3)}\n" &
-       &"  {M}[CE]{D} {le.intToStr(3)}\n" &
-       &"  {R}[MI]{D} {pe.intToStr(3)}\n" &
+       &"  {R}[JE]{D} {je.intToStr(3)}\n" &
+       &"  {M}[PE]{D} {pe.intToStr(3)}\n" &
        "----------------------------------------\n"

@@ -1,6 +1,6 @@
 # Kaitai Struct Expression Language
 
-import parseutils, sequtils, macros, regex
+import parseutils, macros, regex
 import strutils except parseBiggestInt
 import npeg
 
@@ -9,6 +9,7 @@ type
     stack: seq[NimNode]
     stackCnt: int
     context: string
+  ParsingError* = object of CatchableError
 
 proc expr*(txt, context: string): NimNode =
   var s = State(context: context)
@@ -77,8 +78,8 @@ proc expr*(txt, context: string): NimNode =
     hex       <- "0x" * +(Xdigit | '_')
     S <- *Space
 
-  doAssert p.match(txt, s).ok
-  doAssert s.stack.len == 1
+  if not p.match(txt, s).ok or s.stack.len != 1:
+    raise newException(ParsingError, "Failed to parse expression: " & txt)
   s.stack[0]
 
 proc nativeType*(ksyType: string): NimNode =
@@ -108,4 +109,4 @@ proc debug(s: string) =
   echo repr expr
   echo ""
 
-static: debug"a.b + e.f.g * h + 3"
+#static: debug"a.b + e.f.g * h + 3"
