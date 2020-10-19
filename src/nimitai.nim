@@ -5,16 +5,6 @@ const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
-proc attrDecl(attr: Attr): NimNode =
-  newIdentDefs(ident(attr.id), attr.`type`.parsed)
-
-proc instDecl(inst: Attr): NimNode =
-  newIdentDefs(
-    ident(inst.id & "Inst"),
-    nnkBracketExpr.newTree(
-      ident"Option",
-      inst.`type`.parsed))
-
 # A series of assignments of parsing calls to local variables or object fields
 proc parseAttr(attr: Attr): NimNode =
   result = newStmtList()
@@ -126,7 +116,6 @@ proc parseAttr(attr: Attr): NimNode =
 
 # Only value-instances supported for now
 proc instanceProc(inst: Attr, node: Type): NimNode =
-  let field = ident(inst.id & "Inst")
   result = newProc(
     ident(inst.id),
     @[inst.`type`.parsed,
@@ -135,26 +124,28 @@ proc instanceProc(inst: Attr, node: Type): NimNode =
         ident(node.id))])
   result.body = newStmtList(
     newIfStmt(
-      (newCall(
-        ident"isNone",
+     (prefix(
         newDotExpr(
           ident"this",
-          field)),
-       newAssignment(
-         newDotExpr(
-           ident"this",
-           field),
-         newCall(
-           ident"some",
-           newCall(
-             inst.`type`.parsed,
-             inst.value))))),
+          ident(inst.id & "Cached")),
+        "not"),
+      newStmtList(
+        newAssignment(
+          newDotExpr(
+            ident"this",
+            ident(inst.id & "Inst")),
+          newCall(
+            inst.`type`.parsed.strVal,
+            inst.value)), # XXX
+        newAssignment(
+          newDotExpr(
+            ident"this",
+            ident(inst.id & "Cached")),
+          ident"true")))),
     nnkReturnStmt.newTree(
-      newCall(
-        ident"get",
-        newDotExpr(
-          ident"this",
-          field))))
+      newDotExpr(
+        ident"this",
+        ident(inst.id & "Inst"))))
 
 proc parentType(node: Type): string =
   if node.supertype == nil: rootTypeName else: node.supertype.id
@@ -168,10 +159,19 @@ proc typeDecl(node: Type): NimNode =
       ident(parentType(node))))
 
   for a in node.seq:
-    fields.add(attrDecl(a))
+    fields.add(
+      newIdentDefs(
+        ident(a.id),
+        a.`type`.parsed))
 
   for i in node.instances:
-    fields.add(instDecl(i))
+    fields.add(
+      newIdentDefs(
+        ident(i.id & "Inst"),
+        i.`type`.parsed),
+      newIdentDefs(
+        ident(i.id & "Cached"),
+        ident"bool"))
 
   result = nnkTypeDef.newTree(
     ident(node.id),
@@ -211,21 +211,24 @@ proc readProc(node: Type): NimNode =
       ident(parentType(node)),
       newNilLit()))
 
-  var parseAttrs = newStmtList()
+  var
+    parseAttrs = newStmtList()
+    constructor = nnkObjConstr.newTree(
+      ident(node.id),
+      newColonExpr(
+        ident"io",
+        ident"io"),
+      newColonExpr(
+        ident"parent",
+        ident"parent"))
+
   for a in node.seq:
     parseAttrs.add(parseAttr(a))
 
   result.body = newStmtList(
     newAssignment(
       ident"result",
-      nnkObjConstr.newTree(
-        ident(node.id),
-        newColonExpr(
-          ident"io",
-          ident"io"),
-        newColonExpr(
-          ident"parent",
-          ident"parent"))),
+      constructor),
     newAssignment(
       newDotExpr(
         ident"result",
