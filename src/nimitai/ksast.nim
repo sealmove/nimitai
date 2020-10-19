@@ -16,7 +16,7 @@ type
     seq*: seq[Attr]
     instances*: seq[Attr]
     enums*: JsonNode
-  EndianKind {.pure.} = enum
+  EndianKind* {.pure.} = enum
     le, be
   MetaKey* {.pure.} = enum
     id, title, application, `file-extension`, xref, license, `ks-version`,
@@ -107,6 +107,10 @@ proc inferType(expr: NimNode, context: Type): NimNode =
       return ident"string"
     if eqIdent(expr, "size"):
       return ident"int"
+    if eqIdent(expr, "first"):
+      return ident"byte"
+    if eqIdent(expr, "last"):
+      return ident"byte"
     for a in context.seq:
       if eqIdent(expr, a.id):
         return a.`type`.parsed
@@ -118,28 +122,29 @@ proc inferType(expr: NimNode, context: Type): NimNode =
     result = inferType(expr[2], context)
   of nnkDotExpr:
     result = inferType(expr[1], context)
-
   # of nnkNilLit:
   # of nnkCall:
   # of nnkVarTuple:
   # of nnkPar:
-  # of nnkBracket:
-  # of nnkBracketExpr:
+  of nnkBracket:
+    result = inferType(expr[0], context)
+  of nnkBracketExpr:
+    result = inferType(expr[0], context)
   # of nnkDotExpr:
   # of nnkIfExpr:
   # of nnkElifExpr:
   # of nnkElseExpr:
   else:
-    quit("Unexpected NimNodeKind during type inference")
+    quit(fmt"Unexpected NimNodeKind '{expr.kind}' during type inference")
 
 proc toKsType*(json: JsonNode): Type =
   result = Type()
+  var meta = Meta()
   for key in json.keys:
     result.set.incl(parseEnum[TypeKey](key))
   if json.hasKey("meta") and json["meta"].hasKey("id"):
     result.id = json["meta"]["id"].getStr.capitalizeAscii
   if TypeKey.meta in result.set:
-    var meta = Meta()
     for key in json["meta"].keys:
       meta.set.incl(parseEnum[MetaKey](key))
     if MetaKey.id in meta.set:
@@ -187,7 +192,9 @@ proc toKsType*(json: JsonNode): Type =
       meta.encoding = json["meta"]["encoding"].getStr
     if MetaKey.endian in meta.set:
       meta.endian = parseEnum[EndianKind](json["meta"]["endian"].getStr)
-    result.meta = meta
+    else:
+      meta.endian = le
+  result.meta = meta
   if TypeKey.doc in result.set:
     result.doc = json["doc"].getStr
   if TypeKey.`doc-ref` in result.set:

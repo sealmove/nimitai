@@ -6,7 +6,7 @@ const
   streamTypeName = "KaitaiStream"
 
 # A series of assignments of parsing calls to local variables or object fields
-proc parseAttr(attr: Attr): NimNode =
+proc parseAttr(attr: Attr, endian: EndianKind): NimNode =
   result = newStmtList()
 
   # This should be used for both size and sizeless attributes
@@ -41,7 +41,7 @@ proc parseAttr(attr: Attr): NimNode =
     if t.match(re"([us][1248]|f[48])(be|le)?"):
       var procName = "read" & t
       if not t.match(re"([us][1])|(.*(be|le))"):
-        procName &= "le" # XXX
+        procName &= $endian
       result.add(
         newAssignment(
           newDotExpr(
@@ -223,7 +223,7 @@ proc readProc(node: Type): NimNode =
         ident"parent"))
 
   for a in node.seq:
-    parseAttrs.add(parseAttr(a))
+    parseAttrs.add(parseAttr(a, node.meta.endian))
 
   result.body = newStmtList(
     newAssignment(
