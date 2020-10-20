@@ -5,13 +5,13 @@ const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
-proc parse(attr: Attr, endian: EndianKind): NimNode =
-  if AttrKey.value in attr.set:
+proc parse(attr: Field, endian: EndianKind): NimNode =
+  if FieldKey.value in attr.keys:
     return newCall(
       attr.`type`.parsed.strVal,
       attr.value)
 
-  if AttrKey.`type` in attr.set:
+  if FieldKey.`type` in attr.keys:
     let t = attr.`type`.raw
     # Number
     if t.match(re"([us][1248]|f[48])(be|le)?"):
@@ -77,13 +77,13 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
         id)))
 
 # A series of assignments of parsing calls to local variables or object fields
-proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""): NimNode =
+proc parseAttr(attr: Field, context: NimNode, endian: EndianKind, postfix = ""): NimNode =
   result = newStmtList()
 
   let id = newDotExpr(context, ident(attr.id & postfix))
   var posId: NimNode
 
-  if AttrKey.pos in attr.set:
+  if FieldKey.pos in attr.keys:
     posId = ident(attr.id & "Pos")
     result.add(
       newLetStmt(
@@ -98,7 +98,7 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""): 
           ident"skip"),
         attr.pos))
 
-  if AttrKey.`size` in attr.set:
+  if FieldKey.`size` in attr.keys:
     let stmts = substream(
       ident(attr.id & "Raw"),
       newDotExpr(
@@ -130,7 +130,7 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""): 
   of until:
     discard
 
-  if AttrKey.pos in attr.set:
+  if FieldKey.pos in attr.keys:
     result.add(
       newCall(
         newDotExpr(
@@ -138,8 +138,7 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""): 
           ident"seek"),
         posId))
 
-# Only value-instances supported for now
-proc instanceProc(inst: Attr, node: Type): NimNode =
+proc instanceProc(inst: Field, node: Type): NimNode =
   var pa = parseAttr(inst, ident"this", node.meta.endian, postfix = "Inst")
   pa.add(
     newAssignment(
@@ -260,15 +259,17 @@ proc readProc(node: Type): NimNode =
           ident"root"))))
 
   for i in 0 ..< node.seq.len:
-    if i != 0 and
-       node.seq[i-1].`type`.raw.match(re"b[1-9][0-9]*(be|le)?") and
-       not node.seq[i].`type`.raw.match(re"b[1-9][0-9]*(be|le)?"):
-      result.body.add(
-        newCall(
-          ident"alignToByte",
-          newDotExpr(
-            ident"result",
-            ident"io")))
+    # Check if we are transitioning from a bit attribute to a regular one
+    if i != 0:
+      let
+        r = re"b[1-9][0-9]*(be|le)?"
+        prevType = node.seq[i-1].`type`.raw
+        currType = node.seq[i].`type`.raw
+      if prevType.match(r) and not currType.match(r):
+        result.body.add(
+          newCall(
+            ident"alignToByte",
+            newDotExpr(ident"result", ident"io")))
     let stmts = parseAttr(node.seq[i], ident"result", node.meta.endian)
     for s in stmts: result.body.add(s)
 
