@@ -58,6 +58,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
         attr.size))
 
 proc substream(id, stream, size: NimNode): NimNode =
+  result = newStmtList()
   result.add(
     newLetStmt(
       id,
@@ -106,7 +107,8 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""):
         attr.pos))
 
   if AttrKey.`size` in attr.set:
-    result.add(substream(ident(attr.id & "Raw"), stream, attr.size))
+    let stmts = substream(ident(attr.id & "Raw"), stream, attr.size)
+    for s in stmts: result.add(s)
 
   case attr.repeat
   of none:
