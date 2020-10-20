@@ -1,5 +1,5 @@
 import macros, json, strutils, strformat
-import runtime, exprlang
+import exprlang
 
 type
   TypeKey* {.pure.} = enum
@@ -63,7 +63,7 @@ type
     `include`*: bool
     `eos-error`*: bool
     pos*: NimNode
-    io*: KaitaiStream
+    io*: NimNode
     value*: NimNode
 
 proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
@@ -213,7 +213,10 @@ proc toKsType*(json: JsonNode): Type =
         a.`doc-ref` = e["doc-ref"].getStr
       # XXX if AttrKey.contents in a.set:
       let
-        ts = e["type"].getStr
+        ts = if AttrKey.`type` in a.set:
+               e["type"].getStr
+             else:
+               ""
         t = if AttrKey.`type` in a.set:
               nativeType(ts)
             else:
@@ -228,6 +231,12 @@ proc toKsType*(json: JsonNode): Type =
       # XXX if AttrKey.`if` in a.set:
       if AttrKey.size in a.set:
         a.size = ksAsJsonToNim(e["size"], "result")
+        a.io = ident(a.id & "Io")
+      else:
+        if AttrKey.io in a.set:
+          a.io = ksAsJsonToNim(e["io"], "result")
+        else:
+          a.io = newDotExpr(ident"result", ident"io")
       if AttrKey.`size-eos` in a.set:
         a.`size-eos` = e["size-eos"].getBool
       # XXX if AttrKey.process in a.set:
@@ -246,7 +255,6 @@ proc toKsType*(json: JsonNode): Type =
         a.`eos-error` = e["eos-error"].getBool
       else:
         a.`eos-error` = true
-      # XXX if AttrKey.io in a.set:
       result.seq.add(a)
 
   if TypeKey.types in result.set:
@@ -276,6 +284,12 @@ proc toKsType*(json: JsonNode): Type =
       # XXX if AttrKey.`if` in a.set:
       if AttrKey.size in a.set:
         a.size = ksAsJsonToNim(v["size"], "this")
+        a.io = ident(a.id & "Io")
+      else:
+        if AttrKey.io in a.set:
+          a.io = ksAsJsonToNim(v["io"], "this")
+        else:
+          a.io = newDotExpr(ident"this", ident"io")
       if AttrKey.`size-eos` in a.set:
         a.`size-eos` = v["size-eos"].getBool
       # XXX if AttrKey.process in a.set:
@@ -296,7 +310,6 @@ proc toKsType*(json: JsonNode): Type =
         a.`eos-error` = true
       if AttrKey.pos in a.set:
         a.pos = ksAsJsonToNim(v["pos"], "this")
-      # XXX if AttrKey.io in a.set:
       if AttrKey.value in a.set:
         a.value = ksAsJsonToNim(v["value"], "this")
         a.`type` = (inferType(a.value, result), "")

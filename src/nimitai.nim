@@ -5,7 +5,7 @@ const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
-proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
+proc parse(attr: Attr, endian: EndianKind): NimNode =
   if AttrKey.value in attr.set:
     return newCall(
       attr.`type`.parsed.strVal,
@@ -18,7 +18,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
       var procName = "read" & t
       if not t.match(re"([us][1])|(.*(be|le))"):
         procName &= $endian
-      result = newCall(procName, stream)
+      result = newCall(procName, attr.io)
 
     # Bool
     elif t == "b1":
@@ -26,7 +26,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
         ident"bool",
         newCall(
           "readBitsIntBe",
-          stream,
+          attr.io,
           newLit(1)))
 
     # Number from bits
@@ -34,7 +34,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
       let bits = parseInt(t[1..^1])
       result = newCall(
         "readBitsIntBe",
-        stream,
+        attr.io,
         newLit(bits))
 
     # User-defined type
@@ -43,7 +43,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
         newDotExpr(
           ident(t.capitalizeAscii),
           ident"read"),
-        stream,
+        attr.io,
         newDotExpr(
           ident"result",
           ident"root"),
@@ -51,45 +51,37 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
 
   # Typeless
   else:
-    result = newDotExpr(
-      stream,
+    result = newCall(
+      ident"readBytes",
+      attr.io,
       newCall(
-        ident"readBytes",
+        ident"int",
         attr.size))
 
-proc substream(id, stream, size: NimNode): NimNode =
+proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()
   result.add(
     newLetStmt(
       id,
       newCall(
-        newDotExpr(
-          newDotExpr(
-            ident"result",
-            ident"io"),
-          ident"readBytes"),
+        ident"readBytes",
+        ps,
         newCall(
           ident"int",
           size))))
   result.add(
     newLetStmt(
-      stream,
+      ss,
       newCall(
         ident"newKaitaiStream",
         id)))
 
 # A series of assignments of parsing calls to local variables or object fields
-proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""):
-  NimNode =
+proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""): NimNode =
   result = newStmtList()
 
   let id = newDotExpr(context, ident(attr.id & postfix))
-  var stream, posId: NimNode
-
-  if AttrKey.`size` in attr.set:
-    stream = ident(attr.id & "Io")
-  else:
-    stream = newDotExpr(context, ident"io")
+  var posId: NimNode
 
   if AttrKey.pos in attr.set:
     posId = ident(attr.id & "Pos")
@@ -98,16 +90,22 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""):
         posId,
         newCall(
           ident"pos",
-          stream)))
+          attr.io)))
     result.add(
       newCall(
         newDotExpr(
-          stream,
+          attr.io,
           ident"skip"),
         attr.pos))
 
   if AttrKey.`size` in attr.set:
-    let stmts = substream(ident(attr.id & "Raw"), stream, attr.size)
+    let stmts = substream(
+      ident(attr.id & "Raw"),
+      newDotExpr(
+        context,
+        ident"io"),
+      ident(attr.id & "Io"),
+      attr.size)
     for s in stmts: result.add(s)
 
   case attr.repeat
@@ -115,18 +113,18 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""):
     result.add(
       newAssignment(
         id,
-        parse(attr, stream, endian)))
+        parse(attr, endian)))
   of eos:
     result.add(
       nnkWhileStmt.newTree(
         prefix(
           newCall(
             ident"eof",
-            stream),
+            attr.io),
           "not"),
         newCall(
           newDotExpr(id, ident"add"),
-          parse(attr, stream, endian))))
+          parse(attr, endian))))
   of expr:
     discard
   of until:
@@ -136,7 +134,7 @@ proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""):
     result.add(
       newCall(
         newDotExpr(
-          stream,
+          attr.io,
           ident"seek"),
         posId))
 
@@ -234,7 +232,6 @@ proc readProc(node: Type): NimNode =
       newNilLit()))
 
   var
-    parseAttrs = newStmtList()
     constructor = nnkObjConstr.newTree(
       ident(node.id),
       newColonExpr(
@@ -243,9 +240,6 @@ proc readProc(node: Type): NimNode =
       newColonExpr(
         ident"parent",
         ident"parent"))
-
-  for a in node.seq:
-    parseAttrs.add(parseAttr(a, ident"result", node.meta.endian))
 
   result.body = newStmtList(
     newAssignment(
@@ -263,8 +257,20 @@ proc readProc(node: Type): NimNode =
             newNilLit()),
           ident"result"),
         nnkElseExpr.newTree(
-          ident"root"))),
-    parseAttrs)
+          ident"root"))))
+
+  for i in 0 ..< node.seq.len:
+    if i != 0 and
+       node.seq[i-1].`type`.raw.match(re"b[1-9][0-9]*(be|le)?") and
+       not node.seq[i].`type`.raw.match(re"b[1-9][0-9]*(be|le)?"):
+      result.body.add(
+        newCall(
+          ident"alignToByte",
+          newDotExpr(
+            ident"result",
+            ident"io")))
+    let stmts = parseAttr(node.seq[i], ident"result", node.meta.endian)
+    for s in stmts: result.body.add(s)
 
 proc procs(node: Type): NimNode =
   result = newStmtList()
@@ -313,7 +319,8 @@ proc generateParser*(spec: JsonNode): NimNode =
     typeSection(spec),
     procs(spec),
     fromFileProcs(spec))
-  #echo repr result
+  echo treerepr result
+  echo repr result
 
 # static library
 macro injectParser*(spec: static[JsonNode]) =
