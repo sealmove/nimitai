@@ -1,4 +1,4 @@
-import os, strformat, strutils, macros, json
+import os, strformat, strutils, macros, json, algorithm
 import ../src/nimitai/exprlang
 
 proc test(json: JsonNode): NimNode =
@@ -78,13 +78,19 @@ const
 # PE: Parsing error (Failed to parse some expression in the test)
 
 static:
-  var ok, je, pe: int
+  var
+    ok, je, pe: int
+    testFiles: seq[string]
 
   echo &"{B}[Generating]{D} Nimitai"
 
   for k, f in walkDir("tests"):
     if k == pcDir: continue
+    testFiles.add(f)
 
+  sort(testFiles)
+
+  for f in testFiles:
     let casename = splitFile(f).name
     var
       json: JsonNode

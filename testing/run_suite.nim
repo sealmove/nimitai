@@ -1,4 +1,4 @@
-import os, osproc, strformat, strutils
+import os, osproc, strformat, strutils, algorithm
 
 # OK: Okay (Test passed)
 # FL: Failed (Failed to pass)
@@ -13,13 +13,19 @@ const
   M = "\e[35;1m"
   D = "\e[0m"
 
-var ok, fl, ce, mi: int
+var
+  ok, fl, ce, mi: int
+  testFiles: seq[string]
 
 echo &"{B}[Running]{D} Nimitai"
 
 for k, f in walkDir("tests"):
   if k == pcDir: continue
+  testFiles.add(f)
 
+sort(testFiles)
+
+for f in testFiles:
   let
     casename = splitFile(f).name
     dir = "tests/compiled/bin"
