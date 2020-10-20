@@ -25,7 +25,7 @@ proc expr*(txt, context: string): NimNode =
       var arr = newTree(nnkBracket)
       for n in upperLvl:
         arr.add n
-      s.pss[^1].add arr
+      s.pss[^1].add prefix(arr, "@")
     parExpr   <- (parOpen * expr * parClose) ^ 0
     infix     <- >("not")                                 * expr ^  1 |
                  >("or" | "^")                            * expr ^  2 |

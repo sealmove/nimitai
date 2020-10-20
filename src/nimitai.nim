@@ -5,36 +5,7 @@ const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
-# A series of assignments of parsing calls to local variables or object fields
-proc parseAttr(attr: Attr, endian: EndianKind): NimNode =
-  result = newStmtList()
-
-  # This should be used for both size and sizeless attributes
-  var stream, size: NimNode
-
-  # Size key means we get a substream
-  if AttrKey.`size` in attr.set:
-    stream = ident(attr.id & "Io")
-    let raw = ident(attr.id & "Raw")
-    result.add(
-      newLetStmt(
-        raw,
-        newCall(
-          newDotExpr(
-            newDotExpr(
-              ident"result",
-              ident"io"),
-            ident"readBytes"),
-          newCall(
-            ident"int",
-            attr.size))))
-    result.add(
-      newLetStmt(
-        stream,
-        newCall(
-          ident"newKaitaiStream",
-          raw)))
-
+proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
   if AttrKey.`type` in attr.set:
     let t = attr.`type`.raw
     # Number
@@ -42,77 +13,104 @@ proc parseAttr(attr: Attr, endian: EndianKind): NimNode =
       var procName = "read" & t
       if not t.match(re"([us][1])|(.*(be|le))"):
         procName &= $endian
-      result.add(
-        newAssignment(
-          newDotExpr(
-            ident"result",
-            ident(attr.id)),
-            newCall(
-              procName,
-              newDotExpr(
-                ident"result",
-                ident"io"))))
+      result = newCall(procName, newDotExpr(ident"result", ident"io"))
 
     # Bool
     elif t == "b1":
-      result.add(
-        newAssignment(
+      result = newCall(
+        ident"bool",
+        newCall(
+          "readBitsIntBe",
           newDotExpr(
             ident"result",
-            ident(attr.id)),
-          newCall(
-            ident"bool",
-            newCall(
-              "readBitsIntBe",
-              newDotExpr(
-                ident"result",
-                ident"io"),
-              newLit(1)))))
+            ident"io"),
+          newLit(1)))
 
     # Number from bits
     elif t.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
       let bits = parseInt(t[1..^1])
-      result.add(
-        newAssignment(
-          newDotExpr(
-            ident"result",
-            ident(attr.id)),
-          newCall(
-            "readBitsIntBe",
-            newDotExpr(
-              ident"result",
-              ident"io"),
-            newLit(bits))))
+      result = newCall(
+        "readBitsIntBe",
+        newDotExpr(
+          ident"result",
+          ident"io"),
+        newLit(bits))
 
     # User-defined type
     else:
-      result.add(
-        newAssignment(
-          newDotExpr(
-            ident"result",
-            ident(attr.id)),
-          newCall(
-            newDotExpr(
-              ident(t.capitalizeAscii),
-              ident"read"),
-            stream,
-            newDotExpr(
-              ident"result",
-              ident"root"),
-            ident"result")))
+      result = newCall(
+        newDotExpr(
+          ident(t.capitalizeAscii),
+          ident"read"),
+        stream,
+        newDotExpr(
+          ident"result",
+          ident"root"),
+        ident"result")
 
   # Typeless
   else:
+    result = newDotExpr(
+      stream,
+      newCall(
+        ident"readBytes",
+        attr.size))
+
+proc substream(id, stream, size: NimNode): NimNode =
+  result.add(
+    newLetStmt(
+      id,
+      newCall(
+        newDotExpr(
+          newDotExpr(
+            ident"result",
+            ident"io"),
+          ident"readBytes"),
+        newCall(
+          ident"int",
+          size))))
+  result.add(
+    newLetStmt(
+      stream,
+      newCall(
+        ident"newKaitaiStream",
+        id)))
+
+# A series of assignments of parsing calls to local variables or object fields
+proc parseAttr(attr: Attr, endian: EndianKind): NimNode =
+  result = newStmtList()
+
+  var
+    stream: NimNode
+    id = newDotExpr(ident"result", ident(attr.id))
+
+  if AttrKey.`size` in attr.set:
+    stream = ident(attr.id & "Io")
+    result.add(substream(ident(attr.id & "Raw"), stream, attr.size))
+  else:
+    stream = newDotExpr(ident"result", ident"io")
+
+  case attr.repeat
+  of none:
     result.add(
       newAssignment(
-        newDotExpr(
-          ident"result",
-          ident(attr.id)),
-        newDotExpr(
-          stream,
+        id,
+        parse(attr, stream, endian)))
+  of eos:
+    result.add(
+      nnkWhileStmt.newTree(
+        prefix(
           newCall(
-            ident"readBytes",
-            attr.size))))
+            ident"eof",
+            stream),
+          "not"),
+        newCall(
+          newDotExpr(id, ident"add"),
+          parse(attr, stream, endian))))
+  of expr:
+    discard
+  of until:
+    discard
 
 # Only value-instances supported for now
 proc instanceProc(inst: Attr, node: Type): NimNode =

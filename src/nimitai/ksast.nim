@@ -36,7 +36,7 @@ type
     encoding*: string
     endian*: EndianKind
   RepeatKind* {.pure.} = enum
-    eos, expr, until
+    none, eos, expr, until
   AttrKey* {.pure.} = enum
     id, doc, `doc-ref`, contents, `type`, repeat, `repeat-expr`, `repeat-until`,
     `if`, size, `size-eos`, process, `enum`, encoding, terminator, consume,
@@ -212,13 +212,17 @@ proc toKsType*(json: JsonNode): Type =
       if AttrKey.`doc-ref` in a.set:
         a.`doc-ref` = e["doc-ref"].getStr
       # XXX if AttrKey.contents in a.set:
-      if AttrKey.`type` in a.set:
-        let t = e["type"].getStr
-        a.`type` = (nativeType(t), t)
-      else:
-        a.`type` = (nnkBracketExpr.newTree(ident"seq", ident"byte"), "")
+      let
+        ts = e["type"].getStr
+        t = if AttrKey.`type` in a.set:
+              nativeType(ts)
+            else:
+              nnkBracketExpr.newTree(ident"seq", ident"byte")
       if AttrKey.repeat in a.set:
         a.repeat = parseEnum[RepeatKind](e["repeat"].getStr)
+        a.`type` = (nnkBracketExpr.newTree(ident"seq", t), ts)
+      else:
+        a.`type` = (t, ts)
       # XXX if AttrKey.`repeat-expr` in a.set:
       # XXX if AttrKey.`repeat-until` in a.set:
       # XXX if AttrKey.`if` in a.set:
