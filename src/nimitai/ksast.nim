@@ -62,7 +62,7 @@ type
     consume*: bool
     `include`*: bool
     `eos-error`*: bool
-    pos*: int
+    pos*: NimNode
     io*: KaitaiStream
     value*: NimNode
 
@@ -294,7 +294,8 @@ proc toKsType*(json: JsonNode): Type =
         a.`eos-error` = v["eos-error"].getBool
       else:
         a.`eos-error` = true
-      # XXX if AttrKey.pos in a.set:
+      if AttrKey.pos in a.set:
+        a.pos = ksAsJsonToNim(v["pos"], "this")
       # XXX if AttrKey.io in a.set:
       if AttrKey.value in a.set:
         a.value = ksAsJsonToNim(v["value"], "this")

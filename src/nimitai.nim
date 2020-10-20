@@ -6,6 +6,11 @@ const
   streamTypeName = "KaitaiStream"
 
 proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
+  if AttrKey.value in attr.set:
+    return newCall(
+      attr.`type`.parsed.strVal,
+      attr.value)
+
   if AttrKey.`type` in attr.set:
     let t = attr.`type`.raw
     # Number
@@ -13,7 +18,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
       var procName = "read" & t
       if not t.match(re"([us][1])|(.*(be|le))"):
         procName &= $endian
-      result = newCall(procName, newDotExpr(ident"result", ident"io"))
+      result = newCall(procName, stream)
 
     # Bool
     elif t == "b1":
@@ -21,9 +26,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
         ident"bool",
         newCall(
           "readBitsIntBe",
-          newDotExpr(
-            ident"result",
-            ident"io"),
+          stream,
           newLit(1)))
 
     # Number from bits
@@ -31,9 +34,7 @@ proc parse(attr: Attr, stream: NimNode, endian: EndianKind): NimNode =
       let bits = parseInt(t[1..^1])
       result = newCall(
         "readBitsIntBe",
-        newDotExpr(
-          ident"result",
-          ident"io"),
+        stream,
         newLit(bits))
 
     # User-defined type
@@ -77,18 +78,35 @@ proc substream(id, stream, size: NimNode): NimNode =
         id)))
 
 # A series of assignments of parsing calls to local variables or object fields
-proc parseAttr(attr: Attr, endian: EndianKind): NimNode =
+proc parseAttr(attr: Attr, context: NimNode, endian: EndianKind, postfix = ""):
+  NimNode =
   result = newStmtList()
 
-  var
-    stream: NimNode
-    id = newDotExpr(ident"result", ident(attr.id))
+  let id = newDotExpr(context, ident(attr.id & postfix))
+  var stream, posId: NimNode
 
   if AttrKey.`size` in attr.set:
     stream = ident(attr.id & "Io")
-    result.add(substream(ident(attr.id & "Raw"), stream, attr.size))
   else:
-    stream = newDotExpr(ident"result", ident"io")
+    stream = newDotExpr(context, ident"io")
+
+  if AttrKey.pos in attr.set:
+    posId = ident(attr.id & "Pos")
+    result.add(
+      newLetStmt(
+        posId,
+        newCall(
+          ident"pos",
+          stream)))
+    result.add(
+      newCall(
+        newDotExpr(
+          stream,
+          ident"skip"),
+        attr.pos))
+
+  if AttrKey.`size` in attr.set:
+    result.add(substream(ident(attr.id & "Raw"), stream, attr.size))
 
   case attr.repeat
   of none:
@@ -112,8 +130,24 @@ proc parseAttr(attr: Attr, endian: EndianKind): NimNode =
   of until:
     discard
 
+  if AttrKey.pos in attr.set:
+    result.add(
+      newCall(
+        newDotExpr(
+          stream,
+          ident"seek"),
+        posId))
+
 # Only value-instances supported for now
 proc instanceProc(inst: Attr, node: Type): NimNode =
+  var pa = parseAttr(inst, ident"this", node.meta.endian, postfix = "Inst")
+  pa.add(
+    newAssignment(
+      newDotExpr(
+        ident"this",
+        ident(inst.id & "Cached")),
+      ident"true"))
+
   result = newProc(
     ident(inst.id),
     @[inst.`type`.parsed,
@@ -127,19 +161,7 @@ proc instanceProc(inst: Attr, node: Type): NimNode =
           ident"this",
           ident(inst.id & "Cached")),
         "not"),
-      newStmtList(
-        newAssignment(
-          newDotExpr(
-            ident"this",
-            ident(inst.id & "Inst")),
-          newCall(
-            inst.`type`.parsed.strVal,
-            inst.value)), # XXX
-        newAssignment(
-          newDotExpr(
-            ident"this",
-            ident(inst.id & "Cached")),
-          ident"true")))),
+      pa)),
     nnkReturnStmt.newTree(
       newDotExpr(
         ident"this",
@@ -221,7 +243,7 @@ proc readProc(node: Type): NimNode =
         ident"parent"))
 
   for a in node.seq:
-    parseAttrs.add(parseAttr(a, node.meta.endian))
+    parseAttrs.add(parseAttr(a, ident"result", node.meta.endian))
 
   result.body = newStmtList(
     newAssignment(
