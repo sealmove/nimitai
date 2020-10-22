@@ -1,4 +1,5 @@
 import macros, json, strutils, strformat
+import regex
 import exprlang
 
 type
@@ -6,7 +7,7 @@ type
     id, types, meta, doc, `doc-ref`, params, seq, instances, enums
   Type* = ref object
     keys*: set[TypeKey]
-    supertype*: Type
+    parent*: Type
     id*: string
     types*: seq[Type]
     meta*: Meta
@@ -51,6 +52,7 @@ type
       pos*: NimNode
       value*: NimNode
     keys*: set[FieldKey]
+    parent: Type
     id*: string
     doc*: string
     `doc-ref`*: string
@@ -71,7 +73,48 @@ type
     `include`*: bool
     `eos-error`*: bool
     io*: NimNode
-  KaitaiError* = ref object of Defect
+  KaitaiError* = object of Defect
+
+proc hierarchy*(typ: Type): string =
+  var
+    it = typ
+    stack: seq[string]
+
+  while it != nil:
+    stack.add(it.id)
+    it = it.parent
+
+  while stack != @[]:
+    result &= pop(stack)
+
+proc typeLookup(ksType: string, typ: Type): NimNode =
+  for st in typ.types:
+    if ksType == st.id:
+      return ident(hierarchy(st))
+  if ksType == typ.id:
+    return ident(hierarchy(typ))
+  if typ.parent == nil:
+    raise newException(KaitaiError, fmt"Type '{ksType}' not found")
+  typeLookup(ksType, typ.parent)
+
+proc nativeType(ksType: string, typ: Type): NimNode =
+  case ksType
+  of "b1": result = ident"bool"
+  of "u1": result = ident"uint8"
+  of "s1": result = ident"int8"
+  of "u2", "u2le", "u2be": result = ident"uint16"
+  of "s2", "s2le", "s2be": result = ident"int16"
+  of "u4", "u4le", "u4be": result = ident"uint32"
+  of "s4", "s4le", "s4be": result = ident"int32"
+  of "u8", "u8le", "u8be": result = ident"uint64"
+  of "s8", "s8le", "s8be": result = ident"int64"
+  of "f4", "f4be", "f4le": result = ident"float32"
+  of "f8", "f8be", "f8le": result = ident"float64"
+  of "str", "strz": result = ident"string"
+  elif ksType.match(re"b[2-9]|b[1-9][0-9]*"):
+    result = ident"uint64"
+  else:
+    result = typeLookup(ksType.capitalizeAscii, typ)
 
 proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
   case json.kind
@@ -118,12 +161,12 @@ proc inferType(expr: NimNode, context: Type): NimNode =
       return ident"byte"
     if eqIdent(expr, "last"):
       return ident"byte"
-    for a in context.seq:
-      if eqIdent(expr, a.id):
-        return a.`type`.parsed
-    for i in context.instances:
-      if eqIdent(expr, i.id):
-        return i.`type`.parsed
+    #for a in context.seq:
+    #  if eqIdent(expr, a.id):
+    #    return a.`type`.parsed
+    #for i in context.instances:
+    #  if eqIdent(expr, i.id):
+    #    return i.`type`.parsed
     quit(fmt"Identifier {repr(expr)} not found")
   of nnkInfix, nnkPrefix:
     result = inferType(expr[2], context)
@@ -214,8 +257,8 @@ proc meta(json: JsonNode): Meta =
   if MetaKey.endian in result.keys:
     result.endian = parseEnum[EndianKind](json["endian"].getStr)
 
-proc field(kind: FieldKind, id: string, inType: Type, json: JsonNode): Field =
-  result = Field(kind: kind, id: id)
+proc field(kind: FieldKind, id: string, parent: Type, json: JsonNode): Field =
+  result = Field(kind: kind, id: id, parent: parent)
 
   var context: string
   case kind
@@ -236,20 +279,19 @@ proc field(kind: FieldKind, id: string, inType: Type, json: JsonNode): Field =
 
   # XXX contents
 
-  # type
+  # type XXX code feels confusing, there should be a better design
   var
     ts: string
-    t: NimNode
+    t = nnkBracketExpr.newTree(ident"seq", ident"byte")
   if FieldKey.`type` in result.keys:
     ts = json["type"].getStr
-    t = nativeType(ts)
-  else:
-    ts = ""
-    t = nnkBracketExpr.newTree(ident"seq", ident"byte")
+    t = nativeType(ts, result.parent)
   if FieldKey.repeat in result.keys:
-    result.`type` = (nnkBracketExpr.newTree(ident"seq", t), ts)
-  else:
-    result.`type` = (t, ts)
+    t = nnkBracketExpr.newTree(ident"seq", t)
+  if FieldKey.value in result.keys:
+    let v = ksAsJsonToNim(json["value"], context) # XXX this is evaluated twice
+    t = inferType(v, result.parent)
+  result.`type` = (t, ts)
 
   # repeat
   if FieldKey.repeat in result.keys:
@@ -313,53 +355,61 @@ proc field(kind: FieldKind, id: string, inType: Type, json: JsonNode): Field =
   # value
   if FieldKey.value in result.keys:
     result.value = ksAsJsonToNim(json["value"], context)
-    result.`type` = (inferType(result.value, inType), "")
 
-proc toKsType*(json: JsonNode): Type =
-  result = Type()
-
+proc toKsTypeRec(typ: Type, json: JsonNode) =
   # keys
   for key in json.keys:
-    result.keys.incl(parseEnum[TypeKey](key))
-
-  # id - Otherwise it will be set by the parent type
-  if json.hasKey("meta") and json["meta"].hasKey("id"):
-    result.id = json["meta"]["id"].getStr.capitalizeAscii
+    typ.keys.incl(parseEnum[TypeKey](key))
 
   # types
-  if TypeKey.types in result.keys:
+  if TypeKey.types in typ.keys:
+    # Need to construct tree with ids and fill in the rest of the info in a
+    # separate step because attributes can reference the ids from the 'type' key
     for k, v in json["types"].pairs:
-      let node = v.toKsType
-      node.id = k.capitalizeAscii
-      node.supertype = result
-      result.types.add(node)
+      let node = Type(id: k.capitalizeAscii, parent: typ)
+      typ.types.add(node)
+    # This is only possible because Nim's JSON implementation uses OrderedTable
+    var i: int
+    for _, v in json["types"].pairs:
+      toKsTypeRec(typ.types[i], v)
+      inc i
 
   # meta
-  if TypeKey.meta in result.keys:
-    result.meta = meta(json["meta"])
+  if TypeKey.meta in typ.keys:
+    typ.meta = meta(json["meta"])
   else:
-    result.meta = Meta() # need to do this because meta is an object
+    typ.meta = Meta() # need to do this because meta is an object
 
   # seq
-  if TypeKey.seq in result.keys:
+  if TypeKey.seq in typ.keys:
     for a in json["seq"].items:
-      result.seq.add(field(fkAttr, a["id"].getStr, result, a))
+      typ.seq.add(field(fkAttr, a["id"].getStr, typ, a))
 
   # instances
-  if TypeKey.instances in result.keys:
+  if TypeKey.instances in typ.keys:
     for k, v in json["instances"].pairs:
-      result.instances.add(field(fkInst, k, result, v))
+      typ.instances.add(field(fkInst, k, typ, v))
 
   # doc
-  if TypeKey.doc in result.keys:
-    result.doc = json["doc"].getStr
+  if TypeKey.doc in typ.keys:
+    typ.doc = json["doc"].getStr
 
   # doc-ref
-  if TypeKey.`doc-ref` in result.keys:
-    result.`doc-ref` = json["doc-ref"].getStr
+  if TypeKey.`doc-ref` in typ.keys:
+    typ.`doc-ref` = json["doc-ref"].getStr
 
   # params
-  result.params = json.getOrDefault("params") # XXX
+  typ.params = json.getOrDefault("params") # XXX
 
   # enums
-  result.enums = json.getOrDefault("enums") # XXX
+  typ.enums = json.getOrDefault("enums") # XXX
+
+proc toKsType*(json: JsonNode): Type =
+  if not json.hasKey("meta"):
+    raise newException(KaitaiError, "Top level type has no 'meta' section")
+
+  if not json["meta"].hasKey("id"):
+    raise newException(KaitaiError, "No id in 'meta' section for top level type")
+
+  result = Type(id: json["meta"]["id"].getStr.capitalizeAscii)
+  toKsTypeRec(result, json)
