@@ -8,7 +8,7 @@ const
 proc parse(field: Field, endian: EndianKind): NimNode =
   if FieldKey.value in field.keys:
     return newCall(
-      field.`type`.parsed.strVal,
+      field.`type`.parsed,
       field.value)
 
   if FieldKey.`type` in field.keys:
@@ -41,7 +41,7 @@ proc parse(field: Field, endian: EndianKind): NimNode =
     else:
       result = newCall(
         newDotExpr(
-          ident(t.capitalizeAscii),
+          field.`type`.parsed,
           ident"read"),
         field.io,
         newDotExpr(
@@ -138,16 +138,9 @@ proc parseField(field: Field, context: NimNode, endian: EndianKind,
           ident"seek"),
         posId))
 
-proc parentType(node: Type): string =
-  if node.supertype == nil: rootTypeName else: node.supertype.id
-
 proc typeDecl(section: var NimNode, node: Type) =
   var fields = newTree(nnkRecList)
-
-  fields.add(
-    newIdentDefs(
-      ident"parent",
-      ident(parentType(node))))
+  let id = hierarchy(node)
 
   for a in node.seq:
     fields.add(
@@ -165,7 +158,7 @@ proc typeDecl(section: var NimNode, node: Type) =
         ident"bool"))
 
   section.add nnkTypeDef.newTree(
-    ident(node.id),
+    ident(id),
     newEmptyNode(),
     nnkRefTy.newTree(
       nnkObjectTy.newTree(
@@ -178,13 +171,15 @@ proc typeDecl(section: var NimNode, node: Type) =
     typeDecl(section, t)
 
 proc readProcParams(node: Type): NimNode =
+  let id = hierarchy(node)
+
   result = nnkFormalParams.newTree(
-    ident(node.id),
+    ident(id),
     newIdentDefs(
       ident"_",
       nnkBracketExpr.newTree(
         ident"typedesc",
-        ident(node.id))),
+        ident(id))),
     newIdentDefs(
       ident"io",
       ident(streamTypeName)),
@@ -193,14 +188,16 @@ proc readProcParams(node: Type): NimNode =
       ident(rootTypeName)),
     newIdentDefs(
       ident"parent",
-      ident(parentType(node))))
+      ident(rootTypeName)))
 
 proc instProcParams(inst: Field, node: Type): NimNode =
+  let id = hierarchy(node)
+
   result = nnkFormalParams.newTree(
     inst.`type`.parsed,
     newIdentDefs(
       ident"this",
-      ident(node.id)))
+      ident(id)))
 
 proc readProcFw(node: Type): NimNode =
   result = nnkProcDef.newTree(
@@ -233,15 +230,14 @@ proc readProc(node: Type): NimNode =
   result = newProc(name = ident"read")
   result.params = readProcParams(node)
 
+  let id = hierarchy(node)
+
   var
     constructor = nnkObjConstr.newTree(
-      ident(node.id),
+      ident(id),
       newColonExpr(
         ident"io",
-        ident"io"),
-      newColonExpr(
-        ident"parent",
-        ident"parent"))
+        ident"io"))
 
   result.body = newStmtList(
     newAssignment(
@@ -309,21 +305,23 @@ proc procDecl(stmtList: var NimNode, node: Type) =
     stmtList.add(instProc(i, node))
 
 proc fromFileProc(node: Type): NimNode =
+  let id = hierarchy(node)
+
   newProc(
     name = ident"fromFile",
     params = @[
-      ident(node.id),
+      ident(id),
       newIdentDefs(
         ident"_",
         nnkBracketExpr.newTree(
           ident"typedesc",
-          ident(node.id))),
+          ident(id))),
       newIdentDefs(
         ident"filename",
         ident"string")],
     body = newCall(
       ident"read",
-      ident(node.id),
+      ident(id),
       newCall(
         ident"newKaitaiFileStream",
         ident"filename"),
