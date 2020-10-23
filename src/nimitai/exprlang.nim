@@ -10,12 +10,22 @@ type
     context: string
   ParsingError* = object of CatchableError
 
+proc removeLeadingUnderscores(s: var string) =
+  while s[0] == '_':
+    s.delete(0, 0)
+
+#proc addContext(node: NimNode, context: string) =
+#  for i in 0 ..< node.len:
+#    addContext(node[i], context)
+#    if node[i].kind == nnkDotExpr and node.kind != nnkDotExpr:
+#      node[i][0] = newDotExpr(ident(context), node[i][0])
+
 proc expr*(txt, context: string): NimNode =
   let p = peg(G, s: State):
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
-    prefix    <- tBool | tFloat | tInt | tStr | tMeth | tId |
+    prefix    <- tBool | tFloat | tInt | tStr | tId |
                  idx | arr | parExpr
     idx       <- tId * arrOpen * expr * arrClose:
       let (idx, id) = (pop(s.pss[^1]), pop(s.pss[^1]))
@@ -35,11 +45,12 @@ proc expr*(txt, context: string): NimNode =
                  >("+" | "-")                             * expr ^  6 |
                  >("*" | "/")                             * expr ^  7 |
                  >("%")                                   * expr ^  8 |
-                 >(".")                                   * expr ^^ 9 |
-                 >("::")                                  * expr ^^ 10:
-      let (r, l) = (pop(s.pss[^1]), pop(s.pss[^1]))
+                 >(".")                                   * expr ^^ 9:
+      var (r, l) = (pop(s.pss[^1]), pop(s.pss[^1]))
       case $1
       of ".":
+        if l.kind == nnkIdent:
+          l = newDotExpr(ident(s.context), l)
         s.pss[^1].add newDotExpr(l, r)
       else:
         var op: string
@@ -79,14 +90,10 @@ proc expr*(txt, context: string): NimNode =
       s.pss[^1].add newIntLitNode(x)
     tStr      <- '\"' * >*(Print - '\"') * '\"' * S:
       s.pss[^1].add newStrLitNode(($1))
-    tMeth     <- >("to_s" | "to_i" | "length" | "reverse" | "substring" |
-                 "first" | "last" | "size" | "min" | "max") * S:
-      s.pss[^1].add ident($1)
     tId       <- >((Lower | '_') * *(Alnum | '_')) * S:
-      if s.context != "":
-        s.pss[^1].add newDotExpr(ident(s.context), ident($1))
-      else:
-        s.pss[^1].add ident($1)
+      var id = $1
+      removeLeadingUnderscores(id)
+      s.pss[^1].add ident(id)
 
     # Aux
     S        <- *Space
@@ -110,9 +117,10 @@ proc expr*(txt, context: string): NimNode =
   var state = State(pss: pss, context: context)
   if not p.match(txt, state).ok:
     raise newException(ParsingError, "Failed to parse expression: " & txt)
-  #if s.pss.len != 1:
-  #  raise newException(ParsingError, "Stack Length: " & $s.stack.len)
-  state.pss[0][0]
+  if state.pss.len != 1:
+    raise newException(ParsingError, "Stack Length: " & $state.pss.len)
+
+  result = state.pss[0][0]
 
 proc debug(s: string) =
   let expr = expr(s, "this")

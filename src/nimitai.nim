@@ -237,7 +237,10 @@ proc readProc(node: Type): NimNode =
       ident(id),
       newColonExpr(
         ident"io",
-        ident"io"))
+        ident"io"),
+      newColonExpr(
+        ident"parent",
+        ident"parent"))
 
   result.body = newStmtList(
     newAssignment(

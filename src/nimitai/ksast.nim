@@ -52,7 +52,7 @@ type
       pos*: NimNode
       value*: NimNode
     keys*: set[FieldKey]
-    parent: Type
+    parentType: Type
     id*: string
     doc*: string
     `doc-ref`*: string
@@ -257,8 +257,8 @@ proc meta(json: JsonNode): Meta =
   if MetaKey.endian in result.keys:
     result.endian = parseEnum[EndianKind](json["endian"].getStr)
 
-proc field(kind: FieldKind, id: string, parent: Type, json: JsonNode): Field =
-  result = Field(kind: kind, id: id, parent: parent)
+proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field =
+  result = Field(kind: kind, id: id, parentType: parentType)
 
   var context: string
   case kind
@@ -285,12 +285,12 @@ proc field(kind: FieldKind, id: string, parent: Type, json: JsonNode): Field =
     t = nnkBracketExpr.newTree(ident"seq", ident"byte")
   if FieldKey.`type` in result.keys:
     ts = json["type"].getStr
-    t = nativeType(ts, result.parent)
+    t = nativeType(ts, result.parentType)
   if FieldKey.repeat in result.keys:
     t = nnkBracketExpr.newTree(ident"seq", t)
   if FieldKey.value in result.keys:
     let v = ksAsJsonToNim(json["value"], context) # XXX this is evaluated twice
-    t = inferType(v, result.parent)
+    t = inferType(v, result.parentType)
   result.`type` = (t, ts)
 
   # repeat
