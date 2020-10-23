@@ -28,7 +28,7 @@ proc test(json: JsonNode): NimNode =
       var nodeExpected: NimNode
       case expected.kind
       of JString:
-        nodeExpected = expr(expected.getStr, "")
+        nodeExpected = ksAsStrToNim(expected.getStr, "")
       of JInt:
         nodeExpected = newLit(expected.getInt)
       of JBool:
@@ -40,7 +40,7 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           infix(
-            expr("r." & a["actual"].getStr, ""),
+            ksAsStrToNim("r." & a["actual"].getStr, ""),
             "==",
             nodeExpected)))
 
@@ -98,15 +98,15 @@ static:
 
     try:
       json = parseJson(readFile(f))
-    except JsonParsingError:
-      echo &"  {R}[JE]{D} " & casename
+    except JsonParsingError as err:
+      echo &"  {R}[JE]{D} " & casename & &" {R}{err.msg}{D}"
       inc(je)
       continue
 
     try:
       ast = test(json)
-    except ParsingError:
-      echo &"  {M}[PE]{D} " & casename
+    except ParsingError as err:
+      echo &"  {M}[PE]{D} " & casename & &" {M}{err.msg}{D}"
       inc(pe)
       continue
 
