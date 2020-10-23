@@ -5,6 +5,10 @@ const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
+proc parentType(typ: Type): NimNode =
+  if typ.parent == nil: ident(rootTypeName)
+  else: ident(hierarchy(typ.parent))
+
 proc parse(field: Field, endian: EndianKind): NimNode =
   if FieldKey.value in field.keys:
     return newCall(
@@ -142,6 +146,11 @@ proc typeDecl(section: var NimNode, node: Type) =
   var fields = newTree(nnkRecList)
   let id = hierarchy(node)
 
+  fields.add(
+    newIdentDefs(
+      ident"parent",
+      parentType(node)))
+
   for a in node.seq:
     fields.add(
       newIdentDefs(
@@ -188,7 +197,7 @@ proc readProcParams(node: Type): NimNode =
       ident(rootTypeName)),
     newIdentDefs(
       ident"parent",
-      ident(rootTypeName)))
+      parentType(node)))
 
 proc instProcParams(inst: Field, node: Type): NimNode =
   let id = hierarchy(node)

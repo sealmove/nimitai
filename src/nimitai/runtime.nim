@@ -6,7 +6,6 @@ type
   KaitaiStruct* {.inheritable.} = ref object
     io*: KaitaiStream
     root*: KaitaiStruct
-    parent*: KaitaiStruct
   KaitaiStream* = ref object
     io*: Stream
     bits*: uint64
