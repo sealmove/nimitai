@@ -144,12 +144,15 @@ proc parseField(field: Field, context: NimNode, endian: EndianKind,
 
 proc typeDecl(section: var NimNode, node: Type) =
   var fields = newTree(nnkRecList)
-  let id = hierarchy(node)
+  let
+    id = hierarchy(node)
+    pt = if node.isImpureSubstruct: ident(rootTypeName)
+         else: parentType(node)
 
   fields.add(
     newIdentDefs(
       ident"parent",
-      parentType(node)))
+      pt))
 
   for a in node.seq:
     fields.add(
@@ -180,7 +183,10 @@ proc typeDecl(section: var NimNode, node: Type) =
     typeDecl(section, t)
 
 proc readProcParams(node: Type): NimNode =
-  let id = hierarchy(node)
+  let
+    id = hierarchy(node)
+    pt = if node.isImpureSubstruct: ident(rootTypeName)
+         else: parentType(node)
 
   result = nnkFormalParams.newTree(
     ident(id),
@@ -197,7 +203,7 @@ proc readProcParams(node: Type): NimNode =
       ident(rootTypeName)),
     newIdentDefs(
       ident"parent",
-      parentType(node)))
+      pt))
 
 proc instProcParams(inst: Field, node: Type): NimNode =
   let id = hierarchy(node)

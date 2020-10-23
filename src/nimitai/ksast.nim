@@ -7,6 +7,7 @@ type
     id, types, meta, doc, `doc-ref`, params, seq, instances, enums
   Type* = ref object
     keys*: set[TypeKey]
+    isImpureSubStruct*: bool
     parent*: Type
     id*: string
     types*: seq[Type]
@@ -87,15 +88,16 @@ proc hierarchy*(typ: Type): string =
   while stack != @[]:
     result &= pop(stack)
 
-proc typeLookup(ksType: string, typ: Type): NimNode =
+proc typeLookup(ksType: string, typ: Type, mark: bool): NimNode =
   for st in typ.types:
     if ksType == st.id:
+      if mark: st.isImpureSubstruct = true
       return ident(hierarchy(st))
   if ksType == typ.id:
     return ident(hierarchy(typ))
   if typ.parent == nil:
     raise newException(KaitaiError, fmt"Type '{ksType}' not found")
-  typeLookup(ksType, typ.parent)
+  typeLookup(ksType, typ.parent, true)
 
 proc nativeType(ksType: string, typ: Type): NimNode =
   case ksType
@@ -114,12 +116,12 @@ proc nativeType(ksType: string, typ: Type): NimNode =
   elif ksType.match(re"b[2-9]|b[1-9][0-9]*"):
     result = ident"uint64"
   else:
-    result = typeLookup(ksType.capitalizeAscii, typ)
+    result = typeLookup(ksType.capitalizeAscii, typ, false)
 
 proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
   case json.kind
   of JString:
-    result = expr(json.getStr, context)
+    result = ksAsStrToNim(json.getStr, context)
   of JInt:
     result = newLit(json.getInt)
   of JBool:
@@ -180,6 +182,8 @@ proc inferType(expr: NimNode, context: Type): NimNode =
     result = inferType(expr[0], context)
   else:
     quit(fmt"Unexpected NimNodeKind '{expr.kind}' during type inference")
+
+proc determineImpureSubStructs(typ: Type) = discard
 
 proc meta(json: JsonNode): Meta =
   result = Meta()
@@ -413,3 +417,4 @@ proc toKsType*(json: JsonNode): Type =
 
   result = Type(id: json["meta"]["id"].getStr.capitalizeAscii)
   toKsTypeRec(result, json)
+  determineImpureSubStructs(result)
