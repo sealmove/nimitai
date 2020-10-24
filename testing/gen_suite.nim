@@ -98,8 +98,8 @@ static:
 
     try:
       json = parseJson(readFile(f))
-    except JsonParsingError as err:
-      echo &"  {R}[JE]{D} " & casename & &" {R}{err.msg}{D}"
+    except JsonParsingError, ValueError:
+      echo &"  {R}[JE]{D} " & casename & &" {R}{getCurrentException().msg}{D}"
       inc(je)
       continue
 
