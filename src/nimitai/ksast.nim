@@ -1,4 +1,4 @@
-import macros, json, strutils, strformat
+import macros, json, strutils, strformat, tables
 import regex
 import exprlang
 
@@ -17,7 +17,7 @@ type
     params*: JsonNode # XXX
     seq*: seq[Field]
     instances*: seq[Field]
-    enums*: JsonNode # XXX
+    enums*: Table[string, Table[string, int]]
   EndianKind* {.pure.} = enum
     le, be
   MetaKey* {.pure.} = enum
@@ -318,6 +318,8 @@ proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field
   # XXX process
 
   # XXX enum
+  if FieldKey.`enum` in result.keys:
+    result.`enum` = json["enum"].getStr
 
   # encoding
   if FieldKey.encoding in result.keys:
@@ -406,7 +408,12 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
   typ.params = json.getOrDefault("params") # XXX
 
   # enums
-  typ.enums = json.getOrDefault("enums") # XXX
+  if TypeKey.enums in typ.keys:
+    typ.enums = initTable[string, Table[string, int]]()
+    for k, v in json["enums"]:
+      typ.enums[k] = initTable[string, int]()
+      for i, s in v:
+        typ.enums[k][s.getStr] = parseInt(i)
 
 proc toKsType*(json: JsonNode): Type =
   if not json.hasKey("meta"):

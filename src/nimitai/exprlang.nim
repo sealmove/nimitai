@@ -10,6 +10,7 @@ type
     knkArr
     knkInfix
     knkMethod
+    knkEnum
     knkBool
     knkInt
     knkFloat
@@ -35,13 +36,13 @@ proc add(node: KsNode, children: varargs[KsNode]) =
     node.sons.add(c)
 
 proc newKsNode(kind: KsNodeKind, children: varargs[KsNode]): KsNode =
-  doAssert kind in {knkIdx, knkArr, knkInfix, knkMethod}
+  doAssert kind in {knkIdx, knkArr, knkInfix, knkMethod, knkEnum}
   result = KsNode(kind: kind)
   for c in children:
     result.add(c)
 
 proc `[]`(node: KsNode, index: int): KsNode =
-  doAssert node.kind in {knkIdx, knkArr, knkInfix, knkMethod}
+  doAssert node.kind in {knkIdx, knkArr, knkInfix, knkMethod, knkEnum}
   node.sons[index]
 
 proc toKs(str: string): KsNode =
@@ -49,7 +50,7 @@ proc toKs(str: string): KsNode =
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
-    prefix    <- tBool | tFloat | tInt | tStr | tId | idx | arr | parExpr
+    prefix    <- tBool | tFloat | tInt | tStr | tEnum | tId | idx | arr | parExpr
     idx       <- tId * arrOpen * expr * arrClose:
       let (idx, id) = (pop(s[^1]), pop(s[^1]))
       s[^1].add newKsNode(knkIdx, id, idx)
@@ -103,7 +104,16 @@ proc toKs(str: string): KsNode =
       s[^1].add KsNode(kind: knkInt, intval: x)
     tStr      <- '\"' * >*(Print - '\"') * '\"' * S:
       s[^1].add KsNode(kind: knkStr, strval: $1)
-    tId       <- >((Lower | '_') * *(Alnum | '_')) * S:
+    tEnum     <- >(id * "::" * id * *("::" * id)) * S:
+      let split = rsplit($1, "::", maxsplit=1)
+      let
+        scope = replace(split[0], "::")
+        value = split[1]
+      s[^1].add newKsNode(
+        knkEnum,
+        KsNode(kind: knkId, strval: scope),
+        KsNode(kind: knkId, strval: value))
+    tId       <- >id * S:
       s[^1].add KsNode(kind: knkId, strval: $1)
 
     # Aux
@@ -118,6 +128,7 @@ proc toKs(str: string): KsNode =
     oct      <- "0o" * +{'0' .. '7', '_'}
     dec      <- Digit * *(?'_' * Digit)
     hex      <- "0x" * +(Xdigit | '_')
+    id       <- (Lower | '_') * *(Alnum | '_')
 
     # Aux with side-effects
     newLvl   <- 0:
@@ -133,12 +144,48 @@ proc toKs(str: string): KsNode =
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
 
+proc toNim(ks: KsNode): NimNode =
+  case ks.kind
+  of knkIdx:
+    result = nnkBracketExpr.newTree(ks[0].toNim, ks[1].toNim)
+  of knkArr:
+    let x = newTree(nnkBracket)
+    for s in ks.sons:
+      x.add s.toNim
+    result = prefix(x, "@")
+  of knkInfix:
+    result = nnkInfix.newTree(ks[1].toNim, ks[0].toNim, ks[2].toNim)
+  of knkMethod, knkEnum:
+    result = newDotExpr(ks[0].toNim, ks[1].toNim)
+  of knkBool:
+    result = newLit(ks.boolval)
+  of knkInt:
+    result = newIntLitNode(ks.intval)
+  of knkFloat:
+    result = newFloatLitNode(ks.floatval)
+  of knkStr:
+    result = newStrLitNode(ks.strval)
+  of knkId:
+    result = ident(ks.strval)
+  of knkOp:
+    var op: string
+    case ks.strval
+    of "%" : op = "mod"
+    of "<<": op = "shl"
+    of ">>": op = "shr"
+    of "&" : op = "and"
+    of "|" : op = "or"
+    of "^" : op = "xor"
+    else   : op = ks.strval
+    result = ident(op)
+  else: discard
+
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
     s.delete(0, 0)
 
 proc fixIds(node: var KsNode) =
-  if node.kind in {knkIdx, knkArr, knkInfix, knkMethod}:
+  if node.kind in {knkIdx, knkArr, knkInfix, knkMethod, knkEnum}:
     for i in 0 ..< node.sons.len:
       fixIds(node.sons[i])
   elif node.kind == knkId:
@@ -163,41 +210,6 @@ proc addContextRec(node: var KsNode, context: string) =
     else:
       node.sons[0].addContextRec(context)
 
-proc toNim(ks: KsNode): NimNode =
-  case ks.kind
-  of knkIdx:
-    result = nnkBracketExpr.newTree(ks[0].toNim, ks[1].toNim)
-  of knkArr:
-    let x = newTree(nnkBracket)
-    for s in ks.sons:
-      x.add s.toNim
-    result = prefix(x, "@")
-  of knkInfix:
-    result = nnkInfix.newTree(ks[1].toNim, ks[0].toNim, ks[2].toNim)
-  of knkBool:
-    result = newLit(ks.boolval)
-  of knkInt:
-    result = newIntLitNode(ks.intval)
-  of knkFloat:
-    result = newFloatLitNode(ks.floatval)
-  of knkStr:
-    result = newStrLitNode(ks.strval)
-  of knkId:
-    result = ident(ks.strval)
-  of knkMethod:
-    result = newDotExpr(ks[0].toNim, ks[1].toNim)
-  of knkOp:
-    var op: string
-    case ks.strval
-    of "%" : op = "mod"
-    of "<<": op = "shl"
-    of ">>": op = "shr"
-    of "&" : op = "and"
-    of "|" : op = "or"
-    of "^" : op = "xor"
-    else   : op = ks.strval
-    result = ident(op)
-
 proc ksAsStrToNim*(str, context: string): NimNode =
   var ks = str.toKs
   fixIds(ks)
@@ -214,4 +226,4 @@ proc debug(s: string) =
   echo repr expr
   echo ""
 
-#static: debug"[0xff]"
+static: debug"a::b::c"
