@@ -291,7 +291,7 @@ proc readBytesTerm*(ks: KaitaiStream; term: byte;
 proc ensureFixedContents*(ks: KaitaiStream, expected: seq[byte]): seq[byte] =
   result = ks.read_bytes(expected.len)
   if result != expected:
-    raise newException(AssertionError, "the request to the OS failed")
+    raise newException(KaitaiError, "the request to the OS failed")
 
 proc bytesStripRight*(bytes: seq[byte], padByte: byte): seq[byte] =
   var newLen = bytes.len
