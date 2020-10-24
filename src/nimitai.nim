@@ -9,7 +9,7 @@ proc parentType(typ: Type): NimNode =
   if typ.parent == nil: ident(rootTypeName)
   else: ident(hierarchy(typ.parent))
 
-proc parse(field: Field, endian: EndianKind): NimNode =
+proc parse(field: Field, typ: Type): NimNode =
   if FieldKey.value in field.keys:
     return newCall(
       field.`type`.parsed,
@@ -21,7 +21,7 @@ proc parse(field: Field, endian: EndianKind): NimNode =
     if t.match(re"([us][1248]|f[48])(be|le)?"):
       var procName = "read" & t
       if not t.match(re"([us][1])|(.*(be|le))"):
-        procName &= $endian
+        procName &= $typ.meta.endian
       result = newCall(procName, field.io)
 
     # Bool
@@ -42,7 +42,7 @@ proc parse(field: Field, endian: EndianKind): NimNode =
         suffix = t[^2..^1]
       else:
         bits = t[1..^1]
-        suffix = "Be"
+        suffix = $typ.meta.`bit-endian`
       result = newCall(
         "readBitsInt" & suffix,
         field.io,
@@ -90,7 +90,7 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
         ident"newKaitaiStream",
         id)))
 
-proc parseField(field: Field, context: NimNode, endian: EndianKind,
+proc parseField(field: Field, context: NimNode, typ: Type,
                 postfix = ""): NimNode =
   result = newStmtList()
 
@@ -127,7 +127,7 @@ proc parseField(field: Field, context: NimNode, endian: EndianKind,
     result.add(
       newAssignment(
         id,
-        parse(field, endian)))
+        parse(field, typ)))
   of eos:
     result.add(
       nnkWhileStmt.newTree(
@@ -138,7 +138,7 @@ proc parseField(field: Field, context: NimNode, endian: EndianKind,
           "not"),
         newCall(
           newDotExpr(id, ident"add"),
-          parse(field, endian))))
+          parse(field, typ))))
   of expr:
     discard
   of until:
@@ -312,14 +312,14 @@ proc readProc(node: Type): NimNode =
           newCall(
             ident"alignToByte",
             newDotExpr(ident"result", ident"io")))
-    let stmts = parseField(node.seq[i], ident"result", node.meta.endian)
+    let stmts = parseField(node.seq[i], ident"result", node)
     for s in stmts: result.body.add(s)
 
 proc instProc(inst: Field, node: Type): NimNode =
   result = newProc(ident(inst.id))
   result.params = instProcParams(inst, node)
 
-  var pa = parseField(inst, ident"this", node.meta.endian, postfix = "Inst")
+  var pa = parseField(inst, ident"this", node, postfix = "Inst")
   pa.add(
     newAssignment(
       newDotExpr(
