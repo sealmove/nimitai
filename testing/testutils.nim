@@ -1,3 +1,4 @@
+proc `==`*[T: SomeInteger, U: SomeInteger](a: T, b: U): bool = a == T(b)
 proc `==`*[T: SomeInteger, U: SomeInteger](a: seq[T], b: seq[U]): bool =
   if a.len != b.len:
     return false
