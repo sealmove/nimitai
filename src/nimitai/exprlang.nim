@@ -8,8 +8,9 @@ type
   KsNodeKind = enum
     knkIdx
     knkArr
-    knkInfix
     knkMethod
+    knkInfix
+    knkUnary
     knkEnum
     knkBool
     knkInt
@@ -31,18 +32,21 @@ type
       sons: seq[KsNode]
   ParsingError* = object of CatchableError
 
+proc isFatherKind(kind: KsNodeKind): bool =
+  kind in {knkIdx, knkArr, knkMethod, knkInfix, knkUnary, knkEnum}
+
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
     node.sons.add(c)
 
 proc newKsNode(kind: KsNodeKind, children: varargs[KsNode]): KsNode =
-  doAssert kind in {knkIdx, knkArr, knkInfix, knkMethod, knkEnum}
+  doAssert isFatherKind(kind)
   result = KsNode(kind: kind)
   for c in children:
     result.add(c)
 
 proc `[]`(node: KsNode, index: int): KsNode =
-  doAssert node.kind in {knkIdx, knkArr, knkInfix, knkMethod, knkEnum}
+  doAssert isFatherKind(node.kind)
   node.sons[index]
 
 proc toKs(str: string): KsNode =
@@ -50,7 +54,10 @@ proc toKs(str: string): KsNode =
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
-    prefix    <- tBool | tFloat | tInt | tStr | tEnum | idx | tId | arr | parExpr
+    prefix    <- idx | arr | unary | parExpr |
+                 tBool | tFloat | tInt | tStr | tEnum | tId
+    unary     <- >{'+','-'} * expr:
+      s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
     idx       <- >id * arrOpen * expr * arrClose:
       s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
     arr       <- arrOpen * newLvl * expr * *(',' * expr) * arrClose:
@@ -152,10 +159,12 @@ proc toNim(ks: KsNode): NimNode =
     for s in ks.sons:
       x.add s.toNim
     result = prefix(x, "@")
-  of knkInfix:
-    result = nnkInfix.newTree(ks[1].toNim, ks[0].toNim, ks[2].toNim)
   of knkMethod, knkEnum:
     result = newDotExpr(ks[0].toNim, ks[1].toNim)
+  of knkInfix:
+    result = nnkInfix.newTree(ks[1].toNim, ks[0].toNim, ks[2].toNim)
+  of knkUnary:
+    result = nnkPrefix.newTree(ks[0].toNim, ks[1].toNim)
   of knkBool:
     result = newLit(ks.boolval)
   of knkInt:
@@ -183,7 +192,7 @@ proc removeLeadingUnderscores(s: var string) =
     s.delete(0, 0)
 
 proc fixIds(node: var KsNode) =
-  if node.kind in {knkIdx, knkArr, knkInfix, knkMethod, knkEnum}:
+  if isFatherKind(node.kind):
     for i in 0 ..< node.sons.len:
       fixIds(node.sons[i])
   elif node.kind == knkId:
