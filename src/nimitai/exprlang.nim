@@ -202,7 +202,7 @@ proc toNim(ks: KsNode): NimNode =
     let x = newTree(nnkBracket)
     for s in ks.sons:
       x.add s.toNim
-    if ks.isByteArray:
+    if ks.sons != @[] and ks.isByteArray:
       x[0] = newLit(ks.sons[0].intval.byte)
     result = prefix(x, "@")
   of knkMethod, knkEnum:
