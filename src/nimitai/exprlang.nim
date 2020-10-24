@@ -50,10 +50,9 @@ proc toKs(str: string): KsNode =
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
-    prefix    <- tBool | tFloat | tInt | tStr | tEnum | tId | idx | arr | parExpr
-    idx       <- tId * arrOpen * expr * arrClose:
-      let (idx, id) = (pop(s[^1]), pop(s[^1]))
-      s[^1].add newKsNode(knkIdx, id, idx)
+    prefix    <- tBool | tFloat | tInt | tStr | tEnum | idx | tId | arr | parExpr
+    idx       <- >id * arrOpen * expr * arrClose:
+      s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
     arr       <- arrOpen * newLvl * expr * *(',' * expr) * arrClose:
       let
         elements = pop(s)
@@ -113,7 +112,7 @@ proc toKs(str: string): KsNode =
         knkEnum,
         KsNode(kind: knkId, strval: scope),
         KsNode(kind: knkId, strval: value))
-    tId       <- >id * S:
+    tId       <- >id:
       s[^1].add KsNode(kind: knkId, strval: $1)
 
     # Aux
@@ -128,7 +127,7 @@ proc toKs(str: string): KsNode =
     oct      <- "0o" * +{'0' .. '7', '_'}
     dec      <- Digit * *(?'_' * Digit)
     hex      <- "0x" * +(Xdigit | '_')
-    id       <- (Lower | '_') * *(Alnum | '_')
+    id       <- (Lower | '_') * *(Alnum | '_') * S
 
     # Aux with side-effects
     newLvl   <- 0:
@@ -178,7 +177,6 @@ proc toNim(ks: KsNode): NimNode =
     of "^" : op = "xor"
     else   : op = ks.strval
     result = ident(op)
-  else: discard
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
@@ -226,4 +224,4 @@ proc debug(s: string) =
   echo repr expr
   echo ""
 
-static: debug"a::b::c"
+#static: debug"docs[0].indicator"
