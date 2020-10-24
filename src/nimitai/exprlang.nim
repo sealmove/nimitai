@@ -34,7 +34,7 @@ type
   ParsingError* = object of CatchableError
 
 proc isPrim*(ksType: string): bool =
-  ksType.match(re"[su][1248]|f[48]|b[1-9][0-9]*(be|le)?|strz?")
+  ksType.match(re"[su][1248](be|le)?|f[48]|b[1-9][0-9]*(be|le)?|strz?")
 
 proc toPrim*(ksType: string): string =
   case ksType
