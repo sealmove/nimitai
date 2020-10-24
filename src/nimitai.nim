@@ -60,12 +60,31 @@ proc parse(field: Field, typ: Type): NimNode =
 
   # Typeless
   else:
-    result = newCall(
-      ident"readBytes",
-      field.io,
-      newCall(
-        ident"int",
-        field.size))
+    if FieldKey.terminator in field.keys:
+      result = newCall(
+        ident"readBytesTerm",
+        field.io,
+        newLit(field.terminator),
+        newLit(field.`include`),
+        newLit(field.consume),
+        newLit(field.`eos-error`))
+    elif FieldKey.`pad-right` in field.keys:
+      result = newCall(
+        ident"bytesStripRight",
+        newCall(
+          ident"readBytes",
+          field.io,
+          newCall(
+            ident"int",
+            field.size)),
+        newLit(field.`pad-right`))
+    else:
+      result = newCall(
+        ident"readBytes",
+        field.io,
+        newCall(
+          ident"int",
+          field.size))
 
   if FieldKey.`enum` in field.keys:
     result = newCall(ident(field.`enum`), result)

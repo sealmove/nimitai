@@ -277,7 +277,7 @@ proc readBytesFull*(ks: KaitaiStream): seq[byte] =
       break
 
 proc readBytesTerm*(ks: KaitaiStream; term: byte;
-                    includeTerm, consumeTerm: bool, eosError: bool): seq[byte] =
+                    includeTerm, consumeTerm, eosError: bool): seq[byte] =
   while true:
     let c = readUint8(ks.io)
     if c == term:

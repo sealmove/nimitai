@@ -42,7 +42,7 @@ type
   FieldKey* {.pure.} = enum
     id, doc, `doc-ref`, contents, `type`, repeat, `repeat-expr`, `repeat-until`,
     `if`, size, `size-eos`, process, `enum`, encoding, terminator, consume,
-    `include`, `eos-error`, pos, io, value
+    `include`, `eos-error`, pos, io, value, `pad-right`
   FieldKind* = enum
     fkAttr, fkInst
   Field* = ref object
@@ -75,6 +75,12 @@ type
     `eos-error`*: bool
     io*: NimNode
   KaitaiError* = object of Defect
+
+proc parseBinOctDecHex(s: string): int =
+  if   s.startsWith("0b"): parseBinInt(s)
+  elif s.startsWith("0o"): parseOctInt(s)
+  elif s.startsWith("0x"): parseHexInt(s)
+  else: parseInt(s)
 
 proc hierarchy*(typ: Type): string =
   var
@@ -114,6 +120,15 @@ proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
   of JNull:
     result = newNilLit()
   else: discard # Should not occur
+
+proc jsonToByte(json: JsonNode): byte =
+  case json.kind
+  of JString:
+    result = parseBinOctDecHex(json.getStr).byte
+  of JInt:
+    result = json.getInt.byte
+  else:
+    result = 0
 
 # XXX very sloppy implementation
 proc inferType(expr: NimNode, context: Type): NimNode =
@@ -312,9 +327,11 @@ proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field
   if FieldKey.encoding in result.keys:
     result.encoding = json["encoding"].getStr
 
-  # XXX pad-right
+  if FieldKey.`pad-right` in result.keys:
+    result.`pad-right` = jsonToByte(json["pad-right"])
 
-  # XXX terminator
+  if FieldKey.terminator in result.keys:
+    result.terminator = jsonToByte(json["terminator"])
 
   # consume
   if FieldKey.consume in result.keys:
