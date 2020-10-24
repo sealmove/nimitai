@@ -18,10 +18,10 @@ type
     instances*: seq[Field]
     enums*: Table[string, OrderedTable[string, int]]
   EndianKind* {.pure.} = enum
-    le, be
+    be, le
   MetaKey* {.pure.} = enum
     id, title, application, `file-extension`, xref, license, `ks-version`,
-    `ks-debug`, `ks-opaque-types`, imports, encoding, endian
+    `ks-debug`, `ks-opaque-types`, imports, encoding, endian, `bit-endian`
   Meta = ref object
     keys*: set[MetaKey]
     id*: string
@@ -36,6 +36,7 @@ type
     imports*: seq[string]
     encoding*: string
     endian*: EndianKind
+    `bit-endian`*: EndianKind
   RepeatKind* {.pure.} = enum
     none, eos, expr, until
   FieldKey* {.pure.} = enum
@@ -244,6 +245,9 @@ proc meta(json: JsonNode): Meta =
   # endian
   if MetaKey.endian in result.keys:
     result.endian = parseEnum[EndianKind](json["endian"].getStr)
+
+  if MetaKey.`bit-endian` in result.keys:
+    result.`bit-endian` = parseEnum[EndianKind](json["bit-endian"].getStr)
 
 proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field =
   result = Field(kind: kind, id: id, parentType: parentType)
