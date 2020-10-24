@@ -9,6 +9,7 @@ type
     knkIdx
     knkArr
     knkMethod
+    knkTernary
     knkInfix
     knkUnary
     knkEnum
@@ -55,7 +56,7 @@ proc toPrim*(ksType: string): string =
   else: discard # should not occure
 
 proc isFatherKind(kind: KsNodeKind): bool =
-  kind in {knkIdx, knkArr, knkMethod, knkInfix, knkUnary, knkEnum}
+  kind in {knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkEnum}
 
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
@@ -96,20 +97,25 @@ proc toKs(str: string): KsNode =
         newNode.add(e)
       s[^1].add newNode
     parExpr   <- (parOpen * expr * parClose) ^ 0
-    infix     <- >("not")                                 * expr ^  1 |
-                 >("or" | "^")                            * expr ^  2 |
-                 >("and")                                 * expr ^  3 |
-                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  4 |
-                 >("<<" | ">>" | "&" | "|")               * expr ^  5 |
-                 >("+" | "-")                             * expr ^  6 |
-                 >("*" | "/")                             * expr ^  7 |
-                 >("%")                                   * expr ^  8 |
-                 >(".")                                   * expr ^  9:
-      var (r, l) = (pop(s[^1]), pop(s[^1]))
+    infix     <- >("?") * S * expr * ":" * S              * expr ^  1 |
+                 >("not")                                 * expr ^  2 |
+                 >("or" | "^")                            * expr ^  3 |
+                 >("and")                                 * expr ^  4 |
+                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  5 |
+                 >("<<" | ">>" | "&" | "|")               * expr ^  6 |
+                 >("+" | "-")                             * expr ^  7 |
+                 >("*" | "/")                             * expr ^  8 |
+                 >("%")                                   * expr ^  9 |
+                 >(".")                                   * expr ^ 10:
       case $1
       of ".":
+        let (r, l) = (pop(s[^1]), pop(s[^1]))
         s[^1].add newKsNode(knkMethod, l, r)
+      of "?":
+        let (second, first, condition) = (pop(s[^1]), pop(s[^1]), pop(s[^1]))
+        s[^1].add newKsNode(knkTernary, condition, first, second)
       else:
+        let (r, l) = (pop(s[^1]), pop(s[^1]))
         s[^1].add newKsNode(knkInfix, l, KsNode(kind: knkOp, strval: $1), r)
 
     # Terminal
@@ -192,6 +198,13 @@ proc toNim(ks: KsNode): NimNode =
     result = prefix(x, "@")
   of knkMethod, knkEnum:
     result = newDotExpr(ks[0].toNim, ks[1].toNim)
+  of knkTernary:
+    result = nnkIfStmt.newTree(
+      nnkElifBranch.newTree(
+        ks[0].toNim,
+        ks[1].toNim),
+      nnkElse.newTree(
+        ks[2].toNim))
   of knkInfix:
     result = nnkInfix.newTree(ks[1].toNim, ks[0].toNim, ks[2].toNim)
   of knkUnary:
@@ -236,7 +249,7 @@ proc addContext(node: var KsNode, context: string) =
     KsNode(kind: knkId, strval: node.strval))
 
 proc addContextRec(node: var KsNode, context: string) =
-  if node.kind in {knkIdx, knkArr, knkInfix}:
+  if node.kind in {knkIdx, knkArr, knkTernary, knkInfix, knkUnary}:
     for i in 0 ..< node.sons.len:
       if node.sons[i].kind == knkId:
         node.sons[i].addContext(context)
@@ -264,4 +277,4 @@ proc debug(s: string) =
   echo repr expr
   echo ""
 
-#static: debug"(b1 & 0xF0) >> 4 "
+#static: debug"a ? b : c"

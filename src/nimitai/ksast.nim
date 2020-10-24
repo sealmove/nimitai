@@ -176,9 +176,7 @@ proc inferType(expr: NimNode, context: Type): NimNode =
     result = inferType(expr[1], context)
   # of nnkNilLit:
   # of nnkCall:
-  of nnkBracket:
-    result = inferType(expr[0], context)
-  of nnkBracketExpr:
+  of nnkBracket, nnkBracketExpr, nnkIfStmt, nnkElifBranch, nnkElse:
     result = inferType(expr[0], context)
   else:
     quit(fmt"Unexpected NimNodeKind '{expr.kind}' during type inference")
