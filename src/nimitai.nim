@@ -1,5 +1,5 @@
+import json, macros, regex, strutils, tables
 import nimitai/ksast
-import json, macros, regex, strutils
 
 const
   rootTypeName = "KaitaiStruct"
@@ -25,7 +25,7 @@ proc parse(field: Field, endian: EndianKind): NimNode =
       result = newCall(procName, field.io)
 
     # Bool
-    elif t == "b1":
+    elif t.match(re"b1(be|le)?"):
       result = newCall(
         ident"bool",
         newCall(
@@ -35,11 +35,17 @@ proc parse(field: Field, endian: EndianKind): NimNode =
 
     # Number from bits
     elif t.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
-      let bits = parseInt(t[1..^1])
+      var
+        suffix, bits: string
+      if t.match(re".*(be|le)"):
+        bits = t[1..^3]
+        suffix = t[^2..^1]
+      else:
+        bits = t[1..^1]
       result = newCall(
-        "readBitsIntBe",
+        "readBitsInt" & suffix,
         field.io,
-        newLit(bits))
+        newLit(parseInt(bits)))
 
     # User-defined type
     else:
@@ -61,6 +67,9 @@ proc parse(field: Field, endian: EndianKind): NimNode =
       newCall(
         ident"int",
         field.size))
+
+  if FieldKey.`enum` in field.keys:
+    result = newCall(ident(field.`enum`), result)
 
 proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()
@@ -155,10 +164,12 @@ proc typeDecl(section: var NimNode, node: Type) =
       pt))
 
   for a in node.seq:
+    let t = if FieldKey.`enum` in a.keys: ident(a.`enum`)
+            else: a.`type`.parsed
     fields.add(
       newIdentDefs(
         ident(a.id),
-        a.`type`.parsed))
+        t))
 
   for i in node.instances:
     fields.add(
@@ -178,6 +189,19 @@ proc typeDecl(section: var NimNode, node: Type) =
         nnkOfInherit.newTree(
           ident(rootTypeName)),
         fields)))
+
+  var defs: seq[NimNode]
+  for name, consts in node.enums:
+    var fields = nnkEnumTy.newTree(newEmptyNode())
+    for l, v in consts:
+      fields.add(
+        nnkEnumFieldDef.newTree(
+          ident(l),
+          newIntLitNode(v)))
+    defs.add(nnkTypeDef.newTree(ident(hierarchy(node) & name), newEmptyNode(), fields))
+
+  for e in defs:
+    section.add e
 
   for t in node.types:
     typeDecl(section, t)

@@ -16,7 +16,7 @@ type
     params*: JsonNode # XXX
     seq*: seq[Field]
     instances*: seq[Field]
-    enums*: Table[string, Table[string, int]]
+    enums*: Table[string, OrderedTable[string, int]]
   EndianKind* {.pure.} = enum
     le, be
   MetaKey* {.pure.} = enum
@@ -301,9 +301,8 @@ proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field
 
   # XXX process
 
-  # XXX enum
   if FieldKey.`enum` in result.keys:
-    result.`enum` = json["enum"].getStr
+    result.`enum` = hierarchy(result.parentType) & json["enum"].getStr
 
   # encoding
   if FieldKey.encoding in result.keys:
@@ -393,9 +392,9 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
 
   # enums
   if TypeKey.enums in typ.keys:
-    typ.enums = initTable[string, Table[string, int]]()
+    typ.enums = initTable[string, OrderedTable[string, int]]()
     for k, v in json["enums"]:
-      typ.enums[k] = initTable[string, int]()
+      typ.enums[k] = initOrderedTable[string, int]()
       for i, s in v:
         typ.enums[k][s.getStr] = parseInt(i)
 

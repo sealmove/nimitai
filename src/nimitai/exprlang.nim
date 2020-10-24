@@ -34,11 +34,11 @@ type
   ParsingError* = object of CatchableError
 
 proc isPrim*(ksType: string): bool =
-  ksType.match(re"[su][1248]|f[48]|b[1-9][0-9]*|strz?")
+  ksType.match(re"[su][1248]|f[48]|b[1-9][0-9]*(be|le)?|strz?")
 
 proc toPrim*(ksType: string): string =
   case ksType
-  of "b1": result = "bool"
+  of "b1", "b1be", "b1le": result = "bool"
   of "u1": result = "uint8"
   of "s1": result = "int8"
   of "u2", "u2le", "u2be": result = "uint16"
@@ -50,7 +50,7 @@ proc toPrim*(ksType: string): string =
   of "f4", "f4be", "f4le": result = "float32"
   of "f8", "f8be", "f8le": result = "float64"
   of "str", "strz": result = "string"
-  elif ksType.match(re"b[2-9]|b[1-9][0-9]*"):
+  elif ksType.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
     result = "uint64"
   else: discard # should not occure
 
