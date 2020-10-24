@@ -1,5 +1,4 @@
 import macros, json, strutils, strformat, tables
-import regex
 import exprlang
 
 type
@@ -100,23 +99,8 @@ proc typeLookup(ksType: string, typ: Type, mark: bool): NimNode =
   typeLookup(ksType, typ.parent, true)
 
 proc nativeType(ksType: string, typ: Type): NimNode =
-  case ksType
-  of "b1": result = ident"bool"
-  of "u1": result = ident"uint8"
-  of "s1": result = ident"int8"
-  of "u2", "u2le", "u2be": result = ident"uint16"
-  of "s2", "s2le", "s2be": result = ident"int16"
-  of "u4", "u4le", "u4be": result = ident"uint32"
-  of "s4", "s4le", "s4be": result = ident"int32"
-  of "u8", "u8le", "u8be": result = ident"uint64"
-  of "s8", "s8le", "s8be": result = ident"int64"
-  of "f4", "f4be", "f4le": result = ident"float32"
-  of "f8", "f8be", "f8le": result = ident"float64"
-  of "str", "strz": result = ident"string"
-  elif ksType.match(re"b[2-9]|b[1-9][0-9]*"):
-    result = ident"uint64"
-  else:
-    result = typeLookup(ksType.capitalizeAscii, typ, false)
+  if ksType.isPrim: ident(ksType.toPrim)
+  else: typeLookup(ksType.capitalizeAscii, typ, false)
 
 proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
   case json.kind

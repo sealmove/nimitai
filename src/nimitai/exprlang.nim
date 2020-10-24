@@ -2,7 +2,7 @@
 
 import parseutils, macros, strformat
 import strutils except parseBiggestInt
-import npeg
+import npeg, regex
 
 type
   KsNodeKind = enum
@@ -12,6 +12,7 @@ type
     knkInfix
     knkUnary
     knkEnum
+    knkCast
     knkBool
     knkInt
     knkFloat
@@ -32,6 +33,27 @@ type
       sons: seq[KsNode]
   ParsingError* = object of CatchableError
 
+proc isPrim*(ksType: string): bool =
+  ksType.match(re"[su][1248]|f[48]|b[1-9][0-9]*|strz?")
+
+proc toPrim*(ksType: string): string =
+  case ksType
+  of "b1": result = "bool"
+  of "u1": result = "uint8"
+  of "s1": result = "int8"
+  of "u2", "u2le", "u2be": result = "uint16"
+  of "s2", "s2le", "s2be": result = "int16"
+  of "u4", "u4le", "u4be": result = "uint32"
+  of "s4", "s4le", "s4be": result = "int32"
+  of "u8", "u8le", "u8be": result = "uint64"
+  of "s8", "s8le", "s8be": result = "int64"
+  of "f4", "f4be", "f4le": result = "float32"
+  of "f8", "f8be", "f8le": result = "float64"
+  of "str", "strz": result = "string"
+  elif ksType.match(re"b[2-9]|b[1-9][0-9]*"):
+    result = "uint64"
+  else: discard # should not occure
+
 proc isFatherKind(kind: KsNodeKind): bool =
   kind in {knkIdx, knkArr, knkMethod, knkInfix, knkUnary, knkEnum}
 
@@ -49,18 +71,24 @@ proc `[]`(node: KsNode, index: int): KsNode =
   doAssert isFatherKind(node.kind)
   node.sons[index]
 
+proc scopedId(s: string): string = replace(s, "::").capitalizeAscii
+
+proc transpileType(s: string): string =
+  result = if s.isPrim: s.toPrim
+           else: scopedId(s)
+
 proc toKs(str: string): KsNode =
   let p = peg(G, s: seq[seq[KsNode]]):
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
     prefix    <- idx | arr | unary | parExpr |
-                 tBool | tFloat | tInt | tStr | tEnum | tId
+                 tBool | tFloat | tInt | tStr | tCast | tEnum | tId
     unary     <- >{'+','-'} * expr:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
-    idx       <- >id * arrOpen * expr * arrClose:
+    idx       <- >id * S * arrOpen * expr * arrClose:
       s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
-    arr       <- arrOpen * newLvl * expr * *(',' * expr) * arrClose:
+    arr       <- arrOpen * newLvl * *(expr * *(',' * expr)) * arrClose:
       let
         elements = pop(s)
         newNode = newKsNode(knkArr)
@@ -108,18 +136,21 @@ proc toKs(str: string): KsNode =
       var x: BiggestInt
       assert len($0) == parseHex[BiggestInt]($0, x)
       s[^1].add KsNode(kind: knkInt, intval: x)
-    tStr      <- '\"' * >*(Print - '\"') * '\"' * S:
+    tStr      <- ('\"' * >*(Print - '\"') * '\"') |
+                 ('\'' * >*(Print - '\'') * '\'') * S:
       s[^1].add KsNode(kind: knkStr, strval: $1)
+    tCast     <- "as<" * S * >(id * *("::" * id)) * S * '>' * S:
+      s[^1].add KsNode(kind: knkId, strval: transpileType($1))
     tEnum     <- >(id * "::" * id * *("::" * id)) * S:
       let split = rsplit($1, "::", maxsplit=1)
       let
-        scope = replace(split[0], "::")
+        scope = scopedId(split[0])
         value = split[1]
       s[^1].add newKsNode(
         knkEnum,
         KsNode(kind: knkId, strval: scope),
         KsNode(kind: knkId, strval: value))
-    tId       <- >id:
+    tId       <- >id * S:
       s[^1].add KsNode(kind: knkId, strval: $1)
 
     # Aux
@@ -134,7 +165,7 @@ proc toKs(str: string): KsNode =
     oct      <- "0o" * +{'0' .. '7', '_'}
     dec      <- Digit * *(?'_' * Digit)
     hex      <- "0x" * +(Xdigit | '_')
-    id       <- (Lower | '_') * *(Alnum | '_') * S
+    id       <- (Lower | '_') * *(Alnum | '_')
 
     # Aux with side-effects
     newLvl   <- 0:
@@ -173,7 +204,7 @@ proc toNim(ks: KsNode): NimNode =
     result = newFloatLitNode(ks.floatval)
   of knkStr:
     result = newStrLitNode(ks.strval)
-  of knkId:
+  of knkId, knkCast:
     result = ident(ks.strval)
   of knkOp:
     var op: string
@@ -233,4 +264,4 @@ proc debug(s: string) =
   echo repr expr
   echo ""
 
-#static: debug"docs[0].indicator"
+#static: debug"(b1 & 0xF0) >> 4 "
