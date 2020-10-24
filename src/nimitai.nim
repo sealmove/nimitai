@@ -83,6 +83,10 @@ proc parse(field: Field, typ: Type): NimNode =
             ident"int",
             field.size)),
         newLit(field.`pad-right`))
+    elif field.`size-eos`:
+      result = newCall(
+        ident"readBytesFull",
+        field.io)
     else:
       result = newCall(
         ident"readBytes",
