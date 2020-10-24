@@ -42,6 +42,7 @@ proc parse(field: Field, endian: EndianKind): NimNode =
         suffix = t[^2..^1]
       else:
         bits = t[1..^1]
+        suffix = "Be"
       result = newCall(
         "readBitsInt" & suffix,
         field.io,
