@@ -58,6 +58,13 @@ proc toPrim*(ksType: string): string =
 proc isFatherKind(kind: KsNodeKind): bool =
   kind in {knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkEnum}
 
+proc isByteArray(node: KsNode): bool =
+  doAssert node.kind == knkArr
+  for s in node.sons:
+    if s.kind != knkInt or s.intval < 0x00 or s.intval > 0xff:
+      return false
+  return true
+
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
     node.sons.add(c)
@@ -195,6 +202,8 @@ proc toNim(ks: KsNode): NimNode =
     let x = newTree(nnkBracket)
     for s in ks.sons:
       x.add s.toNim
+    if ks.isByteArray:
+      x[0] = newLit(ks.sons[0].intval.byte)
     result = prefix(x, "@")
   of knkMethod, knkEnum:
     result = newDotExpr(ks[0].toNim, ks[1].toNim)

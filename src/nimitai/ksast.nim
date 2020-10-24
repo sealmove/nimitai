@@ -137,6 +137,8 @@ proc inferType(expr: NimNode, context: Type): NimNode =
     result = ident"char"
   of nnkIntLit:
     result = ident"int"
+  of nnkUInt8Lit:
+    result = ident"byte"
   of nnkFloatLit:
     result = ident"float"
   of nnkStrLit:
