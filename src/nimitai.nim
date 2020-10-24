@@ -24,15 +24,6 @@ proc parse(field: Field, typ: Type): NimNode =
         procName &= $typ.meta.endian
       result = newCall(procName, field.io)
 
-    # Bool
-    elif t.match(re"b1(be|le)?"):
-      result = newCall(
-        ident"bool",
-        newCall(
-          "readBitsIntBe",
-          field.io,
-          newLit(1)))
-
     # Number from bits
     elif t.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
       var
@@ -46,10 +37,14 @@ proc parse(field: Field, typ: Type): NimNode =
           suffix = $typ.meta.`bit-endian`
         else:
           suffix = "Be"
+      let nbits = parseInt(bits)
       result = newCall(
         "readBitsInt" & suffix,
         field.io,
-        newLit(parseInt(bits)))
+        newLit(nbits))
+      # Bool
+      if nbits == 1:
+        result = newCall(ident"bool", result)
 
     # User-defined type
     else:
