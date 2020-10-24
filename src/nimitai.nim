@@ -11,12 +11,17 @@ proc parentType(typ: Type): NimNode =
 
 proc parse(field: Field, typ: Type): NimNode =
   if FieldKey.value in field.keys:
-    return newCall(
-      field.`type`.parsed,
-      field.value)
+    let t = field.`type`.parsed
+    if t.kind == nnkBracketExpr:
+      return field.value
+    else:
+      return newCall(
+        field.`type`.parsed,
+        field.value)
 
   if FieldKey.`type` in field.keys:
     let t = field.`type`.raw
+
     # Number
     if t.match(re"([us][1248]|f[48])(be|le)?"):
       var procName = "read" & t

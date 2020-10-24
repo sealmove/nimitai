@@ -28,7 +28,7 @@ type
       intval: BiggestInt
     of knkFloat:
       floatval: float
-    of knkStr, knkId, knkOp:
+    of knkStr, knkId, knkOp, knkCast:
       strval: string
     else:
       sons: seq[KsNode]

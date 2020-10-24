@@ -134,7 +134,7 @@ proc jsonToByte(json: JsonNode): byte =
 proc inferType(expr: NimNode, context: Type): NimNode =
   case expr.kind
   of nnkCharLit:
-    result = ident"chat"
+    result = ident"char"
   of nnkIntLit:
     result = ident"int"
   of nnkFloatLit:
@@ -144,40 +144,35 @@ proc inferType(expr: NimNode, context: Type): NimNode =
   of nnkSym:
     result = ident"bool"
   of nnkIdent:
-    # XXX if eqIdent(expr, "reverse"):
-    # XXX if eqIdent(expr, "min"):
-    # XXX if eqIdent(expr, "max"):
-    # XXX if eqIdent(expr, "first"):
-    # XXX if eqIdent(expr, "last"):
     if eqIdent(expr, "to_s"):
       return ident"string"
-    if eqIdent(expr, "to_i"):
+    elif eqIdent(expr, "to_i"):
       return ident"int"
-    if eqIdent(expr, "length"):
+    elif eqIdent(expr, "length"):
       return ident"int"
-    if eqIdent(expr, "substring"):
+    elif eqIdent(expr, "substring"):
       return ident"string"
-    if eqIdent(expr, "size"):
+    elif eqIdent(expr, "size"):
       return ident"int"
-    if eqIdent(expr, "first"):
+    elif eqIdent(expr, "first"):
       return ident"byte"
-    if eqIdent(expr, "last"):
+    elif eqIdent(expr, "last"):
       return ident"byte"
-    #for a in context.seq:
-    #  if eqIdent(expr, a.id):
-    #    return a.`type`.parsed
-    #for i in context.instances:
-    #  if eqIdent(expr, i.id):
-    #    return i.`type`.parsed
+    # lookup type
+    else:
+      for a in context.seq:
+        if eqIdent(expr, a.id):
+          return a.`type`.parsed
+      for i in context.instances:
+        if eqIdent(expr, i.id):
+          return i.`type`.parsed
     quit(fmt"Identifier {repr(expr)} not found")
-  of nnkInfix, nnkPrefix:
-    result = inferType(expr[2], context)
-  of nnkDotExpr:
-    result = inferType(expr[1], context)
-  # of nnkNilLit:
-  # of nnkCall:
-  of nnkBracket, nnkBracketExpr, nnkIfStmt, nnkElifBranch, nnkElse:
+  of nnkBracket:
+    result = nnkBracketExpr.newTree(ident"seq", inferType(expr[0], context))
+  of nnkBracketExpr, nnkIfStmt, nnkElse:
     result = inferType(expr[0], context)
+  of nnkPrefix, nnkInfix, nnkDotExpr, nnkElifBranch:
+    result = inferType(expr[1], context)
   else:
     quit(fmt"Unexpected NimNodeKind '{expr.kind}' during type inference")
 
