@@ -18,7 +18,7 @@ type
     instances*: seq[Field]
     enums*: Table[string, OrderedTable[string, int]]
   EndianKind* {.pure.} = enum
-    be, le
+    le, be
   MetaKey* {.pure.} = enum
     id, title, application, `file-extension`, xref, license, `ks-version`,
     `ks-debug`, `ks-opaque-types`, imports, encoding, endian, `bit-endian`

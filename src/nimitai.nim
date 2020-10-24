@@ -42,7 +42,10 @@ proc parse(field: Field, typ: Type): NimNode =
         suffix = t[^2..^1]
       else:
         bits = t[1..^1]
-        suffix = $typ.meta.`bit-endian`
+        if MetaKey.`bit-endian` in typ.meta.keys:
+          suffix = $typ.meta.`bit-endian`
+        else:
+          suffix = "Be"
       result = newCall(
         "readBitsInt" & suffix,
         field.io,
