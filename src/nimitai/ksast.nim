@@ -74,6 +74,9 @@ type
     `include`*: bool
     `eos-error`*: bool
     io*: NimNode
+  ScopedEnum = object
+    scope: seq[string]
+    `enum`: string
   KaitaiError* = object of Defect
 
 proc parseBinOctDecHex(s: string): int =
@@ -94,20 +97,32 @@ proc hierarchy*(typ: Type): string =
   while stack != @[]:
     result &= pop(stack)
 
-proc typeLookup(ksType: string, typ: Type, mark: bool): NimNode =
+proc toScopedEnum(se: string): ScopedEnum =
+  let x = rsplit(se, "::",  maxsplit=1)
+  result = ScopedEnum(scope: split(x[0], "::"),`enum`: x[1])
+
+proc typeLookup(ksType: string; typ: Type; shouldMark, mark: bool): string =
   for st in typ.types:
     if ksType == st.id:
-      if mark: st.isImpureSubstruct = true
-      return ident(hierarchy(st))
+      if shouldMark and mark: st.isImpureSubstruct = true
+      return hierarchy(st)
   if ksType == typ.id:
-    return ident(hierarchy(typ))
+    return hierarchy(typ)
   if typ.parent == nil:
     raise newException(KaitaiError, fmt"Type '{ksType}' not found")
-  typeLookup(ksType, typ.parent, true)
+  typeLookup(ksType, typ.parent, shouldMark, true)
+
+proc enumLookup(ksEnum: string, typ: Type): string =
+  for key in typ.enums.keys:
+    if ksEnum == key:
+      return hierarchy(typ) & ksEnum
+  if typ.parent == nil:
+    raise newException(KaitaiError, fmt"Enum '{ksEnum}' not found")
+  enumLookup(ksEnum, typ.parent)
 
 proc nativeType(ksType: string, typ: Type): NimNode =
   if ksType.isPrim: ident(ksType.toPrim)
-  else: typeLookup(ksType.capitalizeAscii, typ, false)
+  else: ident(typeLookup(ksType.capitalizeAscii, typ, true, false))
 
 proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
   case json.kind
@@ -315,16 +330,28 @@ proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field
 
   # XXX process
 
+  # enum
   if FieldKey.`enum` in result.keys:
-    result.`enum` = hierarchy(result.parentType) & json["enum"].getStr
+    let scoped = toScopedEnum(json["enum"].getStr)
+    if scoped.scope == @[]:
+      result.`enum` = enumLookup(scoped.`enum`, result.parentType)
+    else:
+      var `enum` = typeLookup(scoped.scope[0].capitalizeAscii,
+                              result.parentType, false, false)
+      for i in 1 ..< scoped.scope.len:
+        `enum` &= scoped.scope[i]
+      `enum` &= scoped.`enum`
+      result.`enum` = `enum`
 
   # encoding
   if FieldKey.encoding in result.keys:
     result.encoding = json["encoding"].getStr
 
+  # pad-right
   if FieldKey.`pad-right` in result.keys:
     result.`pad-right` = jsonToByte(json["pad-right"])
 
+  # terminator
   if FieldKey.terminator in result.keys:
     result.terminator = jsonToByte(json["terminator"])
 
@@ -377,12 +404,20 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
   else:
     typ.meta = Meta() # need to do this because meta is an object
 
+  # enums
+  if TypeKey.enums in typ.keys:
+    typ.enums = initTable[string, OrderedTable[string, int]]()
+    for k, v in json["enums"]:
+      typ.enums[k] = initOrderedTable[string, int]()
+      for i, s in v:
+        typ.enums[k][s.getStr] = parseInt(i)
+
   # types
   if TypeKey.types in typ.keys:
     # Need to construct tree with ids and fill in the rest of the info in a
     # separate step because attributes can reference the ids from the 'type' key
-    for k, v in json["types"].pairs:
-      let node = Type(id: k.capitalizeAscii, parent: typ)
+    for key in json["types"].keys:
+      let node = Type(id: key.capitalizeAscii, parent: typ)
       typ.types.add(node)
     # This is only possible because Nim's JSON implementation uses OrderedTable
     var i: int
@@ -410,14 +445,6 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
 
   # params
   typ.params = json.getOrDefault("params") # XXX
-
-  # enums
-  if TypeKey.enums in typ.keys:
-    typ.enums = initTable[string, OrderedTable[string, int]]()
-    for k, v in json["enums"]:
-      typ.enums[k] = initOrderedTable[string, int]()
-      for i, s in v:
-        typ.enums[k][s.getStr] = parseInt(i)
 
 proc toKsType*(json: JsonNode): Type =
   if not json.hasKey("meta"):
