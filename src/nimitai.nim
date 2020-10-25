@@ -38,9 +38,10 @@ proc parse(field: Field, typ: Type): NimNode =
         suffix = t[^2..^1]
       else:
         bits = t[1..^1]
+        suffix = $typ.meta.`bit-endian`
       let nbits = parseInt(bits)
       result = newCall(
-        "readBitsInt" & $typ.meta.`bit-endian`,
+        "readBitsInt" & suffix,
         field.io,
         newLit(nbits))
       # Bool
