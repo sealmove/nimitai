@@ -180,8 +180,8 @@ proc inferType(expr: NimNode, context: Type): NimNode =
 
 proc determineImpureSubStructs(typ: Type) = discard
 
-proc meta(json: JsonNode): Meta =
-  result = Meta()
+proc meta(json: JsonNode, defaults: Meta): Meta =
+  result = defaults
 
   # keys
   for key in json.keys:
@@ -366,6 +366,17 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
   for key in json.keys:
     typ.keys.incl(parseEnum[TypeKey](key))
 
+  # meta
+  if TypeKey.meta in typ.keys:
+    var defaults: Meta
+    if typ.parent == nil:
+      defaults = Meta(`bit-endian`: be)
+    else:
+      defaults = Meta(`bit-endian`: typ.parent.meta.`bit-endian`)
+    typ.meta = meta(json["meta"], defaults)
+  else:
+    typ.meta = Meta() # need to do this because meta is an object
+
   # types
   if TypeKey.types in typ.keys:
     # Need to construct tree with ids and fill in the rest of the info in a
@@ -378,12 +389,6 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
     for _, v in json["types"].pairs:
       toKsTypeRec(typ.types[i], v)
       inc i
-
-  # meta
-  if TypeKey.meta in typ.keys:
-    typ.meta = meta(json["meta"])
-  else:
-    typ.meta = Meta() # need to do this because meta is an object
 
   # seq
   if TypeKey.seq in typ.keys:

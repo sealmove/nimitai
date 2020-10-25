@@ -38,13 +38,9 @@ proc parse(field: Field, typ: Type): NimNode =
         suffix = t[^2..^1]
       else:
         bits = t[1..^1]
-        if MetaKey.`bit-endian` in typ.meta.keys:
-          suffix = $typ.meta.`bit-endian`
-        else:
-          suffix = "Be"
       let nbits = parseInt(bits)
       result = newCall(
-        "readBitsInt" & suffix,
+        "readBitsInt" & $typ.meta.`bit-endian`,
         field.io,
         newLit(nbits))
       # Bool
@@ -422,7 +418,6 @@ proc generateParser*(spec: JsonNode): NimNode =
     procDecls,
     fromFileProcs(spec))
 
-  echo treerepr result
   echo repr result
 
 # static library
