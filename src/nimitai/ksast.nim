@@ -98,8 +98,14 @@ proc hierarchy*(typ: Type): string =
     result &= pop(stack)
 
 proc toScopedEnum(se: string): ScopedEnum =
-  let x = rsplit(se, "::",  maxsplit=1)
-  result = ScopedEnum(scope: split(x[0], "::"),`enum`: x[1])
+  var
+    x = split(se, "::")
+    scope: seq[string]
+
+  for i in 1 ..< x.len:
+    scope.add x[i]
+
+  result = ScopedEnum(scope: scope, `enum`: x[^1])
 
 proc typeLookup(ksType: string; typ: Type; shouldMark, mark: bool): string =
   for st in typ.types:
