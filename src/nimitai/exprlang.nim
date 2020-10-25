@@ -5,14 +5,14 @@ import strutils except parseBiggestInt
 import npeg, regex
 
 type
-  KsNodeKind = enum
+  KsNodeKind* = enum
     knkIdx
     knkArr
     knkMethod
     knkTernary
     knkInfix
     knkUnary
-    knkEnum
+    knkScopedId
     knkCast
     knkBool
     knkInt
@@ -20,50 +20,24 @@ type
     knkStr
     knkId
     knkOp
-  KsNode = ref object
-    case kind: KsNodeKind
+  KsNode* = ref object
+    case kind*: KsNodeKind
     of knkBool:
-      boolval: bool
+      boolval*: bool
     of knkInt:
-      intval: BiggestInt
+      intval*: BiggestInt
     of knkFloat:
-      floatval: float
-    of knkStr, knkId, knkOp, knkCast:
-      strval: string
+      floatval*: float
+    of knkScopedId:
+      scope*: seq[string]
+    of knkStr, knkId, knkOp:
+      strval*: string
     else:
-      sons: seq[KsNode]
-  ParsingError* = object of CatchableError
-
-proc isPrim*(ksType: string): bool =
-  ksType.match(re"[su][1248](be|le)?|f[48]|b[1-9][0-9]*(be|le)?|strz?")
-
-proc toPrim*(ksType: string): string =
-  case ksType
-  of "b1", "b1be", "b1le": result = "bool"
-  of "u1": result = "uint8"
-  of "s1": result = "int8"
-  of "u2", "u2le", "u2be": result = "uint16"
-  of "s2", "s2le", "s2be": result = "int16"
-  of "u4", "u4le", "u4be": result = "uint32"
-  of "s4", "s4le", "s4be": result = "int32"
-  of "u8", "u8le", "u8be": result = "uint64"
-  of "s8", "s8le", "s8be": result = "int64"
-  of "f4", "f4be", "f4le": result = "float32"
-  of "f8", "f8be", "f8le": result = "float64"
-  of "str", "strz": result = "string"
-  elif ksType.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
-    result = "uint64"
-  else: discard # should not occure
+      sons*: seq[KsNode]
+  ParsingError = object of CatchableError
 
 proc isFatherKind(kind: KsNodeKind): bool =
-  kind in {knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkEnum}
-
-proc isByteArray(node: KsNode): bool =
-  doAssert node.kind == knkArr
-  for s in node.sons:
-    if s.kind != knkInt or s.intval < 0x00 or s.intval > 0xff:
-      return false
-  return true
+  kind in {knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkCast}
 
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
@@ -79,19 +53,13 @@ proc `[]`(node: KsNode, index: int): KsNode =
   doAssert isFatherKind(node.kind)
   node.sons[index]
 
-proc scopedId(s: string): string = replace(s, "::").capitalizeAscii
-
-proc transpileType(s: string): string =
-  result = if s.isPrim: s.toPrim
-           else: scopedId(s)
-
 proc toKs(str: string): KsNode =
   let p = peg(G, s: seq[seq[KsNode]]):
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
     prefix    <- idx | arr | unary | parExpr |
-                 tBool | tFloat | tInt | tStr | tCast | tEnum | tId
+                 tBool | tFloat | tInt | tStr | tCast | tScoped | tId
     unary     <- >{'+','-'} * expr:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
     idx       <- >id * S * arrOpen * expr * arrClose:
@@ -152,17 +120,10 @@ proc toKs(str: string): KsNode =
     tStr      <- ('\"' * >*(Print - '\"') * '\"') |
                  ('\'' * >*(Print - '\'') * '\'') * S:
       s[^1].add KsNode(kind: knkStr, strval: $1)
-    tCast     <- "as<" * S * >(id * *("::" * id)) * S * '>' * S:
-      s[^1].add KsNode(kind: knkId, strval: transpileType($1))
-    tEnum     <- >(id * "::" * id * *("::" * id)) * S:
-      let split = rsplit($1, "::", maxsplit=1)
-      let
-        scope = scopedId(split[0])
-        value = split[1]
-      s[^1].add newKsNode(
-        knkEnum,
-        KsNode(kind: knkId, strval: scope),
-        KsNode(kind: knkId, strval: value))
+    tCast     <- "as<" * S * expr * '>' * S:
+      s[^1].add newKsNode(knkCast, pop(s[^1]))
+    tScoped   <- >(id * "::" * id * *("::" * id)) * S:
+      s[^1].add KsNode(kind: knkScopedId, scope: split($1, "::"))
     tId       <- >id * S:
       s[^1].add KsNode(kind: knkId, strval: $1)
 
@@ -194,96 +155,30 @@ proc toKs(str: string): KsNode =
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
 
-proc toNim(ks: KsNode): NimNode =
+proc wrap(ks: KsNode, content = "") =
+  stdout.write(($ks.kind)[3..^1])
+  if content != "":
+    stdout.write("[" & content & "]")
+  stdout.write ("\n")
+
+proc debug(ks: KsNode, n = 0) =
+  stdout.write " ".repeat(n)
   case ks.kind
-  of knkIdx:
-    result = nnkBracketExpr.newTree(ks[0].toNim, ks[1].toNim)
-  of knkArr:
-    let x = newTree(nnkBracket)
-    for s in ks.sons:
-      x.add s.toNim
-    if ks.sons != @[] and ks.isByteArray:
-      x[0] = newLit(ks.sons[0].intval.byte)
-    result = prefix(x, "@")
-  of knkMethod, knkEnum:
-    result = newDotExpr(ks[0].toNim, ks[1].toNim)
-  of knkTernary:
-    result = nnkIfStmt.newTree(
-      nnkElifBranch.newTree(
-        ks[0].toNim,
-        ks[1].toNim),
-      nnkElse.newTree(
-        ks[2].toNim))
-  of knkInfix:
-    result = nnkInfix.newTree(ks[1].toNim, ks[0].toNim, ks[2].toNim)
-  of knkUnary:
-    result = nnkPrefix.newTree(ks[0].toNim, ks[1].toNim)
+  of knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkCast:
+    ks.wrap()
+  of knkScopedId:
+    ks.wrap(ks.scope.join(", "))
   of knkBool:
-    result = newLit(ks.boolval)
+    ks.wrap($ks.boolval)
   of knkInt:
-    result = newIntLitNode(ks.intval)
+    ks.wrap($ks.intval)
   of knkFloat:
-    result = newFloatLitNode(ks.floatval)
-  of knkStr:
-    result = newStrLitNode(ks.strval)
-  of knkId, knkCast:
-    result = ident(ks.strval)
-  of knkOp:
-    var op: string
-    case ks.strval
-    of "%" : op = "mod"
-    of "<<": op = "shl"
-    of ">>": op = "shr"
-    of "&" : op = "and"
-    of "|" : op = "or"
-    of "^" : op = "xor"
-    else   : op = ks.strval
-    result = ident(op)
+    ks.wrap($ks.floatval)
+  of knkStr, knkId, knkOp:
+    ks.wrap($ks.strval)
 
-proc removeLeadingUnderscores(s: var string) =
-  while s[0] == '_':
-    s.delete(0, 0)
+  if ks.kind.isFatherKind:
+    for s in ks.sons:
+      debug(s, n + 2)
 
-proc fixIds(node: var KsNode) =
-  if isFatherKind(node.kind):
-    for i in 0 ..< node.sons.len:
-      fixIds(node.sons[i])
-  elif node.kind == knkId:
-    removeLeadingUnderscores(node.strval)
-
-proc addContext(node: var KsNode, context: string) =
-  node = newKsNode(
-    knkMethod,
-    KsNode(kind: knkId, strval: context),
-    KsNode(kind: knkId, strval: node.strval))
-
-proc addContextRec(node: var KsNode, context: string) =
-  if node.kind in {knkIdx, knkArr, knkTernary, knkInfix, knkUnary}:
-    for i in 0 ..< node.sons.len:
-      if node.sons[i].kind == knkId:
-        node.sons[i].addContext(context)
-      else:
-        node.sons[i].addContextRec(context)
-  if node.kind == knkMethod:
-    if node.sons[0].kind == knkId:
-      node.sons[0].addContext(context)
-    else:
-      node.sons[0].addContextRec(context)
-
-proc ksAsStrToNim*(str, context: string): NimNode =
-  var ks = str.toKs
-  fixIds(ks)
-  if context != "":
-    ks.addContextRec(context)
-    if ks.kind == knkId:
-      ks.addContext(context)
-  ks.toNim
-
-proc debug(s: string) =
-  let expr = ksAsStrToNim(s, "result")
-  echo treeRepr expr
-  echo ""
-  echo repr expr
-  echo ""
-
-#static: debug"a ? b : c"
+debug("expr + 2 + a::b".toKs)
