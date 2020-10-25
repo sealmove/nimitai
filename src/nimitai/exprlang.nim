@@ -155,30 +155,22 @@ proc toKs(str: string): KsNode =
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
 
-proc wrap(ks: KsNode, content = "") =
-  stdout.write(($ks.kind)[3..^1])
-  if content != "":
-    stdout.write("[" & content & "]")
-  stdout.write ("\n")
-
 proc debug(ks: KsNode, n = 0) =
-  stdout.write " ".repeat(n)
+  stdout.write(" ".repeat(n) & ($ks.kind)[3..^1])
   case ks.kind
-  of knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkCast:
-    ks.wrap()
   of knkScopedId:
-    ks.wrap(ks.scope.join(", "))
+    stdout.write(" " & ks.scope.join(", ") & "\n")
   of knkBool:
-    ks.wrap($ks.boolval)
+    stdout.write(" " & $ks.boolval & "\n")
   of knkInt:
-    ks.wrap($ks.intval)
+    stdout.write(" " & $ks.intval & "\n")
   of knkFloat:
-    ks.wrap($ks.floatval)
+    stdout.write(" " & $ks.floatval & "\n")
   of knkStr, knkId, knkOp:
-    ks.wrap($ks.strval)
-
-  if ks.kind.isFatherKind:
+    stdout.write(" " & $ks.strval & "\n")
+  else:
+    stdout.write "\n"
     for s in ks.sons:
       debug(s, n + 2)
 
-debug("expr + 2 + a::b".toKs)
+debug("expr + 2 + a.as<b::c>".toKs)
