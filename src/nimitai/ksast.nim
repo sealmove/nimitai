@@ -102,8 +102,9 @@ proc toScopedEnum(se: string): ScopedEnum =
     x = split(se, "::")
     scope: seq[string]
 
-  for i in 1 ..< x.len:
-    scope.add x[i]
+  if x.len > 1:
+    for i in 0 ..< x.len - 1:
+      scope.add x[i]
 
   result = ScopedEnum(scope: scope, `enum`: x[^1])
 
