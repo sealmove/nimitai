@@ -12,89 +12,85 @@ proc parentType(typ: Type): NimNode =
   else: ident(buildNimTypeId(typ.parent))
 
 proc parse(field: Field, typ: Type): NimNode =
-  if FieldKey.value in field.keys:
-    let t = field.`type`.parsed
+  if fkValue in field.keys:
+    let t = field.`type`.ksToNimType(typ)
     if t.kind == nnkBracketExpr:
-      return field.value
+      return field.value.toNim
     else:
       return newCall(
-        field.`type`.parsed,
-        field.value)
+        field.`type`.ksToNimType(typ),
+        field.value.toNim)
 
-  if FieldKey.`type` in field.keys:
-    let t = field.`type`.raw
-
-    # Number
-    if t.match(re"([us][1248]|f[48])(be|le)?"):
-      var procName = "read" & t
-      if not t.match(re"([us][1])|(.*(be|le))"):
-        procName &= $typ.meta.endian
-      result = newCall(procName, field.io)
-
-    # Number from bits
-    elif t.match(re"b[2-9]|b[1-9][0-9]*(be|le)?"):
-      var
-        suffix, bits: string
-      if t.match(re".*(be|le)"):
-        bits = t[1..^3]
-        suffix = t[^2..^1]
-      else:
-        bits = t[1..^1]
-        suffix = $typ.meta.`bit-endian`
-      let nbits = parseInt(bits)
+  if fkType in field.keys:
+    let t = field.`type`
+    case t.kind
+    of ktkBit:
+      let suffix =
+        if t.bitEndian == eNone:
+          $typ.meta.bitEndian
+        else:
+          $t.bitEndian
       result = newCall(
         "readBitsInt" & suffix,
-        field.io,
-        newLit(nbits))
+        field.io.toNim,
+        newLit(t.bits))
       # Bool
-      if nbits == 1:
+      if t.bits == 1:
         result = newCall(ident"bool", result)
-
-    # User-defined type
-    else:
+    of ktkUInt, ktkSInt, ktkFloat:
+      result = newCall(
+      "read" & $t.kind & $t.bytes,
+      field.io.toNim)
+    of ktkArr: discard # XXX
+    of ktkBArr, ktkStr:
+      if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
+        let term = if t.kind == ktkBArr: field.terminator else: 0
+        result = newCall(
+          ident"readBytesTerm",
+          field.io.toNim,
+          newLit(term),
+          newLit(field.`include`),
+          newLit(field.consume),
+          newLit(field.eosError))
+      elif fkPadRight in field.keys:
+        result = newCall(
+          ident"bytesStripRight",
+          newCall(
+            ident"readBytes",
+            field.io.toNim,
+            newCall(
+              ident"int",
+              field.size.toNim)),
+          newLit(field.padRight))
+      elif field.sizeEos:
+        result = newCall(
+          ident"readBytesFull",
+          field.io.toNim)
+      else:
+        result = newCall(
+          ident"readBytes",
+          field.io.toNim,
+          newCall(
+            ident"int",
+            field.size.toNim))
+      if t.kind == ktkStr:
+        doAssert fkEncoding in field.keys
+        result = newCall(
+          ident"encode",
+          result,
+          newStrLitNode(field.encoding))
+    of ktkUser:
       result = newCall(
         newDotExpr(
-          field.`type`.parsed,
+          field.`type`.ksToNimType(typ),
           ident"read"),
-        field.io,
+        field.io.toNim,
         newDotExpr(
           ident"this",
           ident"root"),
         ident"this")
 
-  # Typeless
-  else:
-    if FieldKey.terminator in field.keys:
-      result = newCall(
-        ident"readBytesTerm",
-        field.io,
-        newLit(field.terminator),
-        newLit(field.`include`),
-        newLit(field.consume),
-        newLit(field.`eos-error`))
-    elif FieldKey.`pad-right` in field.keys:
-      result = newCall(
-        ident"bytesStripRight",
-        newCall(
-          ident"readBytes",
-          field.io,
-          newCall(
-            ident"int",
-            field.size)),
-        newLit(field.`pad-right`))
-    elif field.`size-eos`:
-      result = newCall(
-        ident"readBytesFull",
-        field.io)
-    else:
-      result = newCall(
-        ident"readBytes",
-        field.io,
-        newCall(
-          ident"int",
-          field.size))
-
-  if FieldKey.`enum` in field.keys:
+  if fkEnum in field.keys:
     result = newCall(ident(field.`enum`), result)
 
 proc substream(id, ps, ss, size: NimNode): NimNode =
@@ -115,93 +111,92 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
         ident"newKaitaiStream",
         id)))
 
-proc parseField(field: Field, context: NimNode, typ: Type,
-                postfix = ""): NimNode =
+proc parseField(field: Field, typ: Type, postfix = ""): NimNode =
   result = newStmtList()
 
-  let id = newDotExpr(context, ident(field.id & postfix))
+  let id = newDotExpr(ident"this", ident(field.id & postfix))
   var posId: NimNode
 
-  if FieldKey.pos in field.keys:
+  if fkPos in field.keys:
     posId = ident(field.id & "Pos")
     result.add(
       newLetStmt(
         posId,
         newCall(
           ident"pos",
-          field.io)))
+          field.io.toNim)))
     result.add(
       newCall(
         newDotExpr(
-          field.io,
+          field.io.toNim,
           ident"skip"),
-        field.pos))
+        field.pos.toNim))
 
-  if FieldKey.`size` in field.keys:
+  if fkSize in field.keys:
     let stmts = substream(
       ident(field.id & "Raw"),
       newDotExpr(
-        context,
+        ident"this",
         ident"io"),
       ident(field.id & "Io"),
-      field.size)
+      field.size.toNim)
     for s in stmts: result.add(s)
 
   case field.repeat
-  of none:
+  of rkNone:
     result.add(
       newAssignment(
         id,
         parse(field, typ)))
-  of eos:
+  of rkEos:
     result.add(
       nnkWhileStmt.newTree(
         prefix(
           newCall(
             ident"eof",
-            field.io),
+            field.io.toNim),
           "not"),
         newCall(
           newDotExpr(id, ident"add"),
           parse(field, typ))))
-  of expr:
+  of rkExpr:
     discard
-  of until:
+  of rkUntil:
     discard
 
-  if FieldKey.pos in field.keys:
+  if fkPos in field.keys:
     result.add(
       newCall(
         newDotExpr(
-          field.io,
+          field.io.toNim,
           ident"seek"),
         posId))
 
-proc typeDecl(section: var NimNode, node: Type) =
+proc typeDecl(section: var NimNode, typ: Type) =
   var fields = newTree(nnkRecList)
   let
-    id = buildNimTypeId(node)
-    pt = if node.isImpureSubstruct: ident(rootTypeName)
-         else: parentType(node)
+    id = buildNimTypeId(typ)
+    pt = if typ.isImpure: ident(rootTypeName)
+         else: parentType(typ)
 
   fields.add(
     newIdentDefs(
       ident"parent",
       pt))
 
-  for a in node.seq:
-    let t = if FieldKey.`enum` in a.keys: ident(a.`enum`)
-            else: a.`type`.parsed
+  for a in typ.seq:
+    let t = if fkEnum in a.keys: ident(a.`enum`)
+            else: a.`type`.ksToNimType(typ)
     fields.add(
       newIdentDefs(
         ident(a.id),
         t))
 
-  for i in node.instances:
+  for i in typ.instances:
     fields.add(
       newIdentDefs(
         ident(i.id & "Inst"),
-        i.`type`.parsed),
+        i.`type`.ksToNimType(typ)),
       newIdentDefs(
         ident(i.id & "Cached"),
         ident"bool"))
@@ -217,26 +212,26 @@ proc typeDecl(section: var NimNode, node: Type) =
         fields)))
 
   var defs: seq[NimNode]
-  for name, consts in node.enums:
+  for name, consts in typ.enums:
     var fields = nnkEnumTy.newTree(newEmptyNode())
     for l, v in consts:
       fields.add(
         nnkEnumFieldDef.newTree(
           ident(l),
           newIntLitNode(v)))
-    defs.add(nnkTypeDef.newTree(ident(buildNimTypeId(node) & name), newEmptyNode(), fields))
+    defs.add(nnkTypeDef.newTree(ident(buildNimTypeId(typ) & name), newEmptyNode(), fields))
 
   for e in defs:
     section.add e
 
-  for t in node.types:
+  for t in typ.types:
     typeDecl(section, t)
 
-proc readProcParams(node: Type): NimNode =
+proc readProcParams(typ: Type): NimNode =
   let
-    id = buildNimTypeId(node)
-    pt = if node.isImpureSubstruct: ident(rootTypeName)
-         else: parentType(node)
+    id = buildNimTypeId(typ)
+    pt = if typ.isImpure: ident(rootTypeName)
+         else: parentType(typ)
 
   result = nnkFormalParams.newTree(
     ident(id),
@@ -255,47 +250,47 @@ proc readProcParams(node: Type): NimNode =
       ident"parent",
       pt))
 
-proc instProcParams(inst: Field, node: Type): NimNode =
-  let id = buildNimTypeId(node)
+proc instProcParams(inst: Field, typ: Type): NimNode =
+  let id = buildNimTypeId(typ)
 
   result = nnkFormalParams.newTree(
-    inst.`type`.parsed,
+    inst.`type`.ksToNimType(typ),
     newIdentDefs(
       ident"this",
       ident(id)))
 
-proc readProcFw(node: Type): NimNode =
+proc readProcFw(typ: Type): NimNode =
   result = nnkProcDef.newTree(
     ident"read",
     newEmptyNode(),
     newEmptyNode(),
-    readProcParams(node),
+    readProcParams(typ),
     newEmptyNode(),
     newEmptyNode(),
     newEmptyNode())
 
-proc instProcFw(inst: Field, node: Type): NimNode =
+proc instProcFw(inst: Field, typ: Type): NimNode =
   result = nnkProcDef.newTree(
     ident(inst.id),
     newEmptyNode(),
     newEmptyNode(),
-    instProcParams(inst, node),
+    instProcParams(inst, typ),
     newEmptyNode(),
     newEmptyNode(),
     newEmptyNode())
 
-proc procFwDecl(stmtList: var NimNode, node: Type) =
-  for c in node.types:
+proc procFwDecl(stmtList: var NimNode, typ: Type) =
+  for c in typ.types:
     procFwDecl(stmtList, c)
-  stmtList.add(readProcFw(node))
-  for i in node.instances:
-    stmtList.add(instProcFw(i, node))
+  stmtList.add(readProcFw(typ))
+  for i in typ.instances:
+    stmtList.add(instProcFw(i, typ))
 
-proc readProc(node: Type): NimNode =
+proc readProc(typ: Type): NimNode =
   result = newProc(name = ident"read")
-  result.params = readProcParams(node)
+  result.params = readProcParams(typ)
 
-  let id = buildNimTypeId(node)
+  let id = buildNimTypeId(typ)
 
   var
     constructor = nnkObjConstr.newTree(
@@ -308,6 +303,14 @@ proc readProc(node: Type): NimNode =
         ident"parent"))
 
   result.body = newStmtList(
+    nnkTemplateDef.newTree(
+      ident"this",
+      newEmptyNode(),
+      newEmptyNode(),
+      nnkFormalParams.newTree(ident"untyped"),
+      newEmptyNode(),
+      newEmptyNode(),
+      ident"result"),
     newAssignment(
       ident"this",
       constructor),
@@ -325,26 +328,22 @@ proc readProc(node: Type): NimNode =
         nnkElseExpr.newTree(
           ident"root"))))
 
-  for i in 0 ..< node.seq.len:
+  for i in 0 ..< typ.seq.len:
     # Check if we are transitioning from a bit attribute to a regular one
     if i != 0:
-      let
-        r = re"b[1-9][0-9]*(be|le)?"
-        prevType = node.seq[i-1].`type`.raw
-        currType = node.seq[i].`type`.raw
-      if prevType.match(r) and not currType.match(r):
+      if typ.seq[i-1].`type`.kind == ktkBit and typ.seq[i].`type`.kind != ktkBit:
         result.body.add(
           newCall(
             ident"alignToByte",
             newDotExpr(ident"this", ident"io")))
-    let stmts = parseField(node.seq[i], ident"this", node)
+    let stmts = parseField(typ.seq[i], typ)
     for s in stmts: result.body.add(s)
 
-proc instProc(inst: Field, node: Type): NimNode =
+proc instProc(inst: Field, typ: Type): NimNode =
   result = newProc(ident(inst.id))
-  result.params = instProcParams(inst, node)
+  result.params = instProcParams(inst, typ)
 
-  var pa = parseField(inst, ident"this", node, postfix = "Inst")
+  var pa = parseField(inst, typ, postfix = "Inst")
   pa.add(
     newAssignment(
       newDotExpr(
@@ -365,15 +364,15 @@ proc instProc(inst: Field, node: Type): NimNode =
         ident"this",
         ident(inst.id & "Inst"))))
 
-proc procDecl(stmtList: var NimNode, node: Type) =
-  for c in node.types:
+proc procDecl(stmtList: var NimNode, typ: Type) =
+  for c in typ.types:
     procDecl(stmtList, c)
-  stmtList.add(readProc(node))
-  for i in node.instances:
-    stmtList.add(instProc(i, node))
+  stmtList.add(readProc(typ))
+  for i in typ.instances:
+    stmtList.add(instProc(i, typ))
 
-proc fromFileProc(node: Type): NimNode =
-  let id = buildNimTypeId(node)
+proc fromFileProc(typ: Type): NimNode =
+  let id = buildNimTypeId(typ)
 
   newProc(
     name = ident"fromFile",
@@ -396,12 +395,12 @@ proc fromFileProc(node: Type): NimNode =
         newNilLit(),
         newNilLit()))
 
-proc fromFileProcs(node: Type): NimNode =
+proc fromFileProcs(typ: Type): NimNode =
   result = newStmtList()
-  if node.types != @[]:
-    for c in node.types:
+  if typ.types != @[]:
+    for c in typ.types:
       result.add(fromFileProcs(c))
-  result.add(fromFileProc(node))
+  result.add(fromFileProc(typ))
 
 proc generateParser*(spec: JsonNode): NimNode =
   let spec = spec.toKsType

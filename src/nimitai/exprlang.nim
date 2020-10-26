@@ -2,7 +2,7 @@
 
 import parseutils, macros, strformat
 import strutils except parseBiggestInt
-import npeg, regex
+import npeg
 
 type
   KsNodeKind* = enum
@@ -43,7 +43,7 @@ proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
     node.sons.add(c)
 
-proc newKsNode(kind: KsNodeKind, children: varargs[KsNode]): KsNode =
+proc newKsNode*(kind: KsNodeKind, children: varargs[KsNode]): KsNode =
   doAssert isFatherKind(kind)
   result = KsNode(kind: kind)
   for c in children:
@@ -53,7 +53,7 @@ proc `[]`(node: KsNode, index: int): KsNode =
   doAssert isFatherKind(node.kind)
   node.sons[index]
 
-proc toKs(str: string): KsNode =
+proc toKs*(str: string): KsNode =
   let p = peg(G, s: seq[seq[KsNode]]):
     # Non-terminal
     G         <- S * expr * !1

@@ -7,9 +7,9 @@ type
     io*: KaitaiStream
     root*: KaitaiStruct
   KaitaiStream* = ref object
-    io*: Stream
-    bits*: uint64
-    bitsLeft*: int
+    io: Stream
+    bits: uint64
+    bitsLeft: int
   KaitaiError* = object of Defect
 
 proc toString(bytes: seq[byte]): string =
@@ -299,7 +299,8 @@ proc bytesStripRight*(bytes: seq[byte], padByte: byte): seq[byte] =
   result = bytes
   result.setLen(newLen)
 
-proc bytesTerminate*(bytes: seq[byte], term: byte, includeTerm: bool): seq[byte] =
+proc bytesTerminate*(bytes: seq[byte], term: byte,
+                     includeTerm: bool): seq[byte] =
   var newLen: int
   let maxLen = bytes.len
   while newLen < maxLen and bytes[newLen] != term: inc(newLen)
