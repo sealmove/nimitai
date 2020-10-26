@@ -6,20 +6,20 @@ import npeg, regex
 
 type
   KsNodeKind* = enum
-    knkIdx
-    knkArr
-    knkMethod
-    knkTernary
-    knkInfix
-    knkUnary
-    knkScopedId
-    knkCast
     knkBool
     knkInt
     knkFloat
     knkStr
-    knkId
     knkOp
+    knkId
+    knkScopedId
+    knkArr
+    knkIdx
+    knkCast
+    knkDotExpr
+    knkUnary
+    knkInfix
+    knkTernary
   KsNode* = ref object
     case kind*: KsNodeKind
     of knkBool:
@@ -30,14 +30,14 @@ type
       floatval*: float
     of knkScopedId:
       scope*: seq[string]
-    of knkStr, knkId, knkOp:
+    of knkStr, knkOp, knkId:
       strval*: string
     else:
       sons*: seq[KsNode]
   ParsingError = object of CatchableError
 
 proc isFatherKind(kind: KsNodeKind): bool =
-  kind in {knkIdx, knkArr, knkMethod, knkTernary, knkInfix, knkUnary, knkCast}
+  kind in {knkArr, knkIdx, knkCast, knkDotExpr, knkUnary, knkInfix, knkTernary}
 
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
@@ -85,7 +85,7 @@ proc toKs(str: string): KsNode =
       case $1
       of ".":
         let (r, l) = (pop(s[^1]), pop(s[^1]))
-        s[^1].add newKsNode(knkMethod, l, r)
+        s[^1].add newKsNode(knkDotExpr, l, r)
       of "?":
         let (second, first, condition) = (pop(s[^1]), pop(s[^1]), pop(s[^1]))
         s[^1].add newKsNode(knkTernary, condition, first, second)
@@ -173,4 +173,4 @@ proc debug(ks: KsNode, n = 0) =
     for s in ks.sons:
       debug(s, n + 2)
 
-debug("expr + 2 + a.as<b::c>".toKs)
+#debug("expr + 2 + a.as<b::c>".toKs)

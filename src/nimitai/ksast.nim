@@ -1,48 +1,87 @@
-import macros, json, strutils, strformat, tables
+import macros, json, strutils, strformat, tables, sequtils
 import exprlang
 
 type
-  TypeKey* {.pure.} = enum
-    id, types, meta, doc, `doc-ref`, params, seq, instances, enums
+  TypeKey* = enum
+    tkId        = "id"
+    tkTypes     = "types"
+    tkMeta      = "meta"
+    tkDoc       = "doc"
+    tkDocRef    = "doc-ref"
+    tkParams    = "params"
+    tkSeq       = "seq"
+    tkInstances = "instances"
+    tkEnums     = "enums"
   Type* = ref object
-    keys*: set[TypeKey]
-    isImpureSubStruct*: bool
-    parent*: Type
-    id*: string
-    types*: seq[Type]
-    meta*: Meta
-    doc*: string
-    `doc-ref`*: string
-    params*: JsonNode # XXX
-    seq*: seq[Field]
-    instances*: seq[Field]
-    enums*: Table[string, OrderedTable[string, int]]
-  EndianKind* {.pure.} = enum
-    le, be
-  MetaKey* {.pure.} = enum
-    id, title, application, `file-extension`, xref, license, `ks-version`,
-    `ks-debug`, `ks-opaque-types`, imports, encoding, endian, `bit-endian`
+    keys*      : set[TypeKey]
+    isImpure*  : bool
+    parent*    : Type
+    id*        : string
+    types*     : seq[Type]
+    meta*      : Meta
+    doc*       : string
+    docRef*    : string
+    params*    : JsonNode # XXX
+    seq*       : seq[Field]
+    instances* : seq[Field]
+    enums*     : Table[string, OrderedTable[string, int]]
+  MetaKey* = enum
+    mkApplication   = "application"
+    mkBitEndian     = "bit-endian"
+    mkEncoding      = "encoding"
+    mkEndian        = "endian"
+    mkFileExtension = "file-extension"
+    mkId            = "id"
+    mkImports       = "imports"
+    mkKsDebug       = "ks-debug"
+    mkKsOpaqueTypes = "ks-opaque-types"
+    mkKsVersion     = "ks-version"
+    mkLicense       = "license"
+    mkTitle         = "title"
+    mkXref          = "xref"
   Meta = ref object
-    keys*: set[MetaKey]
-    id*: string
-    title*: string
-    application*: seq[string]
-    `file-extension`*: seq[string]
-    xref*: JsonNode # XXX
-    license*: string
-    `ks-version`*: string
-    `ks-debug`*: bool
-    `ks-opaque-types`*: bool
-    imports*: seq[string]
-    encoding*: string
-    endian*: EndianKind
-    `bit-endian`*: EndianKind
-  RepeatKind* {.pure.} = enum
-    none, eos, expr, until
-  FieldKey* {.pure.} = enum
-    id, doc, `doc-ref`, contents, `type`, repeat, `repeat-expr`, `repeat-until`,
-    `if`, size, `size-eos`, process, `enum`, encoding, terminator, consume,
-    `include`, `eos-error`, pos, io, value, `pad-right`
+    keys*          : set[MetaKey]
+    id*            : string
+    title*         : string
+    application*   : seq[string]
+    fileExtension* : seq[string]
+    xref*          : JsonNode # XXX
+    license*       : string
+    ksVersion*     : string
+    ksDebug*       : bool
+    ksOpaqueTypes* : bool
+    imports*       : seq[string]
+    encoding*      : string
+    endian*        : Endian
+    bitEndian*     : Endian
+  RepeatKind* = enum
+    rkNone
+    rkEos   = "eos"
+    rkExpr  = "expr"
+    rkUntil = "until"
+  FieldKey* = enum
+    fkConsume     = "consume"
+    fkContents    = "contents"
+    fkDoc         = "doc"
+    fkDocRef      = "doc-ref"
+    fkEncoding    = "encoding"
+    fkEnum        = "enum"
+    fkEosError    = "eos-error"
+    fkId          = "id"
+    fkIf          = "if"
+    fkInclude     = "include"
+    fkIo          = "io"
+    fkPadRight    = "pad-right"
+    fkPos         = "pos"
+    fkProcess     = "process"
+    fkRepeat      = "repeat"
+    fkRepeatExpr  = "repeat-expr"
+    fkRepeatUntil = "repeat-until"
+    fkSize        = "size"
+    fkSizeEos     = "size-eos"
+    fkTerminator  = "terminator"
+    fkType        = "type"
+    fkValue       = "value"
   FieldKind* = enum
     fkAttr, fkInst
   Field* = ref object
@@ -50,42 +89,115 @@ type
     of fkAttr:
       discard
     of fkInst:
-      pos*: NimNode
-      value*: NimNode
-    keys*: set[FieldKey]
-    parentType: Type
-    id*: string
-    doc*: string
-    `doc-ref`*: string
-    contents*: seq[byte]
-    `type`*: tuple[parsed: NimNode, raw: string]
-    repeat*: RepeatKind
-    `repeat-expr`*: NimNode
-    `repeat-until`*: NimNode
-    `if`*: NimNode
-    size*: NimNode
-    `size-eos`*: bool
-    process*: proc()
-    `enum`*: string
-    encoding*: string
-    `pad-right`*: byte
-    terminator*: byte
-    consume*: bool
-    `include`*: bool
-    `eos-error`*: bool
-    io*: NimNode
-  ScopedEnum = object
-    scope: seq[string]
-    `enum`: string
+      pos*  : Expr
+      value*: Expr
+    keys*        : set[FieldKey]
+    st           : Type
+    id*          : string
+    doc*         : string
+    docRef*      : string
+    contents*    : seq[byte]
+    `type`*      : KsType
+    repeat*      : RepeatKind
+    repeatExpr*  : Expr
+    repeatUntil* : Expr
+    `if`*        : Expr
+    size*        : Expr
+    sizeEos*     : bool
+    process*     : proc()
+    `enum`*      : string
+    encoding*    : string
+    padRight*    : byte
+    terminator*  : byte
+    consume*     : bool
+    `include`*   : bool
+    eosError*    : bool
+    io*          : Expr
+  Expr = ref object
+    node       : KsNode
+    st         : Type
+  KsTypeKind = enum
+    ktkBit   = "b"
+    ktkUInt  = "u"
+    ktkSInt  = "s"
+    ktkFloat = "f"
+    ktkStr   = "str"
+    ktkArr
+    ktkBArr
+    ktkUser
+  KsType = ref object
+    case kind: KsTypeKind
+    of ktkBit:
+      bits: int
+      bitEndian: Endian
+    of ktkUInt, ktkSInt, ktkFloat:
+      bytes: int
+      endian: Endian
+    of ktkStr:
+      isZeroTerm: bool
+    of ktkArr:
+      elemtype: KsType
+    of ktkBArr:
+      discard
+    of ktkUser:
+      scope: seq[string]
+  Endian = enum
+    eLe = "le"
+    eBe = "be"
   KaitaiError* = object of Defect
 
-proc parseBinOctDecHex(s: string): int =
-  if   s.startsWith("0b"): parseBinInt(s)
-  elif s.startsWith("0o"): parseOctInt(s)
-  elif s.startsWith("0x"): parseHexInt(s)
-  else: parseInt(s)
+proc tbit(bits: int, endian = eBe): KsType =
+  doAssert bits in {1..64}
+  KsType(kind: ktkBit, bits: bits, bitEndian: endian)
 
-proc hierarchy*(typ: Type): string =
+proc tuint(bytes: int, endian = eLe): KsType =
+  doAssert bytes in {1,2,4,8}
+  KsType(kind: ktkUInt, bytes: bytes, endian: endian)
+
+proc tsint(bytes: int, endian = eLe): KsType =
+  doAssert bytes in {1,2,4,8}
+  KsType(kind: ktkSInt, bytes: bytes, endian: endian)
+
+proc tfloat(bytes: int, endian = eLe): KsType =
+  doAssert bytes in {4,8}
+  KsType(kind: ktkFloat, bytes: bytes, endian: endian)
+
+proc tstr(isZeroTerm = false): KsType =
+  KsType(kind: ktkStr, isZeroTerm: isZeroTerm)
+
+proc tarr(et: KsType): KsType =
+  KsType(kind: ktkArr, elemtype: et)
+
+proc tbarr(): KsType =
+  KsType(kind: ktkBArr)
+
+proc tuser(s: string): KsType =
+  KsType(kind: ktkUser, label: @[s]) # XXX handle scopes
+
+proc parseType(s: string): KsType =
+  if s.match(re"u[1248](be|le)?"):
+    result = tuint(parseInt(s[1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"s[1248](be|le)?"):
+    result = tuint(parseInt(s[1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"f[48](be|le)?"):
+    result = tfloat(parseInt(s[1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"b[1-9][0-9]*(be|le)?"):
+    if s.match(re".*(be|le)"):
+      result = tbit(parseInt(s[2..^3]), parseEnum[Endian](s[^2..^1]))
+    else:
+      result = tbit(parseInt(s[2..^1]))
+  elif s.match(re"strz?"):
+    result = tstr(if s.endsWith('z'): true else: false)
+  else:
+    result = tuser(s) # XXX handled scoped ids
+
+proc buildNimTypeId*(typ: Type): string =
   var
     it = typ
     stack: seq[string]
@@ -95,112 +207,182 @@ proc hierarchy*(typ: Type): string =
     it = it.parent
 
   while stack != @[]:
-    result &= pop(stack)
+    result &= pop(stack).capitalizeAscii
 
-proc toScopedEnum(se: string): ScopedEnum =
-  var
-    x = split(se, "::")
-    scope: seq[string]
+# match a scoped id completely and construct either an ident or a dotexpr
+# depending on whether a type or an enum was matched
+proc symbolize(sid: seq[string], typ: Type): NimNode =
+  discard 
 
-  if x.len > 1:
-    for i in 0 ..< x.len - 1:
-      scope.add x[i]
+proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
+  case ksType.kind
+  of ktkBit:
+    if ksType.bits == 1:
+      result = ident"bool"
+    else:
+      result = ident"uint64"
+  of ktkUInt:
+    result = ident("uint" & ksType.bytes)
+  of ktkSInt:
+    result = ident("int" & ksType.bytes)
+  of ktkFloat:
+    result = ident("float" & ksType.bytes)
+  of ktkStr:
+    result = ident"string"
+  of ktkUser:
+    result = symbolize(ksType.label, typ)
 
-  result = ScopedEnum(scope: scope, `enum`: x[^1])
-
-proc typeLookup(ksType: string; typ: Type; shouldMark, mark: bool): string =
-  for st in typ.types:
-    if ksType == st.id:
-      if shouldMark and mark: st.isImpureSubstruct = true
-      return hierarchy(st)
-  if ksType == typ.id:
-    return hierarchy(typ)
-  if typ.parent == nil:
-    raise newException(KaitaiError, fmt"Type '{ksType}' not found")
-  typeLookup(ksType, typ.parent, shouldMark, true)
-
-proc enumLookup(ksEnum: string, typ: Type): string =
-  for key in typ.enums.keys:
-    if ksEnum == key:
-      return hierarchy(typ) & ksEnum
-  if typ.parent == nil:
-    raise newException(KaitaiError, fmt"Enum '{ksEnum}' not found")
-  enumLookup(ksEnum, typ.parent)
-
-proc nativeType(ksType: string, typ: Type): NimNode =
-  if ksType.isPrim: ident(ksType.toPrim)
-  else: ident(typeLookup(ksType.capitalizeAscii, typ, true, false))
-
-proc ksAsJsonToNim(json: JsonNode, context: string): NimNode =
-  case json.kind
-  of JString:
-    result = ksAsStrToNim(json.getStr, context)
-  of JInt:
-    result = newLit(json.getInt)
-  of JBool:
-    result = newLit(json.getBool)
-  of JNull:
-    result = newNilLit()
-  else: discard # Should not occur
+proc removeLeadingUnderscores(s: var string) =
+  while s[0] == '_':
+    s.delete(0, 0)
 
 proc jsonToByte(json: JsonNode): byte =
   case json.kind
   of JString:
-    result = parseBinOctDecHex(json.getStr).byte
+    let
+      s = json.getstr
+      i = if   s.startsWith("0b"): parseBinInt(s)
+          elif s.startsWith("0o"): parseOctInt(s)
+          elif s.startsWith("0x"): parseHexInt(s)
+          else: parseInt(s)
+    result = i.byte
   of JInt:
     result = json.getInt.byte
   else:
     result = 0
 
-# XXX very sloppy implementation
-proc inferType(expr: NimNode, context: Type): NimNode =
-  case expr.kind
-  of nnkCharLit:
-    result = ident"char"
-  of nnkIntLit:
-    result = ident"int"
-  of nnkUInt8Lit:
-    result = ident"byte"
-  of nnkFloatLit:
-    result = ident"float"
-  of nnkStrLit:
-    result = ident"string"
-  of nnkSym:
-    result = ident"bool"
-  of nnkIdent:
-    if eqIdent(expr, "to_s"):
-      return ident"string"
-    elif eqIdent(expr, "to_i"):
-      return ident"int"
-    elif eqIdent(expr, "length"):
-      return ident"int"
-    elif eqIdent(expr, "substring"):
-      return ident"string"
-    elif eqIdent(expr, "size"):
-      return ident"int"
-    elif eqIdent(expr, "first"):
-      return ident"byte"
-    elif eqIdent(expr, "last"):
-      return ident"byte"
-    # lookup type
-    else:
-      for a in context.seq:
-        if eqIdent(expr, a.id):
-          return a.`type`.parsed
-      for i in context.instances:
-        if eqIdent(expr, i.id):
-          return i.`type`.parsed
-    quit(fmt"Identifier {repr(expr)} not found")
-  of nnkBracket:
-    result = nnkBracketExpr.newTree(ident"seq", inferType(expr[0], context))
-  of nnkBracketExpr, nnkIfStmt, nnkElse:
-    result = inferType(expr[0], context)
-  of nnkPrefix, nnkInfix, nnkDotExpr, nnkElifBranch:
-    result = inferType(expr[1], context)
-  else:
-    quit(fmt"Unexpected NimNodeKind '{expr.kind}' during type inference")
+proc jsonToExpr(json: JsonNode, typ: Type): Expr =
+  result = Expr(st: typ)
+  case json.kind
+  of JString:
+    result.expr = json.getStr.toKs
+  of JInt:
+    result.expr = KsNode(kind: knkInt, intval: json.getInt)
+  of JBool:
+    result.expr = KsNode(kind: knkBool, boolval: json.getBool)
+  else: discard # Should not occur
 
-proc determineImpureSubStructs(typ: Type) = discard
+proc isByteArray(node: KsNode): bool =
+  doAssert node.kind == knkArr
+  for s in node.sons:
+    if s.kind != knkInt or s.intval < 0x00 or s.intval > 0xff:
+      return false
+  return true
+
+proc toNim(expression: Expr): NimNode =
+  let e = expression.expr
+  case e.kind
+  of knkBool:
+    result = newLit(e.boolval)
+  of knkInt:
+    result = newIntLitNode(e.intval)
+  of knkFloat:
+    result = newFloatLitNode(e.floatval)
+  of knkStr:
+    result = newStrLitNode(e.strval)
+  of knkOp:
+    case e.strval
+    of "%" : result = ident"mod"
+    of "<<": result = ident"shl"
+    of ">>": result = ident"shr"
+    of "&" : result = ident"and"
+    of "|" : result = ident"or"
+    of "^" : result = ident"xor"
+    else   : result = ident(e.strval)
+  of knkId:
+    result = ident(e.strval)
+  of knkScopedId:
+    result = symbolize(e.scope, expression.st)
+  of knkArr:
+    let x = newTree(nnkBracket)
+    for s in e.sons:
+      x.add s.toNim
+    if e.sons != @[] and e.isByteArray:
+      x[0] = newLit(e.sons[0].intval.byte)
+    result = prefix(x, "@")
+  of knkIdx:
+    result = nnkBracketExpr.newTree(e[0].toNim, e[1].toNim)
+  of knkDotExpr:
+    result = newDotExpr(e[0].toNim, e[1].toNim)
+  of knkUnary:
+    result = nnkPrefix.newTree(e[0].toNim, e[1].toNim)
+  of knkInfix:
+    result = nnkInfix.newTree(e[1].toNim, e[0].toNim, e[2].toNim)
+  of knkTernary:
+    result = nnkIfStmt.newTree(
+      nnkElifBranch.newTree(e[0].toNim, e[1].toNim),
+      nnkElse.newTree(e[2].toNim))
+
+# XXX this is the hardest part of the whole compiler
+proc infertype(expression: Expr): KsType =
+  proc toExpr(node: KsNode): Expr = Expr(expr: node, st: expression.st)
+  let (node, kind) = (expression.node, expression.node.kind)
+  case kind
+  of knkBool:
+    result = tbit(1)
+  # XXX Check value and choose just enough bytes (1,2,4,8) for the type
+  of knkInt:
+    result = tsint(8)
+  of knkFloat:
+    result = tfloat(8)
+  of knkStr:
+    result = tstr()
+  of knkOp:
+    discard
+  of knkId: discard # XXX
+  #  # first check if it's a method
+  #  if eqIdent(expr, "to_s"):
+  #    return ident"string"
+  #  elif eqIdent(expr, "to_i"):
+  #    return ident"int"
+  #  elif eqIdent(expr, "length"):
+  #    return ident"int"
+  #  elif eqIdent(expr, "substring"):
+  #    return ident"string"
+  #  elif eqIdent(expr, "size"):
+  #    return ident"int"
+  #  elif eqIdent(expr, "first"):
+  #    return ident"byte"
+  #  elif eqIdent(expr, "last"):
+  #    return ident"byte"
+  #  # if not a method then search 
+  #  else:
+  #    for a in context.seq:
+  #      if eqIdent(expr, a.id):
+  #        return a.`type`.parsed
+  #    for i in context.instances:
+  #      if eqIdent(expr, i.id):
+  #        return i.`type`.parsed
+  #  quit(fmt"Identifier {repr(expr)} not found")
+  of knkScopedId: discard # XXX
+  of knkArr:
+    let
+      types = node.sons.mapIt(infertype(it.toExpr))
+      typekind = types[0].kind
+    var
+      isTrue = true
+    for i in 1 ..< types.len:
+      doAssert typekind == types[i].kind
+    if typekind in ktkSInt:
+      for t in types:
+        if t.bytes != 1:
+          isTrue = false
+          break
+      result = if isTrue: tbarr() else: tarr()
+  of knkIdx: discard # XXX
+  of knkCast: discard # XXX
+  of knkDotExpr: discard # XXX
+  of knkUnary:
+    result = infertype(node.sons[1].toExpr)
+  of knkInfix:
+    let (l, r) = (infertype(node.sons[0], node.sons[2]))
+    doAssert l == r
+    result = l
+  of knkTernary:
+    doAssert node.sons[0] == knkBool
+    let (t, f) = (infertype(node.sons[1], node.sons[2]))
+    doAssert t == f
+    result = t
 
 proc meta(json: JsonNode, defaults: Meta): Meta =
   result = defaults
@@ -210,15 +392,15 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
     result.keys.incl(parseEnum[MetaKey](key))
 
   # id
-  if MetaKey.id in result.keys:
+  if mkId in result.keys:
     result.id = json["id"].getStr
 
   # title
-  if MetaKey.title in result.keys:
+  if mkTitle in result.keys:
     result.title = json["title"].getStr
 
   # application
-  if MetaKey.application in result.keys:
+  if mkApplication in result.keys:
     let jnode = json["application"]
     case jnode.kind
     of JArray:
@@ -229,38 +411,38 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
     else: discard # should not occur
 
   # file-extension
-  if MetaKey.`file-extension` in result.keys:
+  if mkFileExtension in result.keys:
     let jnode = json["file-extension"]
     case jnode.kind
     of JArray:
       for s in jnode.items:
-        result.`file-extension`.add(s.getStr)
+        result.fileExtension.add(s.getStr)
     of JString:
-      result.`file-extension`.add(jnode.getStr)
+      result.fileExtension.add(jnode.getStr)
     else: discard # should not occur
 
   # xref
-  if MetaKey.xref in result.keys:
+  if mkXref in result.keys:
     result.xref = json["xref"] # XXX
 
   # license
-  if MetaKey.license in result.keys:
+  if mkLicense in result.keys:
     result.license = json["license"].getStr
 
   # ks-version
-  if MetaKey.`ks-version` in result.keys:
-    result.`ks-version` = json["ks-version"].getStr
+  if mkKsVersion in result.keys:
+    result.ksVersion = json["ks-version"].getStr
 
   # ks-debug
-  if MetaKey.`ks-debug` in result.keys:
-    result.`ks-debug` = json["ks-debug"].getBool
+  if mkKsDebug in result.keys:
+    result.ksDebug = json["ks-debug"].getBool
 
   # ks-opaque-types
-  if MetaKey.`ks-opaque-types` in result.keys:
-    result.`ks-opaque-types` = json["ks-debug"].getBool
+  if mkKsOpaqueTypes in result.keys:
+    result.ksOpaqueTypes = json["ks-debug"].getBool
 
   # imports
-  if MetaKey.imports in result.keys:
+  if mkImports in result.keys:
     let jnode = json["imports"]
     case jnode.kind
     of JArray:
@@ -271,54 +453,39 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
     else: discard # should not occur
 
   # encoding
-  if MetaKey.encoding in result.keys:
+  if mkEncoding in result.keys:
     result.encoding = json["encoding"].getStr
 
   # endian
-  if MetaKey.endian in result.keys:
-    result.endian = parseEnum[EndianKind](json["endian"].getStr)
+  if mkEndian in result.keys:
+    result.endian = parseEnum[Endian](json["endian"].getStr)
 
-  if MetaKey.`bit-endian` in result.keys:
-    result.`bit-endian` = parseEnum[EndianKind](json["bit-endian"].getStr)
+  if mkBitEndian in result.keys:
+    result.bitEndian = parseEnum[Endian](json["bit-endian"].getStr)
 
-proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field =
-  result = Field(kind: kind, id: id, parentType: parentType)
-
-  var context: string
-  case kind
-  of fkAttr: context = "result"
-  of fkInst: context = "this"
+proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
+  result = Field(kind: kind, id: id, st: st)
 
   # keys
   for key in json.keys:
     result.keys.incl(parseEnum[FieldKey](key))
 
   # doc
-  if FieldKey.doc in result.keys:
+  if fkDoc in result.keys:
     result.doc = json["doc"].getStr
 
   # doc-ref
-  if FieldKey.`doc-ref` in result.keys:
-    result.`doc-ref` = json["doc-ref"].getStr
+  if fkDocRef in result.keys:
+    result.docRef = json["doc-ref"].getStr
 
   # XXX contents
 
-  # type XXX code feels confusing, there should be a better design
-  var
-    ts: string
-    t = nnkBracketExpr.newTree(ident"seq", ident"byte")
-  if FieldKey.`type` in result.keys:
-    ts = json["type"].getStr
-    t = nativeType(ts, result.parentType)
-  if FieldKey.repeat in result.keys:
-    t = nnkBracketExpr.newTree(ident"seq", t)
-  if FieldKey.value in result.keys:
-    let v = ksAsJsonToNim(json["value"], context) # XXX this is evaluated twice
-    t = inferType(v, result.parentType)
-  result.`type` = (t, ts)
+  # type
+  if fkType in result.keys:
+    result.`type` = parseType(json["type"].getStr)
 
   # repeat
-  if FieldKey.repeat in result.keys:
+  if fkRepeat in result.keys:
     result.repeat = parseEnum[RepeatKind](json["repeat"].getStr)
 
   # XXX repeat-expr
@@ -328,72 +495,63 @@ proc field(kind: FieldKind, id: string, parentType: Type, json: JsonNode): Field
   # XXX if
 
   # size
-  if FieldKey.size in result.keys:
-    result.size = ksAsJsonToNim(json["size"], context)
+  if fkSize in result.keys:
+    result.size = jsonToExpr(json["size"], result.st)
 
   # size-eos
-  if FieldKey.`size-eos` in result.keys:
-    result.`size-eos` = json["size-eos"].getBool
+  if fkSizeEos in result.keys:
+    result.sizeEos = json["size-eos"].getBool
 
   # XXX process
 
-  # enum
-  if FieldKey.`enum` in result.keys:
-    let scoped = toScopedEnum(json["enum"].getStr)
-    if scoped.scope == @[]:
-      result.`enum` = enumLookup(scoped.`enum`, result.parentType)
-    else:
-      var `enum` = typeLookup(scoped.scope[0].capitalizeAscii,
-                              result.parentType, false, false)
-      for i in 1 ..< scoped.scope.len:
-        `enum` &= scoped.scope[i]
-      `enum` &= scoped.`enum`
-      result.`enum` = `enum`
+  # XXX enum
+  #if FieldKey.`enum` in result.keys:
 
   # encoding
-  if FieldKey.encoding in result.keys:
+  if fkEncoding in result.keys:
     result.encoding = json["encoding"].getStr
 
   # pad-right
-  if FieldKey.`pad-right` in result.keys:
-    result.`pad-right` = jsonToByte(json["pad-right"])
+  if fkPadRight in result.keys:
+    result.padRight = jsonToByte(json["pad-right"])
 
   # terminator
-  if FieldKey.terminator in result.keys:
+  if fkTerminator in result.keys:
     result.terminator = jsonToByte(json["terminator"])
 
   # consume
-  if FieldKey.consume in result.keys:
+  if fkConsume in result.keys:
     result.consume = json["consume"].getBool
   else:
     result.consume = true
 
   # include
-  if FieldKey.`include` in result.keys:
+  if fkInclude in result.keys:
     result.`include` = json["include"].getBool
 
   # eos-error
-  if FieldKey.`eos-error` in result.keys:
-    result.`eos-error` = json["eos-error"].getBool
+  if fkEosError in result.keys:
+    result.eosError = json["eos-error"].getBool
   else:
-    result.`eos-error` = true
+    result.eosError = true
 
   # io
-  if FieldKey.size in result.keys:
+  if fkSize in result.keys:
     result.io = ident(result.id & "Io")
   else:
-    if FieldKey.io in result.keys:
-      result.io = ksAsJsonToNim(json["io"], context)
+    if fkIo in result.keys:
+      result.io = jsonToExpr(json["io"], st)
     else:
-      result.io = newDotExpr(ident(context), ident"io")
+      result.io = newDotExpr(ident("this"), ident"io")
 
   # pos
-  if FieldKey.pos in result.keys:
-    result.pos = ksAsJsonToNim(json["pos"], context)
+  if fkPos in result.keys:
+    result.pos = jsonToExpr(json["pos"], st)
 
   # value
-  if FieldKey.value in result.keys:
-    result.value = ksAsJsonToNim(json["value"], context)
+  if fkValue in result.keys:
+    result.value = jsonToExpr(json["value"], st)
+    result.`type` = infertype(result.value)
 
 proc toKsTypeRec(typ: Type, json: JsonNode) =
   # keys
@@ -401,18 +559,18 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
     typ.keys.incl(parseEnum[TypeKey](key))
 
   # meta
-  if TypeKey.meta in typ.keys:
+  if tkMeta in typ.keys:
     var defaults: Meta
     if typ.parent == nil:
-      defaults = Meta(`bit-endian`: be)
+      defaults = Meta(bitEndian: eBe)
     else:
-      defaults = Meta(`bit-endian`: typ.parent.meta.`bit-endian`)
+      defaults = Meta(bitEndian: typ.parent.meta.bitEndian)
     typ.meta = meta(json["meta"], defaults)
   else:
     typ.meta = Meta() # need to do this because meta is an object
 
   # enums
-  if TypeKey.enums in typ.keys:
+  if tkEnums in typ.keys:
     typ.enums = initTable[string, OrderedTable[string, int]]()
     for k, v in json["enums"]:
       typ.enums[k] = initOrderedTable[string, int]()
@@ -420,11 +578,11 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
         typ.enums[k][s.getStr] = parseInt(i)
 
   # types
-  if TypeKey.types in typ.keys:
+  if tkTypes in typ.keys:
     # Need to construct tree with ids and fill in the rest of the info in a
     # separate step because attributes can reference the ids from the 'type' key
     for key in json["types"].keys:
-      let node = Type(id: key.capitalizeAscii, parent: typ)
+      let node = Type(id: key, parent: typ)
       typ.types.add(node)
     # This is only possible because Nim's JSON implementation uses OrderedTable
     var i: int
@@ -433,22 +591,22 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
       inc i
 
   # seq
-  if TypeKey.seq in typ.keys:
+  if tkSeq in typ.keys:
     for a in json["seq"].items:
       typ.seq.add(field(fkAttr, a["id"].getStr, typ, a))
 
   # instances
-  if TypeKey.instances in typ.keys:
+  if tkInstances in typ.keys:
     for k, v in json["instances"].pairs:
       typ.instances.add(field(fkInst, k, typ, v))
 
   # doc
-  if TypeKey.doc in typ.keys:
+  if tkDoc in typ.keys:
     typ.doc = json["doc"].getStr
 
   # doc-ref
-  if TypeKey.`doc-ref` in typ.keys:
-    typ.`doc-ref` = json["doc-ref"].getStr
+  if tkDocRef in typ.keys:
+    typ.docRef = json["doc-ref"].getStr
 
   # params
   typ.params = json.getOrDefault("params") # XXX
@@ -462,4 +620,3 @@ proc toKsType*(json: JsonNode): Type =
 
   result = Type(id: json["meta"]["id"].getStr.capitalizeAscii)
   toKsTypeRec(result, json)
-  determineImpureSubStructs(result)

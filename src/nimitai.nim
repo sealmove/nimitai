@@ -1,13 +1,15 @@
 import json, macros, regex, strutils, tables
 import nimitai/ksast
 
+# XXX add --> template this: untyped = result
+
 const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
 proc parentType(typ: Type): NimNode =
   if typ.parent == nil: ident(rootTypeName)
-  else: ident(hierarchy(typ.parent))
+  else: ident(buildNimTypeId(typ.parent))
 
 proc parse(field: Field, typ: Type): NimNode =
   if FieldKey.value in field.keys:
@@ -56,9 +58,9 @@ proc parse(field: Field, typ: Type): NimNode =
           ident"read"),
         field.io,
         newDotExpr(
-          ident"result",
+          ident"this",
           ident"root"),
-        ident"result")
+        ident"this")
 
   # Typeless
   else:
@@ -178,7 +180,7 @@ proc parseField(field: Field, context: NimNode, typ: Type,
 proc typeDecl(section: var NimNode, node: Type) =
   var fields = newTree(nnkRecList)
   let
-    id = hierarchy(node)
+    id = buildNimTypeId(node)
     pt = if node.isImpureSubstruct: ident(rootTypeName)
          else: parentType(node)
 
@@ -222,7 +224,7 @@ proc typeDecl(section: var NimNode, node: Type) =
         nnkEnumFieldDef.newTree(
           ident(l),
           newIntLitNode(v)))
-    defs.add(nnkTypeDef.newTree(ident(hierarchy(node) & name), newEmptyNode(), fields))
+    defs.add(nnkTypeDef.newTree(ident(buildNimTypeId(node) & name), newEmptyNode(), fields))
 
   for e in defs:
     section.add e
@@ -232,7 +234,7 @@ proc typeDecl(section: var NimNode, node: Type) =
 
 proc readProcParams(node: Type): NimNode =
   let
-    id = hierarchy(node)
+    id = buildNimTypeId(node)
     pt = if node.isImpureSubstruct: ident(rootTypeName)
          else: parentType(node)
 
@@ -254,7 +256,7 @@ proc readProcParams(node: Type): NimNode =
       pt))
 
 proc instProcParams(inst: Field, node: Type): NimNode =
-  let id = hierarchy(node)
+  let id = buildNimTypeId(node)
 
   result = nnkFormalParams.newTree(
     inst.`type`.parsed,
@@ -293,7 +295,7 @@ proc readProc(node: Type): NimNode =
   result = newProc(name = ident"read")
   result.params = readProcParams(node)
 
-  let id = hierarchy(node)
+  let id = buildNimTypeId(node)
 
   var
     constructor = nnkObjConstr.newTree(
@@ -307,11 +309,11 @@ proc readProc(node: Type): NimNode =
 
   result.body = newStmtList(
     newAssignment(
-      ident"result",
+      ident"this",
       constructor),
     newAssignment(
       newDotExpr(
-        ident"result",
+        ident"this",
         ident"root"),
       nnkIfExpr.newTree(
         nnkElifExpr.newTree(
@@ -319,7 +321,7 @@ proc readProc(node: Type): NimNode =
             ident"root",
             "==",
             newNilLit()),
-          ident"result"),
+          ident"this"),
         nnkElseExpr.newTree(
           ident"root"))))
 
@@ -334,8 +336,8 @@ proc readProc(node: Type): NimNode =
         result.body.add(
           newCall(
             ident"alignToByte",
-            newDotExpr(ident"result", ident"io")))
-    let stmts = parseField(node.seq[i], ident"result", node)
+            newDotExpr(ident"this", ident"io")))
+    let stmts = parseField(node.seq[i], ident"this", node)
     for s in stmts: result.body.add(s)
 
 proc instProc(inst: Field, node: Type): NimNode =
@@ -371,7 +373,7 @@ proc procDecl(stmtList: var NimNode, node: Type) =
     stmtList.add(instProc(i, node))
 
 proc fromFileProc(node: Type): NimNode =
-  let id = hierarchy(node)
+  let id = buildNimTypeId(node)
 
   newProc(
     name = ident"fromFile",
