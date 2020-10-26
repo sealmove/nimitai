@@ -34,7 +34,7 @@ type
       strval*: string
     else:
       sons*: seq[KsNode]
-  ParsingError = object of CatchableError
+  ParsingError* = object of CatchableError
 
 proc isFatherKind(kind: KsNodeKind): bool =
   kind in {knkArr, knkIdx, knkCast, knkDotExpr, knkUnary, knkInfix, knkTernary}

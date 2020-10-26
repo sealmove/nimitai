@@ -114,9 +114,9 @@ type
     `include`*   : bool
     eosError*    : bool
     io*          : Expr
-  Expr = ref object
-    node       : KsNode
-    st         : Type
+  Expr* = ref object
+    node* : KsNode
+    st*   : Type
   KsTypeKind* = enum
     ktkBit   = "b"
     ktkUInt  = "u"

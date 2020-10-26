@@ -1,5 +1,5 @@
 import os, strformat, strutils, macros, json, algorithm
-import ../src/nimitai/exprlang
+import ../src/nimitai/[exprlang, ksast]
 
 proc test(json: JsonNode): NimNode =
   let
@@ -28,7 +28,7 @@ proc test(json: JsonNode): NimNode =
       var nodeExpected: NimNode
       case expected.kind
       of JString:
-        nodeExpected = ksAsStrToNim(expected.getStr, "")
+        nodeExpected = Expr(node: expected.getStr.toKs).toNim
       of JInt:
         nodeExpected = newLit(expected.getInt)
       of JBool:
@@ -40,7 +40,10 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           infix(
-            ksAsStrToNim("r." & a["actual"].getStr, ""),
+            Expr(node: newKsNode(
+              knkDotExpr,
+              KsNode(kind: knkId, strval: "r"),
+              toKs(a["actual"].getStr))).toNim,
             "==",
             nodeExpected)))
 
