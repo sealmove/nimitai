@@ -92,7 +92,10 @@ proc parse(field: Field, typ: Type): NimNode =
       ident"this")
 
   if fkEnum in field.keys:
-    result = newCall(ident(buildNimTypeId(typ) & field.`enum`[0]), result) # XXX
+    result = newCall(
+      ident(matchAndBuildEnum(field.`enum`, typ)),
+      result)
+
 
 proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()
@@ -186,8 +189,11 @@ proc typeDecl(section: var NimNode, typ: Type) =
       pt))
 
   for a in typ.seq:
-    let t = if fkEnum in a.keys: ident(buildNimTypeId(typ) & a.`enum`[0]) # XXX
-            else: a.`type`.ksToNimType(typ)
+    let t =
+      if fkEnum in a.keys:
+        ident(matchAndBuildEnum(a.`enum`, typ))
+      else:
+        a.`type`.ksToNimType(typ)
     fields.add(
       newIdentDefs(
         ident(a.id),
@@ -220,7 +226,11 @@ proc typeDecl(section: var NimNode, typ: Type) =
         nnkEnumFieldDef.newTree(
           ident(l),
           newIntLitNode(v)))
-    defs.add(nnkTypeDef.newTree(ident(buildNimTypeId(typ) & name), newEmptyNode(), fields))
+    defs.add(
+      nnkTypeDef.newTree(
+        ident(buildNimTypeId(typ) & name),
+        newEmptyNode(),
+        fields))
 
   for e in defs:
     section.add e

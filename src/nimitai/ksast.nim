@@ -216,6 +216,15 @@ proc buildNimTypeId*(typ: Type): string =
 # depending on whether a type or an enum was matched
 # XXX
 
+proc matchAndBuildEnum*(scope: seq[string], typ: Type): string =
+  for e in typ.enums.keys:
+    if scope[0] == e:
+      return buildNimTypeId(typ) & scope.join
+  if typ.parent != nil:
+    return matchAndBuildEnum(scope, typ.parent)
+  let e = scope.join("::")
+  quit(fmt"Enum {e} not found")
+
 proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   case ksType.kind
   of ktkBit:
