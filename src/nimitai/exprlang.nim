@@ -126,8 +126,8 @@ proc toKs*(str: string): KsNode =
       var x: BiggestInt
       assert len($0) == parseHex[BiggestInt]($0, x)
       s[^1].add KsNode(kind: knkInt, intval: x)
-    tStr      <- ('\"' * >*(Print - '\"') * '\"') |
-                 ('\'' * >*(Print - '\'') * '\'') * S:
+    tStr      <- (('\"' * >*(Print - '\"') * '\"') |
+                  ('\'' * >*(Print - '\'') * '\'')) * S:
       s[^1].add KsNode(kind: knkStr, strval: $1)
     tId       <- >id * S:
       s[^1].add KsNode(kind: knkId, strval: $1)
@@ -177,4 +177,4 @@ proc debug(ks: KsNode, n = 0) =
     for s in ks.sons:
       debug(s, n + 2)
 
-#debug("(b1 & 0xF0) >> 4".toKs)
+#debug("\"abc\" + \"123\"".toKs)
