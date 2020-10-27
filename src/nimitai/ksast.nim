@@ -152,15 +152,15 @@ proc tbit(bits: int, endian = eNone): KsType =
   doAssert bits in {1..64}
   KsType(kind: ktkBit, bits: bits, bitEndian: endian)
 
-proc tuint(bytes: int, endian = eLe): KsType =
+proc tuint(bytes: int, endian = eNone): KsType =
   doAssert bytes in {1,2,4,8}
   KsType(kind: ktkUInt, bytes: bytes, endian: endian)
 
-proc tsint(bytes: int, endian = eLe): KsType =
+proc tsint(bytes: int, endian = eNone): KsType =
   doAssert bytes in {1,2,4,8}
   KsType(kind: ktkSInt, bytes: bytes, endian: endian)
 
-proc tfloat(bytes: int, endian = eLe): KsType =
+proc tfloat(bytes: int, endian = eNone): KsType =
   doAssert bytes in {4,8}
   KsType(kind: ktkFloat, bytes: bytes, endian: endian)
 

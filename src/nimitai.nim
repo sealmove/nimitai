@@ -37,9 +37,10 @@ proc parse(field: Field, typ: Type): NimNode =
     if t.bits == 1:
       result = newCall(ident"bool", result)
   of ktkUInt, ktkSInt, ktkFloat:
+    let endian = if t.endian == eNone: typ.meta.endian else: t.endian
     result = newCall(
-    "read" & $t.kind & $t.bytes & (if t.bytes != 1: $t.endian else: ""),
-    field.io.toNim)
+      "read" & $t.kind & $t.bytes & (if t.bytes != 1: $endian else: ""),
+      field.io.toNim)
   of ktkArr: discard # XXX
   of ktkBArr, ktkStr:
     if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
