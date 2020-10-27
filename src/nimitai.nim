@@ -39,7 +39,7 @@ proc parse(field: Field, typ: Type): NimNode =
         result = newCall(ident"bool", result)
     of ktkUInt, ktkSInt, ktkFloat:
       result = newCall(
-      "read" & $t.kind & $t.bytes,
+      "read" & $t.kind & $t.bytes & $t.endian,
       field.io.toNim)
     of ktkArr: discard # XXX
     of ktkBArr, ktkStr:
@@ -114,7 +114,7 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
 proc parseField(field: Field, typ: Type, postfix = ""): NimNode =
   result = newStmtList()
 
-  let id = newDotExpr(ident"this", ident(field.id & postfix))
+  let id = ident(field.id & postfix)
   var posId: NimNode
 
   if fkPos in field.keys:
@@ -145,7 +145,7 @@ proc parseField(field: Field, typ: Type, postfix = ""): NimNode =
   case field.repeat
   of rkNone:
     result.add(
-      newAssignment(
+      newVarStmt(
         id,
         parse(field, typ)))
   of rkEos:
@@ -171,6 +171,8 @@ proc parseField(field: Field, typ: Type, postfix = ""): NimNode =
           field.io.toNim,
           ident"seek"),
         posId))
+
+  result.add(newAssignment(newDotExpr(ident"this", id), id))
 
 proc typeDecl(section: var NimNode, typ: Type) =
   var fields = newTree(nnkRecList)

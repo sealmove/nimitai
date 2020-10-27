@@ -211,10 +211,11 @@ proc buildNimTypeId*(typ: Type): string =
   while stack != @[]:
     result &= pop(stack).capitalizeAscii
 
+# XXX
 # match a scoped id completely and construct either an ident or a dotexpr
 # depending on whether a type or an enum was matched
 proc symbolize(sid: seq[string], typ: Type): NimNode =
-  discard 
+  ident(buildNimTypeId(typ) & sid[0])
 
 proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   case ksType.kind
@@ -295,7 +296,7 @@ proc toNim*(expression: Expr): NimNode =
     of "|" : result = ident"or"
     of "^" : result = ident"xor"
     else   : result = ident(e.strval)
-  of knkId:
+  of knkId: # XXX
     result = ident(e.strval)
   of knkScopedId:
     result = symbolize(e.scope, st)
