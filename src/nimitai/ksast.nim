@@ -348,7 +348,7 @@ proc infertype(expression: Expr): KsType =
     result = tstr()
   of knkOp:
     discard
-  of knkId: discard # XXX
+  of knkId: result = tsint(8)#discard # XXX
   #  # first check if it's a method
   #  if eqIdent(expr, "to_s"):
   #    return ident"string"
@@ -389,14 +389,14 @@ proc infertype(expression: Expr): KsType =
           break
     result = if isTrue: tbarr() else: tarr(types[0])
   of knkIdx: discard # XXX
-  of knkCast: discard # XXX
-  of knkDotExpr: discard # XXX
+  of knkCast: result = tstr()#discard # XXX
+  of knkDotExpr: result = tstr()#discard # XXX
   of knkUnary:
     result = infertype(Expr(node: node.sons[1], st: st))
   of knkInfix:
     let (l, r) = (infertype(Expr(node: node.sons[0], st: st)),
                   infertype(Expr(node: node.sons[2], st: st)))
-    doAssert l == r
+    #doAssert l == r
     result = l
   of knkTernary:
     doAssert node.sons[0].kind == knkBool
@@ -578,7 +578,7 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
     result.value = jsonToExpr(json["value"], st)
     result.`type` = infertype(result.value)
 
-proc toKsTypeRec(typ: Type, json: JsonNode) =
+proc fillType(typ: Type, json: JsonNode) =
   # keys
   for key in json.keys:
     typ.keys.incl(parseEnum[TypeKey](key))
@@ -612,7 +612,7 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
     # This is only possible because Nim's JSON implementation uses OrderedTable
     var i: int
     for _, v in json["types"].pairs:
-      toKsTypeRec(typ.types[i], v)
+      fillType(typ.types[i], v)
       inc i
 
   # seq
@@ -636,7 +636,7 @@ proc toKsTypeRec(typ: Type, json: JsonNode) =
   # params
   typ.params = json.getOrDefault("params") # XXX
 
-proc toKsType*(json: JsonNode): Type =
+proc toType*(json: JsonNode): Type =
   if not json.hasKey("meta"):
     raise newException(KaitaiError, "Top level type has no 'meta' section")
 
@@ -644,4 +644,4 @@ proc toKsType*(json: JsonNode): Type =
     raise newException(KaitaiError, "No id in 'meta' section for top level type")
 
   result = Type(id: json["meta"]["id"].getStr.capitalizeAscii)
-  toKsTypeRec(result, json)
+  fillType(result, json)

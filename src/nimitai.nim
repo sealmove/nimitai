@@ -39,7 +39,7 @@ proc parse(field: Field, typ: Type): NimNode =
         result = newCall(ident"bool", result)
     of ktkUInt, ktkSInt, ktkFloat:
       result = newCall(
-      "read" & $t.kind & $t.bytes & $t.endian,
+      "read" & $t.kind & $t.bytes & (if t.bytes != 1: $t.endian else: ""),
       field.io.toNim)
     of ktkArr: discard # XXX
     of ktkBArr, ktkStr:
@@ -111,9 +111,7 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
         ident"newKaitaiStream",
         id)))
 
-proc parseField(field: Field, typ: Type, postfix = ""): NimNode =
-  result = newStmtList()
-
+proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
   let id = ident(field.id & postfix)
   var posId: NimNode
 
@@ -145,7 +143,7 @@ proc parseField(field: Field, typ: Type, postfix = ""): NimNode =
   case field.repeat
   of rkNone:
     result.add(
-      newVarStmt(
+      newLetStmt(
         id,
         parse(field, typ)))
   of rkEos:
@@ -345,7 +343,36 @@ proc instProc(inst: Field, typ: Type): NimNode =
   result = newProc(ident(inst.id))
   result.params = instProcParams(inst, typ)
 
-  var pa = parseField(inst, typ, postfix = "Inst")
+  var pa = newStmtList()
+
+  for a in typ.seq:
+    pa.add(
+      nnkTemplateDef.newTree(
+        ident(a.id),
+        newEmptyNode(),
+        newEmptyNode(),
+        nnkFormalParams.newTree(ident"untyped"),
+        newEmptyNode(),
+        newEmptyNode(),
+        newDotExpr(
+          ident"this",
+          ident(a.id))))
+
+  for i in typ.instances:
+    pa.add(
+      nnkTemplateDef.newTree(
+        ident(i.id),
+        newEmptyNode(),
+        newEmptyNode(),
+        nnkFormalParams.newTree(ident"untyped"),
+        newEmptyNode(),
+        newEmptyNode(),
+        newDotExpr(
+          ident"this",
+          ident(i.id))))
+
+  for s in parseField(inst, typ, postfix = "Inst"): pa.add(s)
+
   pa.add(
     newAssignment(
       newDotExpr(
@@ -405,7 +432,7 @@ proc fromFileProcs(typ: Type): NimNode =
   result.add(fromFileProc(typ))
 
 proc generateParser*(spec: JsonNode): NimNode =
-  let spec = spec.toKsType
+  let spec = spec.toType
 
   var
     typeSection = newTree(nnkTypeSection)
