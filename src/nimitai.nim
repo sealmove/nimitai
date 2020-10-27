@@ -89,8 +89,6 @@ proc parse(field: Field, typ: Type): NimNode =
         ident"root"),
       ident"this")
 
-  #result = ident(field.id & "Raw")
-
   if fkEnum in field.keys:
     result = newCall(ident(buildNimTypeId(typ) & field.`enum`[0]), result) # XXX
 

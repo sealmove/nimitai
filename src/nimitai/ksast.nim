@@ -1,4 +1,4 @@
-import macros, json, strutils, tables, sequtils
+import macros, json, strutils, tables, sequtils, strformat
 import regex
 import exprlang
 
@@ -354,8 +354,8 @@ proc inferType(expression: Expr): KsType =
     result = tstr()
   of knkOp:
     discard
-  of knkId: # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
-  #  # first check if it's a method
+  of knkId:
+  # first check if it's a method
     if eqIdent(node.strval, "to_s"):
       result = tstr()
     elif eqIdent(node.strval, "to_i"):
@@ -371,14 +371,14 @@ proc inferType(expression: Expr): KsType =
     elif eqIdent(node.strval, "last"):
       result = tuint(1) # XXX
     # if not a method, then investigate id
-    else: result = tsint(8) # XXX
-  #    for a in context.seq:
-  #      if eqIdent(expr, a.id):
-  #        return a.`type`.parsed
-  #    for i in context.instances:
-  #      if eqIdent(expr, i.id):
-  #        return i.`type`.parsed
-  #  quit(fmt"Identifier {repr(expr)} not found")
+    else:
+      for a in st.seq:
+        if eqIdent(node.strval, a.id):
+          return a.`type`
+      for i in st.instances:
+        if eqIdent(node.strval, i.id):
+          return i.`type`
+    quit(fmt"Identifier {repr(expr)} not found")
   of knkEnum: discard # XXX
   of knkArr:
     let
