@@ -315,7 +315,7 @@ proc toNim*(expression: Expr): NimNode =
     result = ident(e.strval)
   of knkEnum: # XXX implement relative matching
     result = newDotExpr(
-      ident(e.scope[0 .. ^2].join().capitalizeAscii),
+      ident(matchAndBuildEnum(e.scope[0..^2], st)),
       ident(e.scope[^1]))
   of knkCast:
     discard # XXX
@@ -434,7 +434,11 @@ proc inferType(expression: Expr): KsType =
   of knkInfix:
     let (l, r) = (inferType(Expr(node: node.sons[0], st: st)),
                   inferType(Expr(node: node.sons[2], st: st)))
-
+    case node.sons[1].strval
+    of ">=", ">", "<=", "<", "==", "!=":
+      result = tbit(1)
+    else:
+      result = l
     # XXX type algebra
     #case l.kind
     #of ktkBit
@@ -445,7 +449,6 @@ proc inferType(expression: Expr): KsType =
     #of ktkArr
     #of ktkBArr
     #of ktkUser
-    result = l
   of knkTernary:
     doAssert node.sons[0].kind == knkBool
     let (t, f) = (inferType(Expr(node: node.sons[1], st: st)),
