@@ -23,6 +23,13 @@ Instead of being an external compiler, nimitai is a CT library which means you d
 
 ## Example
 
+### Codegen
+buffered_struct.nim (...)
+```nim
+import json, nimitai, nimitai/runtime
+injectParser(parseJson(readFile"buffered_struct.json"))
+```
+
 buffered_struct.json
 ```json
 {
@@ -69,12 +76,6 @@ buffered_struct.json
     }
   }
 }
-```
-
-buffered_struct.nim
-```nim
-import json, nimitai, nimitai/runtime, strutils
-injectParser(parseJson(readFile"buffered_struct.json"))
 ```
 
 generated code
@@ -133,4 +134,29 @@ proc fromFile(_: typedesc[Buffered_structBlock]; filename: string): Buffered_str
 
 proc fromFile(_: typedesc[Buffered_struct]; filename: string): Buffered_struct =
   read(Buffered_struct, newKaitaiFileStream(filename), nil, nil)
+```
+
+### API usage
+(...) buffered_struct.nim
+```nim
+let x = BufferedStruct.fromFile("buffered_struct.bin")
+echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
+echo "Block1, number2: " & toHex(x.block1.number2.int64, 2)
+echo "Block2, number1: " & toHex(x.block2.number1.int64, 2)
+echo "Block2, number2: " & toHex(x.block2.number2.int64, 2)
+```
+
+buffered_struct.bin (hex view)
+```bin
+10 00 00 00 42 00 00 00 43 00 00 00 ff ff ff ff
+ff ff ff ff 08 00 00 00 44 00 00 00 45 00 00 00
+ee 00 00 00
+```
+
+output:
+```
+Block1, number1: 42
+Block1, number2: 43
+Block2, number1: 44
+Block2, number2: 45
 ```
