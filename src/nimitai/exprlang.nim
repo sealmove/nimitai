@@ -37,6 +37,24 @@ type
       sons*: seq[KsNode]
   ParsingError* = object of CatchableError
 
+proc debug(ks: KsNode, n = 0) =
+  let k = " ".repeat(n) & ($ks.kind)[3..^1]
+  case ks.kind
+  of knkEnum, knkCast:
+    echo k & " " & ks.scope.join(", ")
+  of knkBool:
+    echo k & " " & $ks.boolval
+  of knkInt:
+    echo k & " " & $ks.intval
+  of knkFloat:
+    echo k & " " & $ks.floatval
+  of knkStr, knkId, knkOp:
+    echo k & " " & $ks.strval
+  else:
+    echo k
+    for s in ks.sons:
+      debug(s, n + 2)
+
 proc isFatherKind(kind: KsNodeKind): bool =
   kind in {knkArr, knkMeth, knkIdx, knkDotExpr, knkUnary, knkInfix, knkTernary}
 
@@ -158,23 +176,7 @@ proc toKs*(str: string): KsNode =
   elif s[^1].len != 1:
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
+  debug(result)
 
-proc debug(ks: KsNode, n = 0) =
-  stdout.write(" ".repeat(n) & ($ks.kind)[3..^1])
-  case ks.kind
-  of knkEnum, knkCast:
-    stdout.write(" " & ks.scope.join(", ") & "\n")
-  of knkBool:
-    stdout.write(" " & $ks.boolval & "\n")
-  of knkInt:
-    stdout.write(" " & $ks.intval & "\n")
-  of knkFloat:
-    stdout.write(" " & $ks.floatval & "\n")
-  of knkStr, knkId, knkOp:
-    stdout.write(" " & $ks.strval & "\n")
-  else:
-    stdout.write "\n"
-    for s in ks.sons:
-      debug(s, n + 2)
 
 #debug("\"abc\" + \"123\"".toKs)
