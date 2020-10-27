@@ -217,9 +217,16 @@ proc buildNimTypeId*(typ: Type): string =
 # XXX
 
 proc matchAndBuildEnum*(scope: seq[string], typ: Type): string =
-  for e in typ.enums.keys:
-    if scope[0] == e:
-      return buildNimTypeId(typ) & scope.join
+  if scope.len > 1:
+    for t in typ.types:
+      if t.id == scope[0]:
+        for e in t.enums.keys:
+          if scope[^1] == e:
+            return buildNimTypeId(t) & scope[1..^1].join
+  else:
+    for e in typ.enums.keys:
+      if scope[^1] == e:
+        return buildNimTypeId(typ) & scope.join
   if typ.parent != nil:
     return matchAndBuildEnum(scope, typ.parent)
   let e = scope.join("::")
