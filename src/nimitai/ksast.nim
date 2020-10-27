@@ -620,13 +620,17 @@ proc fillType(typ: Type, json: JsonNode) =
     typ.keys.incl(parseEnum[TypeKey](key))
 
   # meta
-  if tkMeta in typ.keys:
-    if typ.parent == nil:
-      typ.meta = meta(json["meta"], Meta(bitEndian: eBe))
+  if typ.parent == nil:
+    let defaults = Meta(bitEndian: eBe)
+    if tkMeta in typ.keys:
+      typ.meta = meta(json["meta"], defaults)
     else:
-      typ.meta = meta(json["meta"], Meta(bitEndian: typ.parent.meta.bitEndian))
+      typ.meta = defaults
   else:
-    typ.meta = Meta() # need to do this because meta is an object
+    if tkMeta in typ.keys:
+      typ.meta = meta(json["meta"], Meta(bitEndian: typ.parent.meta.bitEndian))
+    else:
+      typ.meta = typ.parent.meta
 
   # enums
   if tkEnums in typ.keys:
