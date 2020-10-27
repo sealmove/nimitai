@@ -15,6 +15,7 @@ type
     knkEnum
     knkCast
     knkArr
+    knkMeth
     knkIdx
     knkDotExpr
     knkUnary
@@ -37,7 +38,7 @@ type
   ParsingError* = object of CatchableError
 
 proc isFatherKind(kind: KsNodeKind): bool =
-  kind in {knkArr, knkIdx, knkDotExpr, knkUnary, knkInfix, knkTernary}
+  kind in {knkArr, knkMeth, knkIdx, knkDotExpr, knkUnary, knkInfix, knkTernary}
 
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
@@ -58,20 +59,28 @@ proc toKs*(str: string): KsNode =
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
-    prefix    <- idx | arr | unary | parExpr |
+    prefix    <- arr | meth | idx | unary | parExpr |
                  tBool | tFloat | tInt | tStr | tCast | tEnum | tId
-    unary     <- >{'+','-'} * expr:
-      s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
-    idx       <- >id * S * arrOpen * expr * arrClose:
-      s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
-    arr       <- arrOpen * newLvl * *(expr * *(',' * expr)) * arrClose:
+    arr       <- '[' * S * newLvl * *(expr * *(',' * expr)) * S * ']' * S:
       let
         elements = pop(s)
         newNode = newKsNode(knkArr)
       for e in elements:
         newNode.add(e)
       s[^1].add newNode
-    parExpr   <- (parOpen * expr * parClose) ^ 0
+    meth      <- >("to_s"|"to_i"|"length"|"substring"|"size"|"first"|"last") *
+                 &(!(Alpha | '_' | '[')) * newLvl * ?('(' * expr * *(',' * expr) * ')') * S:
+      let
+        elements = pop(s)
+        newNode = newKsNode(knkMeth, KsNode(kind: knkId, strval: $1))
+      for e in elements:
+        newNode.add(e)
+      s[^1].add newNode
+    idx       <- >id * S * '[' * expr * ']' * S:
+      s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
+    unary     <- >{'+','-'} * expr * S:
+      s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
+    parExpr   <- ('(' * expr * ')') * S ^ 0
     infix     <- >("?") * S * expr * ":" * S              * expr ^  1 |
                  >("not")                                 * expr ^  2 |
                  >("or" | "^")                            * expr ^  3 |
@@ -129,11 +138,6 @@ proc toKs*(str: string): KsNode =
 
     # Aux
     S        <- *Space
-    comma    <- "," * S
-    parOpen  <- "(" * S
-    parClose <- ")" * S
-    arrOpen  <- "[" * S
-    arrClose <- "]" * S
     int      <- hex | oct | bin | dec
     bin      <- "0b" * +{'0', '1', '_'}
     oct      <- "0o" * +{'0' .. '7', '_'}
@@ -173,4 +177,4 @@ proc debug(ks: KsNode, n = 0) =
     for s in ks.sons:
       debug(s, n + 2)
 
-#debug("expr + 2 + a.as<b::c> * d::e::f".toKs)
+#debug("(b1 & 0xF0) >> 4".toKs)

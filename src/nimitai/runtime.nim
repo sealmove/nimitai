@@ -349,9 +349,12 @@ proc toI*(f: float): int = int(f)
 
 # Byte arrays
 proc length*(ba: seq[byte]): int = ba.len
-# proc toS*(ba: seq[byte], encoding: string): string =
-#   XXX
-#   convert(s, srcEncoding = encoding)
+
+proc toS*(ba: seq[byte], encoding: string): string =
+  var x: string
+  for b in ba:
+    x.add b.char
+  convert(x, srcEncoding = encoding)
 
 # Strings
 proc `+`*(x, y: string): string = x & y

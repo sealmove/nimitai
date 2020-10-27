@@ -43,7 +43,7 @@ proc parse(field: Field, typ: Type): NimNode =
   of ktkArr: discard # XXX
   of ktkBArr, ktkStr:
     if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
-      let term = if t.kind == ktkBArr: field.terminator else: 0
+      let term = if fkTerminator in field.keys: field.terminator else: 0
       result = newCall(
         ident"readBytesTerm",
         field.io.toNim,
@@ -73,11 +73,12 @@ proc parse(field: Field, typ: Type): NimNode =
           ident"int",
           field.size.toNim))
     if t.kind == ktkStr:
-      doAssert fkEncoding in field.keys
+      let enc = if fkEncoding in field.keys: field.encoding
+                else: "UTF-8"
       result = newCall(
         ident"encode",
         result,
-        newStrLitNode(field.encoding))
+        newStrLitNode(enc))
   of ktkUser:
     result = newCall(
       newDotExpr(
@@ -342,10 +343,9 @@ proc instProc(inst: Field, typ: Type): NimNode =
   result = newProc(ident(inst.id))
   result.params = instProcParams(inst, typ)
 
-  var pa = newStmtList()
-
+  var templates = newStmtList()
   for a in typ.seq:
-    pa.add(
+    templates.add(
       nnkTemplateDef.newTree(
         ident(a.id),
         newEmptyNode(),
@@ -358,7 +358,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
           ident(a.id))))
 
   for i in typ.instances:
-    pa.add(
+    templates.add(
       nnkTemplateDef.newTree(
         ident(i.id),
         newEmptyNode(),
@@ -370,6 +370,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
           ident"this",
           ident(i.id))))
 
+  var pa = newStmtList()
   for s in parseField(inst, typ, postfix = "Inst"): pa.add(s)
 
   pa.add(
@@ -380,6 +381,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
       ident"true"))
 
   result.body = newStmtList(
+    templates,
     newIfStmt(
      (prefix(
         newDotExpr(

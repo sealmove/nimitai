@@ -214,6 +214,7 @@ proc buildNimTypeId*(typ: Type): string =
 # XXX
 # match a scoped id completely and construct either an ident or a dotexpr
 # depending on whether a type or an enum was matched
+# XXX
 
 proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   case ksType.kind
@@ -309,14 +310,24 @@ proc toNim*(expression: Expr): NimNode =
     if e.sons != @[] and e.isByteArray:
       x[0] = newLit(e.sons[0].intval.byte)
     result = prefix(x, "@")
+  of knkMeth:
+    result = newTree(nnkCall)
+    for i in 0 ..< e.sons.len:
+      result.add(Expr(node: e.sons[i], st: st).toNim)
   of knkIdx:
     result = nnkBracketExpr.newTree(
       Expr(node: e.sons[0], st: st).toNim,
       Expr(node: e.sons[1], st: st).toNim)
   of knkDotExpr:
-    result = newDotExpr(
-      Expr(node: e.sons[0], st: st).toNim,
-      Expr(node: e.sons[1], st: st).toNim)
+    # ! special case because of Nim AST peculiarity
+    if e.sons[1].kind == knkMeth:
+      let x = e.sons[1]
+      x.sons.insert(e.sons[0], 1)
+      result = Expr(node: x, st: st).toNim
+    else:
+      result = newDotExpr(
+        Expr(node: e.sons[0], st: st).toNim,
+        Expr(node: e.sons[1], st: st).toNim)
   of knkUnary:
     result = nnkPrefix.newTree(
       Expr(node: e.sons[0], st: st).toNim,
@@ -358,30 +369,13 @@ proc inferType(expression: Expr): KsType =
     result = tstr()
   of knkOp:
     discard
-  of knkId:
-  # first check if it's a method
-    if eqIdent(node.strval, "to_s"):
-      result = tstr()
-    elif eqIdent(node.strval, "to_i"):
-      result = tsint(8)
-    elif eqIdent(node.strval, "length"):
-      result = tsint(8)
-    elif eqIdent(node.strval, "substring"):
-      result = tstr()
-    elif eqIdent(node.strval, "size"):
-      result = tsint(8)
-    elif eqIdent(node.strval, "first"):
-      result = tuint(1) # XXX
-    elif eqIdent(node.strval, "last"):
-      result = tuint(1) # XXX
-    # if not a method, then investigate id
-    else:
-      for a in st.seq:
-        if eqIdent(node.strval, a.id):
-          return a.`type`
-      for i in st.instances:
-        if eqIdent(node.strval, i.id):
-          return i.`type`
+  of knkId: # investigate id
+    for a in st.seq:
+      if eqIdent(node.strval, a.id):
+        return a.`type`
+    for i in st.instances:
+      if eqIdent(node.strval, i.id):
+        return i.`type`
     quit(fmt"Identifier {node.strval} not found")
   of knkEnum: discard # XXX
   of knkArr:
@@ -398,6 +392,24 @@ proc inferType(expression: Expr): KsType =
           isTrue = false
           break
     result = if isTrue: tbarr() else: tarr(types[0])
+  of knkMeth: # XXX
+    doAssert node.sons[0].kind == knkId
+    if eqIdent(node.sons[0].strval, "to_s"):
+      result = tstr()
+    elif eqIdent(node.sons[0].strval, "to_i"):
+      result = tsint(8)
+    elif eqIdent(node.sons[0].strval, "length"):
+      result = tsint(8)
+    elif eqIdent(node.sons[0].strval, "substring"):
+      result = tstr()
+    elif eqIdent(node.sons[0].strval, "size"):
+      result = tsint(8)
+    elif eqIdent(node.sons[0].strval, "first"):
+      result = tuint(1) # XXX
+    elif eqIdent(node.sons[0].strval, "last"):
+      result = tuint(1) # XXX
+    else:
+      quit(fmt"Method {node.sons[0].strval} not found")
   of knkIdx: discard # XXX
   of knkCast: result = tstr()#discard # XXX
   of knkDotExpr: result = tstr()#discard # XXX XXX XXX XXX XXX XXX XXX XXX XXX
@@ -406,7 +418,17 @@ proc inferType(expression: Expr): KsType =
   of knkInfix:
     let (l, r) = (inferType(Expr(node: node.sons[0], st: st)),
                   inferType(Expr(node: node.sons[2], st: st)))
-    doAssert l.kind == r.kind
+
+    # XXX type algebra
+    #case l.kind
+    #of ktkBit
+    #of ktkUInt
+    #of ktkSInt
+    #of ktkFloat
+    #of ktkStr
+    #of ktkArr
+    #of ktkBArr
+    #of ktkUser
     result = l
   of knkTernary:
     doAssert node.sons[0].kind == knkBool
