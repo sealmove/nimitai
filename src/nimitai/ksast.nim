@@ -596,7 +596,7 @@ proc fillType(typ: Type, json: JsonNode) =
   # meta
   if tkMeta in typ.keys:
     if typ.parent == nil:
-      typ.meta = meta(json["meta"], Meta())
+      typ.meta = meta(json["meta"], Meta(bitEndian: eBe))
     else:
       typ.meta = meta(json["meta"], Meta(bitEndian: typ.parent.meta.bitEndian))
   else:

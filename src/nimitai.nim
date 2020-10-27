@@ -21,76 +21,75 @@ proc parse(field: Field, typ: Type): NimNode =
         field.`type`.ksToNimType(typ),
         field.value.toNim)
 
-  if fkType in field.keys:
-    let t = field.`type`
-    case t.kind
-    of ktkBit:
-      let suffix =
-        if t.bitEndian == eNone:
-          $typ.meta.bitEndian
-        else:
-          $t.bitEndian
-      result = newCall(
-        "readBitsInt" & suffix,
-        field.io.toNim,
-        newLit(t.bits))
-      # Bool
-      if t.bits == 1:
-        result = newCall(ident"bool", result)
-    of ktkUInt, ktkSInt, ktkFloat:
-      result = newCall(
-      "read" & $t.kind & $t.bytes & (if t.bytes != 1: $t.endian else: ""),
-      field.io.toNim)
-    of ktkArr: discard # XXX
-    of ktkBArr, ktkStr:
-      if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
-        let term = if t.kind == ktkBArr: field.terminator else: 0
-        result = newCall(
-          ident"readBytesTerm",
-          field.io.toNim,
-          newLit(term),
-          newLit(field.`include`),
-          newLit(field.consume),
-          newLit(field.eosError))
-      elif fkPadRight in field.keys:
-        result = newCall(
-          ident"bytesStripRight",
-          newCall(
-            ident"readBytes",
-            field.io.toNim,
-            newCall(
-              ident"int",
-              field.size.toNim)),
-          newLit(field.padRight))
-      elif field.sizeEos:
-        result = newCall(
-          ident"readBytesFull",
-          field.io.toNim)
+  let t = field.`type`
+  case t.kind
+  of ktkBit:
+    let suffix =
+      if t.bitEndian == eNone:
+        $typ.meta.bitEndian
       else:
-        result = newCall(
+        $t.bitEndian
+    result = newCall(
+      "readBitsInt" & suffix,
+      field.io.toNim,
+      newLit(t.bits))
+    # Bool
+    if t.bits == 1:
+      result = newCall(ident"bool", result)
+  of ktkUInt, ktkSInt, ktkFloat:
+    result = newCall(
+    "read" & $t.kind & $t.bytes & (if t.bytes != 1: $t.endian else: ""),
+    field.io.toNim)
+  of ktkArr: discard # XXX
+  of ktkBArr, ktkStr:
+    if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
+      let term = if t.kind == ktkBArr: field.terminator else: 0
+      result = newCall(
+        ident"readBytesTerm",
+        field.io.toNim,
+        newLit(term),
+        newLit(field.`include`),
+        newLit(field.consume),
+        newLit(field.eosError))
+    elif fkPadRight in field.keys:
+      result = newCall(
+        ident"bytesStripRight",
+        newCall(
           ident"readBytes",
           field.io.toNim,
           newCall(
             ident"int",
-            field.size.toNim))
-      if t.kind == ktkStr:
-        doAssert fkEncoding in field.keys
-        result = newCall(
-          ident"encode",
-          result,
-          newStrLitNode(field.encoding))
-    of ktkUser:
+            field.size.toNim)),
+        newLit(field.padRight))
+    elif field.sizeEos:
       result = newCall(
-        newDotExpr(
-          field.`type`.ksToNimType(typ),
-          ident"read"),
+        ident"readBytesFull",
+        field.io.toNim)
+    else:
+      result = newCall(
+        ident"readBytes",
         field.io.toNim,
-        newDotExpr(
-          ident"this",
-          ident"root"),
-        ident"this")
-  else:
-    result = ident(field.id & "Raw")
+        newCall(
+          ident"int",
+          field.size.toNim))
+    if t.kind == ktkStr:
+      doAssert fkEncoding in field.keys
+      result = newCall(
+        ident"encode",
+        result,
+        newStrLitNode(field.encoding))
+  of ktkUser:
+    result = newCall(
+      newDotExpr(
+        field.`type`.ksToNimType(typ),
+        ident"read"),
+      field.io.toNim,
+      newDotExpr(
+        ident"this",
+        ident"root"),
+      ident"this")
+
+  #result = ident(field.id & "Raw")
 
   if fkEnum in field.keys:
     result = newCall(ident(buildNimTypeId(typ) & field.`enum`[0]), result) # XXX
