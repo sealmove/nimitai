@@ -25,7 +25,7 @@ type
     params*    : JsonNode # XXX
     seq*       : seq[Field]
     instances* : seq[Field]
-    enums*     : Table[string, OrderedTable[string, int]]
+    enums*     : Table[string, OrderedTable[int, VerboseEnum]]
   MetaKey* = enum
     mkApplication   = "application"
     mkBitEndian     = "bit-endian"
@@ -114,6 +114,18 @@ type
     `include`*   : bool
     eosError*    : bool
     io*          : Expr
+  VerboseEnumKey* = enum
+    vekId     = "id"
+    vekDoc    = "doc"
+    vekDocRef = "doc-ref"
+    vekOrigId = "-orig-id"
+  VerboseEnum* = ref object
+    keys*   : set[VerboseEnumKey]
+    id*     : string
+    doc*    : string
+    docRef* : string
+    origId* : string
+
   Expr* = ref object
     node* : KsNode
     st*   : Type
@@ -633,6 +645,27 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
     result.value = jsonToExpr(json["value"], st)
     result.`type` = inferType(result.value)
 
+proc verboseEnum(json: JsonNode): VerboseEnum =
+  result = VerboseEnum()
+  for key in json.keys:
+    result.keys.incl(parseEnum[VerboseEnumKey](key))
+
+  # id
+  if vekId in result.keys:
+    result.id = json["id"].getStr
+
+  # doc
+  if vekDoc in result.keys:
+    result.doc = json["doc"].getStr
+
+  # doc-ref
+  if vekDocRef in result.keys:
+    result.docRef = json["doc-ref"].getStr
+
+  # -orig-id
+  if vekDocRef in result.keys:
+    result.origId = json["-orig-id"].getStr
+
 proc fillType(typ: Type, json: JsonNode) =
   # keys
   for key in json.keys:
@@ -653,11 +686,16 @@ proc fillType(typ: Type, json: JsonNode) =
 
   # enums
   if tkEnums in typ.keys:
-    typ.enums = initTable[string, OrderedTable[string, int]]()
-    for k, v in json["enums"]:
-      typ.enums[k] = initOrderedTable[string, int]()
-      for i, s in v:
-        typ.enums[k][s.getStr] = parseInt(i)
+    typ.enums = initTable[string, OrderedTable[int, VerboseEnum]]()
+    for name, consts in json["enums"]:
+      typ.enums[name] = initOrderedTable[int, VerboseEnum]()
+      for n, ve in consts:
+        case ve.kind
+        of JString:
+          typ.enums[name][parseInt(n)] = VerboseEnum(keys: {vekId}, id: ve.getStr)
+        of JObject:
+          typ.enums[name][parseInt(n)] = verboseEnum(ve)
+        else: discard # should not occur
 
   # types
   if tkTypes in typ.keys:

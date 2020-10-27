@@ -221,11 +221,11 @@ proc typeDecl(section: var NimNode, typ: Type) =
   var defs: seq[NimNode]
   for name, consts in typ.enums:
     var fields = nnkEnumTy.newTree(newEmptyNode())
-    for l, v in consts:
+    for n, ve in consts:
       fields.add(
         nnkEnumFieldDef.newTree(
-          ident(l),
-          newIntLitNode(v)))
+          ident(ve.id),
+          newIntLitNode(n)))
     defs.add(
       nnkTypeDef.newTree(
         ident(buildNimTypeId(typ) & name),
