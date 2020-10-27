@@ -106,7 +106,7 @@ type
     size*        : Expr
     sizeEos*     : bool
     process*     : proc()
-    `enum`*      : string
+    `enum`*      : seq[string]
     encoding*    : string
     padRight*    : byte
     terminator*  : byte
@@ -148,7 +148,7 @@ type
     eBe = "be"
   KaitaiError* = object of Defect
 
-proc tbit(bits: int, endian = eBe): KsType =
+proc tbit(bits: int, endian = eNone): KsType =
   doAssert bits in {1..64}
   KsType(kind: ktkBit, bits: bits, bitEndian: endian)
 
@@ -191,9 +191,9 @@ proc parseType(s: string): KsType =
       result.endian = parseEnum[Endian](s[2..3])
   elif s.match(re"b[1-9][0-9]*(be|le)?"):
     if s.match(re".*(be|le)"):
-      result = tbit(parseInt(s[2..^3]), parseEnum[Endian](s[^2..^1]))
+      result = tbit(parseInt(s[1..^3]), parseEnum[Endian](s[^2..^1]))
     else:
-      result = tbit(parseInt(s[2..^1]))
+      result = tbit(parseInt(s[1..^1]))
   elif s.match(re"strz?"):
     result = tstr(if s.endsWith('z'): true else: false)
   else:
@@ -214,8 +214,6 @@ proc buildNimTypeId*(typ: Type): string =
 # XXX
 # match a scoped id completely and construct either an ident or a dotexpr
 # depending on whether a type or an enum was matched
-proc symbolize(sid: seq[string], typ: Type): NimNode =
-  ident(buildNimTypeId(typ) & sid[0])
 
 proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   case ksType.kind
@@ -237,7 +235,7 @@ proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   of ktkBArr:
     result = nnkBracketExpr.newTree(ident"seq", ident"byte")
   of ktkUser:
-    result = symbolize(ksType.scope, typ)
+    result = ident(buildNimTypeId(typ) & join(ksType.scope))
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
@@ -298,8 +296,12 @@ proc toNim*(expression: Expr): NimNode =
     else   : result = ident(e.strval)
   of knkId: # XXX
     result = ident(e.strval)
-  of knkScopedId:
-    result = symbolize(e.scope, st)
+  of knkEnum: # XXX implement relative matching
+    result = newDotExpr(
+      ident(e.scope[0 .. ^2].join().capitalizeAscii),
+      ident(e.scope[^1]))
+  of knkCast:
+    discard # XXX
   of knkArr:
     let x = newTree(nnkBracket)
     for s in e.sons:
@@ -311,8 +313,6 @@ proc toNim*(expression: Expr): NimNode =
     result = nnkBracketExpr.newTree(
       Expr(node: e.sons[0], st: st).toNim,
       Expr(node: e.sons[1], st: st).toNim)
-  of knkCast:
-    discard # XXX
   of knkDotExpr:
     result = newDotExpr(
       Expr(node: e.sons[0], st: st).toNim,
@@ -334,38 +334,44 @@ proc toNim*(expression: Expr): NimNode =
       nnkElse.newTree(Expr(node: e.sons[2], st: st).toNim))
 
 # XXX this is the hardest part of the whole compiler
-proc infertype(expression: Expr): KsType =
+proc inferType(expression: Expr): KsType =
   let (node, kind, st) = (expression.node, expression.node.kind, expression.st)
   case kind
   of knkBool:
     result = tbit(1)
-  # XXX Check value and choose just enough bytes (1,2,4,8) for the type
+  # XXX what if it doesn't fit into an int? (use uint)
   of knkInt:
-    result = tsint(8)
+    case node.intval
+    of -0x8000 .. 0x7fff:
+      result = tsint(2)
+    of -0x8000_0000 .. -0x8001, 0x8000 .. 0x7fff_ffff:
+      result = tsint(4)
+    of low(int) .. -0x8000_0001, 0x8000_0000 .. high(int):
+      result = tsint(8)
   of knkFloat:
     result = tfloat(8)
   of knkStr:
     result = tstr()
   of knkOp:
     discard
-  of knkId: result = tsint(8)#discard # XXX
+  of knkId: # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
   #  # first check if it's a method
-  #  if eqIdent(expr, "to_s"):
-  #    return ident"string"
-  #  elif eqIdent(expr, "to_i"):
-  #    return ident"int"
-  #  elif eqIdent(expr, "length"):
-  #    return ident"int"
-  #  elif eqIdent(expr, "substring"):
-  #    return ident"string"
-  #  elif eqIdent(expr, "size"):
-  #    return ident"int"
-  #  elif eqIdent(expr, "first"):
-  #    return ident"byte"
-  #  elif eqIdent(expr, "last"):
-  #    return ident"byte"
-  #  # if not a method then search 
-  #  else:
+    if eqIdent(node.strval, "to_s"):
+      result = tstr()
+    elif eqIdent(node.strval, "to_i"):
+      result = tsint(8)
+    elif eqIdent(node.strval, "length"):
+      result = tsint(8)
+    elif eqIdent(node.strval, "substring"):
+      result = tstr()
+    elif eqIdent(node.strval, "size"):
+      result = tsint(8)
+    elif eqIdent(node.strval, "first"):
+      result = tuint(1) # XXX
+    elif eqIdent(node.strval, "last"):
+      result = tuint(1) # XXX
+    # if not a method, then investigate id
+    else: result = tsint(8) # XXX
   #    for a in context.seq:
   #      if eqIdent(expr, a.id):
   #        return a.`type`.parsed
@@ -373,10 +379,10 @@ proc infertype(expression: Expr): KsType =
   #      if eqIdent(expr, i.id):
   #        return i.`type`.parsed
   #  quit(fmt"Identifier {repr(expr)} not found")
-  of knkScopedId: discard # XXX
+  of knkEnum: discard # XXX
   of knkArr:
     let
-      types = node.sons.mapIt(infertype(Expr(node: it, st: st)))
+      types = node.sons.mapIt(inferType(Expr(node: it, st: st)))
       typekind = types[0].kind
     var
       isTrue = true
@@ -390,18 +396,18 @@ proc infertype(expression: Expr): KsType =
     result = if isTrue: tbarr() else: tarr(types[0])
   of knkIdx: discard # XXX
   of knkCast: result = tstr()#discard # XXX
-  of knkDotExpr: result = tstr()#discard # XXX
+  of knkDotExpr: result = tstr()#discard # XXX XXX XXX XXX XXX XXX XXX XXX XXX
   of knkUnary:
-    result = infertype(Expr(node: node.sons[1], st: st))
+    result = inferType(Expr(node: node.sons[1], st: st))
   of knkInfix:
-    let (l, r) = (infertype(Expr(node: node.sons[0], st: st)),
-                  infertype(Expr(node: node.sons[2], st: st)))
+    let (l, r) = (inferType(Expr(node: node.sons[0], st: st)),
+                  inferType(Expr(node: node.sons[2], st: st)))
     #doAssert l == r
     result = l
   of knkTernary:
     doAssert node.sons[0].kind == knkBool
-    let (t, f) = (infertype(Expr(node: node.sons[1], st: st)),
-                  infertype(Expr(node: node.sons[2], st: st)))
+    let (t, f) = (inferType(Expr(node: node.sons[1], st: st)),
+                  inferType(Expr(node: node.sons[2], st: st)))
     doAssert t == f
     result = t
 
@@ -481,6 +487,7 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
   if mkEndian in result.keys:
     result.endian = parseEnum[Endian](json["endian"].getStr)
 
+  # bit-endian
   if mkBitEndian in result.keys:
     result.bitEndian = parseEnum[Endian](json["bit-endian"].getStr)
 
@@ -504,6 +511,8 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   # type
   if fkType in result.keys:
     result.`type` = parseType(json["type"].getStr)
+  else:
+    result.`type` = tbarr()
 
   # repeat
   if fkRepeat in result.keys:
@@ -525,8 +534,9 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
 
   # XXX process
 
-  # XXX enum
-  #if FieldKey.`enum` in result.keys:
+  # enum
+  if fkEnum in result.keys:
+    result.`enum` = split(json["enum"].getStr, "::")
 
   # encoding
   if fkEncoding in result.keys:
@@ -576,7 +586,7 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   # value
   if fkValue in result.keys:
     result.value = jsonToExpr(json["value"], st)
-    result.`type` = infertype(result.value)
+    result.`type` = inferType(result.value)
 
 proc fillType(typ: Type, json: JsonNode) =
   # keys
@@ -585,12 +595,10 @@ proc fillType(typ: Type, json: JsonNode) =
 
   # meta
   if tkMeta in typ.keys:
-    var defaults: Meta
     if typ.parent == nil:
-      defaults = Meta(bitEndian: eBe)
+      typ.meta = meta(json["meta"], Meta())
     else:
-      defaults = Meta(bitEndian: typ.parent.meta.bitEndian)
-    typ.meta = meta(json["meta"], defaults)
+      typ.meta = meta(json["meta"], Meta(bitEndian: typ.parent.meta.bitEndian))
   else:
     typ.meta = Meta() # need to do this because meta is an object
 

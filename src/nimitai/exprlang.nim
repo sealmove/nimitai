@@ -12,10 +12,10 @@ type
     knkStr
     knkOp
     knkId
-    knkScopedId
+    knkEnum
+    knkCast
     knkArr
     knkIdx
-    knkCast
     knkDotExpr
     knkUnary
     knkInfix
@@ -28,7 +28,7 @@ type
       intval*: BiggestInt
     of knkFloat:
       floatval*: float
-    of knkScopedId:
+    of knkEnum, knkCast:
       scope*: seq[string]
     of knkStr, knkOp, knkId:
       strval*: string
@@ -37,7 +37,7 @@ type
   ParsingError* = object of CatchableError
 
 proc isFatherKind(kind: KsNodeKind): bool =
-  kind in {knkArr, knkIdx, knkCast, knkDotExpr, knkUnary, knkInfix, knkTernary}
+  kind in {knkArr, knkIdx, knkDotExpr, knkUnary, knkInfix, knkTernary}
 
 proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
@@ -59,7 +59,7 @@ proc toKs*(str: string): KsNode =
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
     prefix    <- idx | arr | unary | parExpr |
-                 tBool | tFloat | tInt | tStr | tCast | tScoped | tId
+                 tBool | tFloat | tInt | tStr | tCast | tEnum | tId
     unary     <- >{'+','-'} * expr:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
     idx       <- >id * S * arrOpen * expr * arrClose:
@@ -120,12 +120,12 @@ proc toKs*(str: string): KsNode =
     tStr      <- ('\"' * >*(Print - '\"') * '\"') |
                  ('\'' * >*(Print - '\'') * '\'') * S:
       s[^1].add KsNode(kind: knkStr, strval: $1)
-    tCast     <- "as<" * S * expr * '>' * S:
-      s[^1].add newKsNode(knkCast, pop(s[^1]))
-    tScoped   <- >(id * "::" * id * *("::" * id)) * S:
-      s[^1].add KsNode(kind: knkScopedId, scope: split($1, "::"))
     tId       <- >id * S:
       s[^1].add KsNode(kind: knkId, strval: $1)
+    tEnum     <- >(id * "::" * id * *("::" * id)) * S:
+      s[^1].add KsNode(kind: knkEnum, scope: split($1, "::"))
+    tCast     <- "as<" * S * >(id * *("::" * id)) * S * '>' * S:
+      s[^1].add KsNode(kind: knkCast, scope: split($1, "::"))
 
     # Aux
     S        <- *Space
@@ -158,7 +158,7 @@ proc toKs*(str: string): KsNode =
 proc debug(ks: KsNode, n = 0) =
   stdout.write(" ".repeat(n) & ($ks.kind)[3..^1])
   case ks.kind
-  of knkScopedId:
+  of knkEnum, knkCast:
     stdout.write(" " & ks.scope.join(", ") & "\n")
   of knkBool:
     stdout.write(" " & $ks.boolval & "\n")
@@ -173,4 +173,4 @@ proc debug(ks: KsNode, n = 0) =
     for s in ks.sons:
       debug(s, n + 2)
 
-#debug("expr + 2 + a.as<b::c>".toKs)
+#debug("expr + 2 + a.as<b::c> * d::e::f".toKs)

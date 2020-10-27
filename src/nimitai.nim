@@ -1,4 +1,4 @@
-import json, macros, regex, strutils, tables
+import json, macros, tables
 import nimitai/ksast
 
 # XXX add --> template this: untyped = result
@@ -89,9 +89,11 @@ proc parse(field: Field, typ: Type): NimNode =
           ident"this",
           ident"root"),
         ident"this")
+  else:
+    result = ident(field.id & "Raw")
 
   if fkEnum in field.keys:
-    result = newCall(ident(field.`enum`), result)
+    result = newCall(ident(buildNimTypeId(typ) & field.`enum`[0]), result) # XXX
 
 proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()
@@ -185,7 +187,7 @@ proc typeDecl(section: var NimNode, typ: Type) =
       pt))
 
   for a in typ.seq:
-    let t = if fkEnum in a.keys: ident(a.`enum`)
+    let t = if fkEnum in a.keys: ident(buildNimTypeId(typ) & a.`enum`[0]) # XXX
             else: a.`type`.ksToNimType(typ)
     fields.add(
       newIdentDefs(
