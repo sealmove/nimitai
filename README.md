@@ -71,28 +71,66 @@ buffered_struct.json
 }
 ```
 
-buffered_struct.bin (hex view)
-```bin
-10 00 00 00 42 00 00 00 43 00 00 00 ff ff ff ff
-ff ff ff ff 08 00 00 00 44 00 00 00 45 00 00 00
-ee 00 00 00
-```
-
 buffered_struct.nim
 ```nim
 import json, nimitai, nimitai/runtime, strutils
 injectParser(parseJson(readFile"buffered_struct.json"))
-let x = BufferedStruct.fromFile("buffered_struct.bin")
-echo "Block1, number1: " & toHex(x.block1.number1.int64, 2)
-echo "Block1, number2: " & toHex(x.block1.number2.int64, 2)
-echo "Block2, number1: " & toHex(x.block2.number1.int64, 2)
-echo "Block2, number2: " & toHex(x.block2.number2.int64, 2)
 ```
 
-output:
-```
-Block1, number1: 42
-Block1, number2: 43
-Block2, number1: 44
-Block2, number2: 45
+generated code
+```nim
+type
+  Buffered_struct = ref object of KaitaiStruct
+    parent: KaitaiStruct
+    len1: uint32
+    block1: Buffered_structblock
+    len2: uint32
+    block2: Buffered_structblock
+    finisher: uint32
+
+  Buffered_structBlock = ref object of KaitaiStruct
+    parent: Buffered_struct
+    number1: uint32
+    number2: uint32
+
+proc read(_: typedesc[Buffered_structBlock]; io: KaitaiStream;
+          root: KaitaiStruct; parent: Buffered_struct): Buffered_structBlock
+proc read(_: typedesc[Buffered_struct]; io: KaitaiStream; root: KaitaiStruct;
+          parent: KaitaiStruct): Buffered_struct
+
+proc read(_: typedesc[Buffered_structBlock]; io: KaitaiStream;
+          root: KaitaiStruct; parent: Buffered_struct): Buffered_structBlock =
+  template this(): untyped = result
+  this = Buffered_structBlock(io: io, parent: parent)
+  this.root = if root == nil: this else: root
+  let number1 = readu4le(this.io)
+  this.number1 = number1
+  let number2 = readu4le(this.io)
+  this.number2 = number2
+
+proc read(_: typedesc[Buffered_struct]; io: KaitaiStream; root: KaitaiStruct;
+          parent: KaitaiStruct): Buffered_struct =
+  template this(): untyped = result
+  this = Buffered_struct(io: io, parent: parent)
+  this.root = if root == nil: this else: root
+  let len1 = readu4le(this.io)
+  this.len1 = len1
+  let block1Raw = readBytes(this.io, int(len1))
+  let block1Io = newKaitaiStream(block1Raw)
+  let block1 = Buffered_structblock.read(block1io, this.root, this)
+  this.block1 = block1
+  let len2 = readu4le(this.io)
+  this.len2 = len2
+  let block2Raw = readBytes(this.io, int(len2))
+  let block2Io = newKaitaiStream(block2Raw)
+  let block2 = Buffered_structblock.read(block2io, this.root, this)
+  this.block2 = block2
+  let finisher = readu4le(this.io)
+  this.finisher = finisher
+
+proc fromFile(_: typedesc[Buffered_structBlock]; filename: string): Buffered_structBlock =
+  read(Buffered_structBlock, newKaitaiFileStream(filename), nil, nil)
+
+proc fromFile(_: typedesc[Buffered_struct]; filename: string): Buffered_struct =
+  read(Buffered_struct, newKaitaiFileStream(filename), nil, nil)
 ```
