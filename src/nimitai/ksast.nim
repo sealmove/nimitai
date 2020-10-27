@@ -342,7 +342,11 @@ proc inferType(expression: Expr): KsType =
   # XXX what if it doesn't fit into an int? (use uint)
   of knkInt:
     case node.intval
-    of -0x8000 .. 0x7fff:
+    of -0x80 .. -0x01:
+      result = tsint(1)
+    of 0x00 .. 0xff:
+      result = tuint(1)
+    of -0x8000 .. -0x81, 0x100 .. 0x7fff:
       result = tsint(2)
     of -0x8000_0000 .. -0x8001, 0x8000 .. 0x7fff_ffff:
       result = tsint(4)
@@ -378,7 +382,7 @@ proc inferType(expression: Expr): KsType =
       for i in st.instances:
         if eqIdent(node.strval, i.id):
           return i.`type`
-    quit(fmt"Identifier {repr(expr)} not found")
+    quit(fmt"Identifier {node.strval} not found")
   of knkEnum: discard # XXX
   of knkArr:
     let
@@ -402,13 +406,13 @@ proc inferType(expression: Expr): KsType =
   of knkInfix:
     let (l, r) = (inferType(Expr(node: node.sons[0], st: st)),
                   inferType(Expr(node: node.sons[2], st: st)))
-    #doAssert l == r
+    doAssert l.kind == r.kind
     result = l
   of knkTernary:
     doAssert node.sons[0].kind == knkBool
     let (t, f) = (inferType(Expr(node: node.sons[1], st: st)),
                   inferType(Expr(node: node.sons[2], st: st)))
-    doAssert t == f
+    doAssert t.kind == f.kind
     result = t
 
 proc meta(json: JsonNode, defaults: Meta): Meta =
