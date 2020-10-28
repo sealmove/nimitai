@@ -440,7 +440,8 @@ proc inferType(expression: Expr): KsType =
       quit(fmt"Method {node.sons[0].strval} not found")
   of knkIdx: discard # XXX
   of knkCast: result = tstr()#discard # XXX
-  of knkDotExpr: result = tstr()#discard # XXX XXX XXX XXX XXX XXX XXX XXX XXX
+  of knkDotExpr:
+    result = infertype(Expr(node: node.sons[1], st: st))
   of knkUnary:
     result = inferType(Expr(node: node.sons[1], st: st))
   of knkInfix:

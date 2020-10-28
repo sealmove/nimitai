@@ -312,16 +312,31 @@ proc readProc(typ: Type): NimNode =
       newColonExpr(
         ident"parent",
         ident"parent"))
+    templates = newStmtList(
+      nnkTemplateDef.newTree(
+        ident"this",
+        newEmptyNode(),
+        newEmptyNode(),
+        nnkFormalParams.newTree(ident"untyped"),
+        newEmptyNode(),
+        newEmptyNode(),
+        ident"result"))
+
+  for i in typ.instances:
+    templates.add(
+      nnkTemplateDef.newTree(
+        ident(i.id),
+        newEmptyNode(),
+        newEmptyNode(),
+        nnkFormalParams.newTree(ident"untyped"),
+        newEmptyNode(),
+        newEmptyNode(),
+        newDotExpr(
+          ident"this",
+          ident(i.id))))
 
   result.body = newStmtList(
-    nnkTemplateDef.newTree(
-      ident"this",
-      newEmptyNode(),
-      newEmptyNode(),
-      nnkFormalParams.newTree(ident"untyped"),
-      newEmptyNode(),
-      newEmptyNode(),
-      ident"result"),
+    templates,
     newAssignment(
       ident"this",
       constructor),
