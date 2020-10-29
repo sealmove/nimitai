@@ -136,12 +136,13 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
             ident"io"))))
     result.add(
       newCall(
+        ident"seek",
         newDotExpr(
-          newDotExpr(
-            ident"this",
-            ident"io"),
-          ident"seek"),
-        field.pos.toNim))
+          ident"this",
+          ident"io"),
+        newCall(
+          ident"int",
+          field.pos.toNim)))
 
   if fkSize in field.keys:
     let stmts = substream(
@@ -184,7 +185,9 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
         newDotExpr(
           ident"this",
           ident"io"),
-        ident(field.id & "SavePos")))
+        newCall(
+          ident"int",
+          ident(field.id & "SavePos"))))
 
   if fkIf in field.keys:
     var stmts = newStmtList()
