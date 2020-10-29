@@ -124,22 +124,23 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
 
 proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
   let id = ident(field.id & postfix)
-  var posId: NimNode
 
   if fkPos in field.keys:
     result.add(
-      newAssignment(
-        newDotExpr(
-          ident"this",
-          ident(field.id & "Pos")),
+      newLetStmt(
+        ident(field.id & "SavePos"),
         newCall(
           ident"pos",
-          field.io.toNim)))
+          newDotExpr(
+            ident"this",
+            ident"io"))))
     result.add(
       newCall(
         newDotExpr(
-          field.io.toNim,
-          ident"skip"),
+          newDotExpr(
+            ident"this",
+            ident"io"),
+          ident"seek"),
         field.pos.toNim))
 
   if fkSize in field.keys:
@@ -179,10 +180,11 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
   if fkPos in field.keys:
     result.add(
       newCall(
+        ident"seek",
         newDotExpr(
-          field.io.toNim,
-          ident"seek"),
-        posId))
+          ident"this",
+          ident"io"),
+        ident(field.id & "SavePos")))
 
   if fkIf in field.keys:
     var stmts = newStmtList()
@@ -190,8 +192,6 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
     result.setLen(1)
     result[0] = newIfStmt(
       (field.`if`.toNim, stmts))
-
-  #result.add(newAssignment(newDotExpr(ident"this", id), id))
 
 proc typeDecl(section: var NimNode, typ: Type) =
   var fields = newTree(nnkRecList)
@@ -223,6 +223,14 @@ proc typeDecl(section: var NimNode, typ: Type) =
 
   for i in typ.instances:
     fields.add(
+      newIdentDefs(
+        ident(i.id & "Io"),
+        ident(streamTypeName)),
+      newIdentDefs(
+        ident(i.id & "Raw"),
+        nnkBracketExpr.newTree(
+          ident"seq",
+          ident"byte")),
       newIdentDefs(
         ident(i.id & "Inst"),
         i.`type`.ksToNimType),
