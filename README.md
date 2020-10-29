@@ -81,58 +81,58 @@ buffered_struct.json
 generated code
 ```nim
 type
-  Buffered_struct = ref object of KaitaiStruct
-    parent: KaitaiStruct
-    len1: uint32
-    block1: Buffered_structblock
-    len2: uint32
-    block2: Buffered_structblock
-    finisher: uint32
+  Buffered_struct* = ref object of KaitaiStruct
+    parent*: KaitaiStruct
+    len1*: uint32
+    block1*: Buffered_structBlock
+    block1Io: KaitaiStream
+    block1Raw: seq[byte]
+    len2*: uint32
+    block2*: Buffered_structBlock
+    block2Io: KaitaiStream
+    block2Raw: seq[byte]
+    finisher*: uint32
 
-  Buffered_structBlock = ref object of KaitaiStruct
-    parent: Buffered_struct
-    number1: uint32
-    number2: uint32
+  Buffered_structBlock* = ref object of KaitaiStruct
+    parent*: Buffered_struct
+    number1*: uint32
+    number2*: uint32
 
-proc read(_: typedesc[Buffered_structBlock]; io: KaitaiStream;
+proc read*(_: typedesc[Buffered_structBlock]; io: KaitaiStream;
           root: KaitaiStruct; parent: Buffered_struct): Buffered_structBlock
-proc read(_: typedesc[Buffered_struct]; io: KaitaiStream; root: KaitaiStruct;
+proc read*(_: typedesc[Buffered_struct]; io: KaitaiStream; root: KaitaiStruct;
           parent: KaitaiStruct): Buffered_struct
-
-proc read(_: typedesc[Buffered_structBlock]; io: KaitaiStream;
+proc read*(_: typedesc[Buffered_structBlock]; io: KaitaiStream;
           root: KaitaiStruct; parent: Buffered_struct): Buffered_structBlock =
-  template this(): untyped = result
+  template this(): untyped =
+    result
+
   this = Buffered_structBlock(io: io, parent: parent)
   this.root = if root == nil: this else: root
-  let number1 = readu4le(this.io)
-  this.number1 = number1
-  let number2 = readu4le(this.io)
-  this.number2 = number2
+  this.number1 = readu4le(this.io)
+  this.number2 = readu4le(this.io)
 
-proc read(_: typedesc[Buffered_struct]; io: KaitaiStream; root: KaitaiStruct;
+proc read*(_: typedesc[Buffered_struct]; io: KaitaiStream; root: KaitaiStruct;
           parent: KaitaiStruct): Buffered_struct =
-  template this(): untyped = result
+  template this(): untyped =
+    result
+
   this = Buffered_struct(io: io, parent: parent)
   this.root = if root == nil: this else: root
-  let len1 = readu4le(this.io)
-  this.len1 = len1
-  let block1Raw = readBytes(this.io, int(len1))
-  let block1Io = newKaitaiStream(block1Raw)
-  let block1 = Buffered_structblock.read(block1io, this.root, this)
-  this.block1 = block1
-  let len2 = readu4le(this.io)
-  this.len2 = len2
-  let block2Raw = readBytes(this.io, int(len2))
-  let block2Io = newKaitaiStream(block2Raw)
-  let block2 = Buffered_structblock.read(block2io, this.root, this)
-  this.block2 = block2
-  let finisher = readu4le(this.io)
-  this.finisher = finisher
+  this.len1 = readu4le(this.io)
+  this.block1Raw = readBytes(this.io, int(this.len1))
+  this.block1Io = newKaitaiStream(this.block1Raw)
+  this.block1 = Buffered_structBlock.read(this.block1io, this.root, this)
+  this.len2 = readu4le(this.io)
+  this.block2Raw = readBytes(this.io, int(this.len2))
+  this.block2Io = newKaitaiStream(this.block2Raw)
+  this.block2 = Buffered_structBlock.read(this.block2io, this.root, this)
+  this.finisher = readu4le(this.io)
 
-proc fromFile(_: typedesc[Buffered_structBlock]; filename: string): Buffered_structBlock =
+proc fromFile*(_: typedesc[Buffered_structBlock]; filename: string): Buffered_structBlock =
   read(Buffered_structBlock, newKaitaiFileStream(filename), nil, nil)
 
-proc fromFile(_: typedesc[Buffered_struct]; filename: string): Buffered_struct =
+proc fromFile*(_: typedesc[Buffered_struct]; filename: string): Buffered_struct =
   read(Buffered_struct, newKaitaiFileStream(filename), nil, nil)
 ```
 
