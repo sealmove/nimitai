@@ -184,6 +184,13 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
           ident"seek"),
         posId))
 
+  if fkIf in field.keys:
+    var stmts = newStmtList()
+    for s in result: stmts.add(s)
+    result.setLen(1)
+    result[0] = newIfStmt(
+      (field.`if`.toNim, stmts))
+
   #result.add(newAssignment(newDotExpr(ident"this", id), id))
 
 proc typeDecl(section: var NimNode, typ: Type) =

@@ -631,7 +631,9 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
 
   # XXX repeat-until
 
-  # XXX if
+  # if
+  if fkIf in result.keys:
+    result.`if` = jsonToExpr(json["if"], result.st)
 
   # size
   if fkSize in result.keys:
