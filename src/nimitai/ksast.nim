@@ -169,17 +169,17 @@ proc walkdown(typ: Type, path: seq[string]): Type =
     typ = typ
     path = path
   while path != @[]:
-    var matched = false
-    for t in typ.types:
-      if eqIdent(path[^1], typ.id):
-        typ = t
-        matched = true
-    for e in typ.enums.keys:
-      if eqIdent(path[^1], e):
-        matched = true
-    if not matched:
+    block walking:
+      for t in typ.types:
+        if eqIdent(path[^1], t.id):
+          typ = t
+          discard pop(path)
+          break walking
+      for e in typ.enums.keys:
+        if eqIdent(path[^1], e):
+          discard pop(path)
+          break walking
       quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
-    discard pop(path)
   return typ
 
 proc follow(typ: Type, name: string, path: seq[string]): Type =
