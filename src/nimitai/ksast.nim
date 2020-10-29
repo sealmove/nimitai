@@ -369,9 +369,14 @@ proc toNim*(expression: Expr): NimNode =
   of knkId: # XXX
     result = newDotExpr(ident"this", ident(e.strval))
   of knkEnum: # XXX implement relative matching
-    result = newDotExpr(
-      ident(matchAndBuildEnum(e.scope[0..^2], st)),
-      ident(e.scope[^1]))
+    if st != nil:
+      result = newDotExpr(
+        ident(matchAndBuildEnum(e.scope[0..^2], st)),
+        ident(e.scope[^1]))
+    else: # needed for generating tests
+      result = newDotExpr(
+        ident(join(e.scope[0..^2]).capitalizeAscii),
+        ident(e.scope[^1]))
   of knkCast:
     discard # XXX
   of knkArr:
@@ -391,15 +396,17 @@ proc toNim*(expression: Expr): NimNode =
       Expr(node: e.sons[0], st: st).toNim,
       Expr(node: e.sons[1], st: st).toNim)
   of knkDotExpr:
-    # ! special case because of Nim AST peculiarity
     var (l, r) = (e.sons[0], e.sons[1])
-    if r.kind == knkMeth:
+    case r.kind
+    # ! special case because of Nim AST peculiarity
+    of knkMeth:
       r.sons.insert(l, 1)
       result = Expr(node: r, st: st).toNim
-    else:
+    of knkId:
       result = newDotExpr(
         Expr(node: l, st: st).toNim,
         ident(r.strval))
+    else: discard # should not occur
   of knkUnary:
     result = nnkPrefix.newTree(
       Expr(node: e.sons[0], st: st).toNim,

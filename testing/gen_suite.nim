@@ -15,7 +15,7 @@ proc test(json: JsonNode): NimNode =
           ident"readFile",
           newLit(&"specs/{id}.ksj")))),
     newLetStmt(
-      newIdentNode("r"),
+      newIdentNode("this"),
       newCall(
         newDotExpr(
           ident(id.capitalizeAscii),
@@ -40,10 +40,7 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           infix(
-            Expr(node: newKsNode(
-              knkDotExpr,
-              KsNode(kind: knkId, strval: "r"),
-              toKs(a["actual"].getStr))).toNim,
+            Expr(node: toKs(a["actual"].getStr)).toNim,
             "==",
             nodeExpected)))
 
