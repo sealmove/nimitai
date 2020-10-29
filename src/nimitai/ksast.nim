@@ -250,7 +250,7 @@ proc parseType(s: string, typ: Type): KsType =
     if s.match(re".*(be|le)"):
       result.endian = parseEnum[Endian](s[2..3])
   elif s.match(re"s[1248](be|le)?"):
-    result = tuint(parseInt(s[1..1]))
+    result = tsint(parseInt(s[1..1]))
     if s.match(re".*(be|le)"):
       result.endian = parseEnum[Endian](s[2..3])
   elif s.match(re"f[48](be|le)?"):
