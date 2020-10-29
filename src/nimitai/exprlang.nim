@@ -99,11 +99,11 @@ proc toKs*(str: string): KsNode =
     unary     <- >("+"|"-"|"not") * expr * S:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
     parExpr   <- ('(' * expr * ')') * S ^ 0
-    infix     <- >("?") * S * expr * ":" * S              * expr ^  1 |
-                 >("not")                                 * expr ^  2 |
-                 >("or" | "^")                            * expr ^  3 |
-                 >("and")                                 * expr ^  4 |
-                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  5 |
+    infix     <- >("not")                                 * expr ^  1 |
+                 >("or" | "^")                            * expr ^  2 |
+                 >("and")                                 * expr ^  3 |
+                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  4 |
+                 >("?") * S * expr * ":" * S              * expr ^  5 |
                  >("<<" | ">>" | "&" | "|")               * expr ^  6 |
                  >("+" | "-")                             * expr ^  7 |
                  >("*" | "/")                             * expr ^  8 |
@@ -176,4 +176,6 @@ proc toKs*(str: string): KsNode =
   elif s[^1].len != 1:
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
-  #debug(result)
+  debug(result)
+
+static: discard "a == b ? c : d".toKs
