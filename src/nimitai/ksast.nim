@@ -14,18 +14,18 @@ type
     tkInstances = "instances"
     tkEnums     = "enums"
   Type* = ref object
-    keys*      : set[TypeKey]
-    isImpure*  : bool
-    parent*    : Type
-    id*        : string
-    types*     : seq[Type]
-    meta*      : Meta
-    doc*       : string
-    docRef*    : string
-    params*    : JsonNode # XXX
-    seq*       : seq[Field]
-    instances* : seq[Field]
-    enums*     : Table[string, OrderedTable[int, VerboseEnum]]
+    keys*       : set[TypeKey]
+    supertypes* : seq[Type]
+    parent*     : Type
+    id*         : string
+    types*      : seq[Type]
+    meta*       : Meta
+    doc*        : string
+    docRef*     : string
+    params*     : JsonNode # XXX
+    seq*        : seq[Field]
+    instances*  : seq[Field]
+    enums*      : Table[string, OrderedTable[int, VerboseEnum]]
   MetaKey* = enum
     mkApplication   = "application"
     mkBitEndian     = "bit-endian"
@@ -618,6 +618,8 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   # type
   if fkType in result.keys:
     result.`type` = parseType(json["type"].getStr, result.st)
+    if result.`type`.kind == ktkUser:
+      result.`type`.usertype.supertypes.add(st)
   else:
     result.`type` = tbarr()
 

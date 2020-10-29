@@ -8,9 +8,9 @@ const
   streamTypeName = "KaitaiStream"
 
 proc parentType(typ: Type): NimNode =
-  if typ.parent == nil or typ.isImpure:
+  if typ.supertypes.len != 1:
     return ident(rootTypeName)
-  return ident(buildNimTypeId(typ.parent))
+  return ident(buildNimTypeId(typ.supertypes[0]))
 
 proc parse(field: Field, typ: Type): NimNode =
   if fkValue in field.keys:
