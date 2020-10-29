@@ -101,18 +101,17 @@ proc toKs*(str: string): KsNode =
       s[^1].add newNode
     idx       <- >id * S * '[' * expr * ']' * S:
       s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
-    unary     <- >("+"|"-"|"not") * expr * S:
+    unary     <- (>("+"|"-"|"not") * S * expr * S) ^ 9:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
-    parExpr   <- ('(' * expr * ')') * S ^ 0
+    parExpr   <- ('(' * expr * ')' * S) ^ 0
     infix     <- >("?") * S * expr ^ 1 * ":" * S          * expr      |
-                 >("not")                                 * expr ^  2 |
-                 >("or" | "^")                            * expr ^  3 |
-                 >("and")                                 * expr ^  4 |
-                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  5 |
-                 >("<<" | ">>" | "&" | "|")               * expr ^  6 |
-                 >("+" | "-")                             * expr ^  7 |
-                 >("*" | "/")                             * expr ^  8 |
-                 >("%")                                   * expr ^  9 |
+                 >("or" | "^")                            * expr ^  2 |
+                 >("and")                                 * expr ^  3 |
+                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  4 |
+                 >("<<" | ">>" | "&" | "|")               * expr ^  5 |
+                 >("+" | "-")                             * expr ^  6 |
+                 >("*" | "/")                             * expr ^  7 |
+                 >("%")                                   * expr ^  8 |
                  >(".")                                   * expr ^ 10:
       case $1
       of ".":
@@ -182,6 +181,6 @@ proc toKs*(str: string): KsNode =
   elif s[^1].len != 1:
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
-  #debug(result)
+  debug(result)
 
-#static: discard "a == b ? c : d".toKs
+static: discard "-5 / 3".toKs
