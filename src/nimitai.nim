@@ -8,17 +8,18 @@ const
   streamTypeName = "KaitaiStream"
 
 proc parentType(typ: Type): NimNode =
-  if typ.parent == nil: ident(rootTypeName)
-  else: ident(buildNimTypeId(typ.parent))
+  if typ.parent == nil or typ.isImpure:
+    return ident(rootTypeName)
+  return ident(buildNimTypeId(typ.parent))
 
 proc parse(field: Field, typ: Type): NimNode =
   if fkValue in field.keys:
-    let t = field.`type`.ksToNimType(typ)
+    let t = field.`type`.ksToNimType
     if t.kind == nnkBracketExpr:
       return field.value.toNim
     else:
       return newCall(
-        field.`type`.ksToNimType(typ),
+        field.`type`.ksToNimType,
         field.value.toNim)
 
   let t = field.`type`
@@ -83,7 +84,7 @@ proc parse(field: Field, typ: Type): NimNode =
   of ktkUser:
     result = newCall(
       newDotExpr(
-        field.`type`.ksToNimType(typ),
+        field.`type`.ksToNimType,
         ident"read"),
       field.io.toNim,
       newDotExpr(
@@ -187,22 +188,19 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
 
 proc typeDecl(section: var NimNode, typ: Type) =
   var fields = newTree(nnkRecList)
-  let
-    id = buildNimTypeId(typ)
-    pt = if typ.isImpure: ident(rootTypeName)
-         else: parentType(typ)
+  let id = buildNimTypeId(typ)
 
   fields.add(
     newIdentDefs(
       ident"parent",
-      pt))
+      parentType(typ)))
 
   for a in typ.seq:
     let t =
       if fkEnum in a.keys:
         ident(matchAndBuildEnum(a.`enum`, typ))
       else:
-        a.`type`.ksToNimType(typ)
+        a.`type`.ksToNimType
     fields.add(
       newIdentDefs(
         ident(a.id),
@@ -220,7 +218,7 @@ proc typeDecl(section: var NimNode, typ: Type) =
     fields.add(
       newIdentDefs(
         ident(i.id & "Inst"),
-        i.`type`.ksToNimType(typ)),
+        i.`type`.ksToNimType),
       newIdentDefs(
         ident(i.id & "Cached"),
         ident"bool"))
@@ -256,10 +254,7 @@ proc typeDecl(section: var NimNode, typ: Type) =
     typeDecl(section, t)
 
 proc readProcParams(typ: Type): NimNode =
-  let
-    id = buildNimTypeId(typ)
-    pt = if typ.isImpure: ident(rootTypeName)
-         else: parentType(typ)
+  let id = buildNimTypeId(typ)
 
   result = nnkFormalParams.newTree(
     ident(id),
@@ -276,13 +271,13 @@ proc readProcParams(typ: Type): NimNode =
       ident(rootTypeName)),
     newIdentDefs(
       ident"parent",
-      pt))
+      parentType(typ)))
 
 proc instProcParams(inst: Field, typ: Type): NimNode =
   let id = buildNimTypeId(typ)
 
   result = nnkFormalParams.newTree(
-    inst.`type`.ksToNimType(typ),
+    inst.`type`.ksToNimType,
     newIdentDefs(
       ident"this",
       ident(id)))

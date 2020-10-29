@@ -153,13 +153,43 @@ type
     of ktkBArr:
       discard
     of ktkUser:
-      name*: string
-      path*: seq[string] # stored in reverse order for easy popping
+      usertype*: Type
   Endian* = enum
     eNone
     eLe = "le"
     eBe = "be"
   KaitaiError* = object of Defect
+
+# XXX handle enum matching
+proc walkdown(typ: Type, path: seq[string]): Type =
+  var
+    typ = typ
+    path = path
+  while path != @[]:
+    var matched = false
+    for t in typ.types:
+      if eqIdent(path[^1], typ.id):
+        typ = t
+        matched = true
+    if not matched:
+      quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
+    discard pop(path)
+  return typ
+
+# XXX handle enum matching
+proc follow(typ: Type, name: string, path: seq[string]): Type =
+  # First search in current's type types
+  for t in typ.types:
+    if eqIdent(name, t.id):
+      return walkdown(t, path)
+  # Then check current type itself
+  if eqIdent(name, typ.id):
+    return walkdown(typ, path)
+  # Then go one level up and try again
+  if typ.parent != nil:
+    return follow(typ.parent, name, path)
+  # No match
+  quit(fmt"Could not follow '{name}' from type '{typ.id}'")
 
 proc tbit(bits: int, endian = eNone): KsType =
   doAssert bits in {1..64}
@@ -186,10 +216,10 @@ proc tarr(et: KsType): KsType =
 proc tbarr(): KsType =
   KsType(kind: ktkBArr)
 
-proc tuser(name: string, path: seq[string]): KsType =
-  KsType(kind: ktkUser, name: name, path: path)
+proc tuser(typ: Type, name: string, path: seq[string]): KsType =
+  KsType(kind: ktkUser, usertype: typ.follow(name, path))
 
-proc parseType(s: string): KsType =
+proc parseType(s: string, typ: Type): KsType =
   if s.match(re"u[1248](be|le)?"):
     result = tuint(parseInt(s[1..1]))
     if s.match(re".*(be|le)"):
@@ -216,7 +246,7 @@ proc parseType(s: string): KsType =
     let name = scope[0]
     for i in countdown(scope.len - 1, 1):
       path.add(scope[i])
-    result = tuser(name, path)
+    result = tuser(typ, name, path)
 
 proc buildNimTypeId*(typ: Type): string =
   var
@@ -229,38 +259,6 @@ proc buildNimTypeId*(typ: Type): string =
 
   while stack != @[]:
     result &= pop(stack).capitalizeAscii
-
-# XXX handle enum matching
-proc walkdown(typ: Type, path: seq[string]): Type =
-  var
-    typ = typ
-    path = path
-  while path != @[]:
-    var matched = false
-    for t in typ.types:
-      if eqIdent(path[^1], typ.id):
-        typ = t
-        matched = true
-    if not matched:
-      quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
-    discard pop(path)
-  return typ
-
-# XXX handle enum matching
-proc follow(typ: Type, ks: KsType): Type =
-  doAssert ks.kind == ktkUser
-  # First search in current's type types
-  for t in typ.types:
-    if eqIdent(ks.name, t.id):
-      return walkdown(t, ks.path)
-  # Then check current type itself
-  if eqIdent(ks.name, typ.id):
-    return walkdown(typ, ks.path)
-  # Then go one level up and try again
-  if typ.parent != nil:
-    return follow(typ.parent, ks)
-  # No match
-  quit(fmt"Could not follow '{ks.name}' from type '{typ.id}'")
 
 proc access(typ: Type, symbol: string): KsType =
   for a in typ.seq:
@@ -287,7 +285,7 @@ proc matchAndBuildEnum*(scope: seq[string], typ: Type): string =
   let e = scope.join("::")
   quit(fmt"Enum {e} not found")
 
-proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
+proc ksToNimType*(ksType: KsType): NimNode =
   case ksType.kind
   of ktkBit:
     if ksType.bits == 1:
@@ -303,26 +301,26 @@ proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   of ktkStr:
     result = ident"string"
   of ktkArr:
-    result = nnkBracketExpr.newTree(ident"seq", ksToNimType(ksType.elemtype, typ))
+    result = nnkBracketExpr.newTree(ident"seq", ksToNimType(ksType.elemtype))
   of ktkBArr:
     result = nnkBracketExpr.newTree(ident"seq", ident"byte")
   of ktkUser:
-    result = ident(buildNimTypeId(typ.follow(ksType)))
+    result = ident(buildNimTypeId(ksType.usertype))
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
     s.delete(0, 0)
 
+proc parseBinOctDecHex(s: string): int =
+  if   s.startsWith("0b"): parseBinInt(s)
+  elif s.startsWith("0o"): parseOctInt(s)
+  elif s.startsWith("0x"): parseHexInt(s)
+  else: parseInt(s)
+
 proc jsonToByte(json: JsonNode): byte =
   case json.kind
   of JString:
-    let
-      s = json.getstr
-      i = if   s.startsWith("0b"): parseBinInt(s)
-          elif s.startsWith("0o"): parseOctInt(s)
-          elif s.startsWith("0x"): parseHexInt(s)
-          else: parseInt(s)
-    result = i.byte
+    result = json.getStr.parseBinOctDecHex.byte
   of JInt:
     result = json.getInt.byte
   else:
@@ -488,11 +486,8 @@ proc inferType(expression: Expr): KsType =
   of knkDotExpr:
     case node.sons[1].kind
     of knkId:
-      let
-        kt = infertype(Expr(node: node.sons[0], st: st))
-        t = follow(st, kt)
-      echo t.id
-      result = access(t, node.sons[1].strval)
+      let kt = infertype(Expr(node: node.sons[0], st: st))
+      result = access(kt.usertype, node.sons[1].strval)
     of knkMeth:
       result = infertype(Expr(node: node.sons[1], st: st))
     else: discard # XXX
@@ -622,7 +617,7 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
 
   # type
   if fkType in result.keys:
-    result.`type` = parseType(json["type"].getStr)
+    result.`type` = parseType(json["type"].getStr, result.st)
   else:
     result.`type` = tbarr()
 
@@ -743,9 +738,9 @@ proc fillType(typ: Type, json: JsonNode) =
       for n, ve in consts:
         case ve.kind
         of JString:
-          typ.enums[name][parseInt(n)] = VerboseEnum(keys: {vekId}, id: ve.getStr)
+          typ.enums[name][parseBinOctDecHex(n)] = VerboseEnum(keys: {vekId}, id: ve.getStr)
         of JObject:
-          typ.enums[name][parseInt(n)] = verboseEnum(ve)
+          typ.enums[name][parseBinOctDecHex(n)] = verboseEnum(ve)
         else: discard # should not occur
 
   # types
