@@ -29,8 +29,11 @@ type
       intval*: BiggestInt
     of knkFloat:
       floatval*: float
-    of knkEnum, knkCast:
+    of knkCast:
       scope*: seq[string]
+    of knkEnum:
+      enumscope*: seq[string]
+      enumval*: string
     of knkStr, knkOp, knkId:
       strval*: string
     else:
@@ -40,8 +43,10 @@ type
 proc debug*(ks: KsNode, n = 0) =
   let k = " ".repeat(n) & ($ks.kind)[3..^1]
   case ks.kind
-  of knkEnum, knkCast:
+  of knkCast:
     echo k & " " & ks.scope.join(", ")
+  of knkEnum:
+    echo k & " " & ks.enumscope.join("::") & ", " & ks.enumval
   of knkBool:
     echo k & " " & $ks.boolval
   of knkInt:
@@ -99,11 +104,11 @@ proc toKs*(str: string): KsNode =
     unary     <- >("+"|"-"|"not") * expr * S:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
     parExpr   <- ('(' * expr * ')') * S ^ 0
-    infix     <- >("not")                                 * expr ^  1 |
-                 >("or" | "^")                            * expr ^  2 |
-                 >("and")                                 * expr ^  3 |
-                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  4 |
-                 >("?") * S * expr * ":" * S              * expr ^  5 |
+    infix     <- >("?") * S * expr ^ 1 * ":" * S          * expr      |
+                 >("not")                                 * expr ^  2 |
+                 >("or" | "^")                            * expr ^  3 |
+                 >("and")                                 * expr ^  4 |
+                 >(">=" | ">" | "<=" | "<" | "==" | "!=") * expr ^  5 |
                  >("<<" | ">>" | "&" | "|")               * expr ^  6 |
                  >("+" | "-")                             * expr ^  7 |
                  >("*" | "/")                             * expr ^  8 |
@@ -150,7 +155,8 @@ proc toKs*(str: string): KsNode =
     tId       <- >id * S:
       s[^1].add KsNode(kind: knkId, strval: $1)
     tEnum     <- >(id * "::" * id * *("::" * id)) * S:
-      s[^1].add KsNode(kind: knkEnum, scope: split($1, "::"))
+      let x = split($1, "::")
+      s[^1].add KsNode(kind: knkEnum, enumscope: x[0..^2], enumval: x[^1])
     tCast     <- "as<" * S * >(id * *("::" * id)) * S * '>' * S:
       s[^1].add KsNode(kind: knkCast, scope: split($1, "::"))
 
@@ -176,6 +182,6 @@ proc toKs*(str: string): KsNode =
   elif s[^1].len != 1:
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
-  debug(result)
+  #debug(result)
 
-static: discard "a == b ? c : d".toKs
+#static: discard "a == b ? c : d".toKs

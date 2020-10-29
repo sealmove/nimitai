@@ -138,6 +138,7 @@ type
     ktkArr
     ktkBArr
     ktkUser
+    ktkEnum
   KsType* = ref object
     case kind*: KsTypeKind
     of ktkBit:
@@ -154,13 +155,15 @@ type
       discard
     of ktkUser:
       usertype*: Type
+    of ktkEnum:
+      owningtype*: Type
+      enumname*: string
   Endian* = enum
     eNone
     eLe = "le"
     eBe = "be"
   KaitaiError* = object of Defect
 
-# XXX handle enum matching
 proc walkdown(typ: Type, path: seq[string]): Type =
   var
     typ = typ
@@ -171,17 +174,23 @@ proc walkdown(typ: Type, path: seq[string]): Type =
       if eqIdent(path[^1], typ.id):
         typ = t
         matched = true
+    for e in typ.enums.keys:
+      if eqIdent(path[^1], e):
+        matched = true
     if not matched:
       quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
     discard pop(path)
   return typ
 
-# XXX handle enum matching
 proc follow(typ: Type, name: string, path: seq[string]): Type =
   # First search in current's type types
   for t in typ.types:
     if eqIdent(name, t.id):
       return walkdown(t, path)
+  # Then search in current's type enums
+  for e in typ.enums.keys:
+    if eqIdent(name, e):
+      return walkdown(typ, path)
   # Then check current type itself
   if eqIdent(name, typ.id):
     return walkdown(typ, path)
@@ -218,6 +227,22 @@ proc tbarr(): KsType =
 
 proc tuser(typ: Type, name: string, path: seq[string]): KsType =
   KsType(kind: ktkUser, usertype: typ.follow(name, path))
+
+proc tenum(typ: Type, scope: seq[string]): KsType =
+  let
+    typename = scope[0]
+    enumname = scope[^1]
+  var
+    scope = scope
+    path: seq[string]
+  discard pop(scope)
+  for i in countdown(scope.len - 1, 1):
+    path.add(scope[i])
+
+  KsType(
+    kind: ktkEnum,
+    owningtype: if scope == @[]: typ else: typ.follow(typename, path),
+    enumname: enumname)
 
 proc parseType(s: string, typ: Type): KsType =
   if s.match(re"u[1248](be|le)?"):
@@ -306,6 +331,8 @@ proc ksToNimType*(ksType: KsType): NimNode =
     result = nnkBracketExpr.newTree(ident"seq", ident"byte")
   of ktkUser:
     result = ident(buildNimTypeId(ksType.usertype))
+  of ktkEnum:
+    result = ident(buildNimTypeId(ksType.owningtype) & ksType.enumname)
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
@@ -369,12 +396,12 @@ proc toNim*(expression: Expr): NimNode =
   of knkEnum: # XXX implement relative matching
     if st != nil:
       result = newDotExpr(
-        ident(matchAndBuildEnum(e.scope[0..^2], st)),
-        ident(e.scope[^1]))
+        ident(matchAndBuildEnum(e.enumscope, st)),
+        ident(e.enumval))
     else: # needed for generating tests
       result = newDotExpr(
-        ident(join(e.scope[0..^2]).capitalizeAscii),
-        ident(e.scope[^1]))
+        ident(join(e.enumscope).capitalizeAscii),
+        ident(e.enumval))
   of knkCast:
     discard # XXX
   of knkArr:
@@ -448,7 +475,8 @@ proc inferType(expression: Expr): KsType =
     discard
   of knkId:
     result = st.access(node.strval)
-  of knkEnum: discard # XXX
+  of knkEnum:
+    result = tenum(st, node.enumscope)
   of knkArr:
     let
       types = node.sons.mapIt(inferType(Expr(node: it, st: st)))
@@ -512,9 +540,10 @@ proc inferType(expression: Expr): KsType =
     #of ktkBArr
     #of ktkUser
   of knkTernary:
-    doAssert node.sons[0].kind == knkBool
-    let (t, f) = (inferType(Expr(node: node.sons[1], st: st)),
-                  inferType(Expr(node: node.sons[2], st: st)))
+    let (c, t, f) = (inferType(Expr(node: node.sons[0], st: st)),
+                     inferType(Expr(node: node.sons[1], st: st)),
+                     inferType(Expr(node: node.sons[2], st: st)))
+    doAssert (c.kind == ktkBit and c.bits == 1)
     doAssert t.kind == f.kind
     result = t
 

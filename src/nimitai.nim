@@ -81,7 +81,7 @@ proc parse(field: Field, typ: Type): NimNode =
         ident"encode",
         result,
         newStrLitNode(enc))
-  of ktkUser:
+  of ktkUser, ktkEnum:
     result = newCall(
       newDotExpr(
         field.`type`.ksToNimType,
@@ -282,6 +282,7 @@ proc readProcParams(typ: Type): NimNode =
 
 proc instProcParams(inst: Field, typ: Type): NimNode =
   let id = buildNimTypeId(typ)
+  var t = inst.`type`.ksToNimType
 
   result = nnkFormalParams.newTree(
     inst.`type`.ksToNimType,
