@@ -37,7 +37,7 @@ type
       sons*: seq[KsNode]
   ParsingError* = object of CatchableError
 
-proc debug(ks: KsNode, n = 0) =
+proc debug*(ks: KsNode, n = 0) =
   let k = " ".repeat(n) & ($ks.kind)[3..^1]
   case ks.kind
   of knkEnum, knkCast:
@@ -96,7 +96,7 @@ proc toKs*(str: string): KsNode =
       s[^1].add newNode
     idx       <- >id * S * '[' * expr * ']' * S:
       s[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s[^1]))
-    unary     <- >{'+','-'} * expr * S:
+    unary     <- >("+"|"-"|"not") * expr * S:
       s[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s[^1]))
     parExpr   <- ('(' * expr * ')') * S ^ 0
     infix     <- >("?") * S * expr * ":" * S              * expr ^  1 |
@@ -176,7 +176,4 @@ proc toKs*(str: string): KsNode =
   elif s[^1].len != 1:
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
-  debug(result)
-
-
-#debug("\"abc\" + \"123\"".toKs)
+  #debug(result)

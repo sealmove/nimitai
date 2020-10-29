@@ -153,7 +153,8 @@ type
     of ktkBArr:
       discard
     of ktkUser:
-      scope*: seq[string]
+      name*: string
+      path*: seq[string] # stored in reverse order for easy popping
   Endian* = enum
     eNone
     eLe = "le"
@@ -185,8 +186,8 @@ proc tarr(et: KsType): KsType =
 proc tbarr(): KsType =
   KsType(kind: ktkBArr)
 
-proc tuser(s: string): KsType =
-  KsType(kind: ktkUser, scope: @[s]) # XXX handle scopes
+proc tuser(name: string, path: seq[string]): KsType =
+  KsType(kind: ktkUser, name: name, path: path)
 
 proc parseType(s: string): KsType =
   if s.match(re"u[1248](be|le)?"):
@@ -209,7 +210,13 @@ proc parseType(s: string): KsType =
   elif s.match(re"strz?"):
     result = tstr(if s.endsWith('z'): true else: false)
   else:
-    result = tuser(s) # XXX handled scoped ids
+    var
+      scope = split(s, "::")
+      path: seq[string]
+    let name = scope[0]
+    for i in countdown(scope.len - 1, 1):
+      path.add(scope[i])
+    result = tuser(name, path)
 
 proc buildNimTypeId*(typ: Type): string =
   var
@@ -223,10 +230,46 @@ proc buildNimTypeId*(typ: Type): string =
   while stack != @[]:
     result &= pop(stack).capitalizeAscii
 
-# XXX
-# match a scoped id completely and construct either an ident or a dotexpr
-# depending on whether a type or an enum was matched
-# XXX
+# XXX handle enum matching
+proc walkdown(typ: Type, path: seq[string]): Type =
+  var
+    typ = typ
+    path = path
+  while path != @[]:
+    var matched = false
+    for t in typ.types:
+      if eqIdent(path[^1], typ.id):
+        typ = t
+        matched = true
+    if not matched:
+      quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
+    discard pop(path)
+  return typ
+
+# XXX handle enum matching
+proc follow(typ: Type, ks: KsType): Type =
+  doAssert ks.kind == ktkUser
+  # First search in current's type types
+  for t in typ.types:
+    if eqIdent(ks.name, t.id):
+      return walkdown(t, ks.path)
+  # Then check current type itself
+  if eqIdent(ks.name, typ.id):
+    return walkdown(typ, ks.path)
+  # Then go one level up and try again
+  if typ.parent != nil:
+    return follow(typ.parent, ks)
+  # No match
+  quit(fmt"Could not follow '{ks.name}' from type '{typ.id}'")
+
+proc access(typ: Type, symbol: string): KsType =
+  for a in typ.seq:
+    if eqIdent(symbol, a.id):
+      return a.`type`
+  for i in typ.instances:
+    if eqIdent(symbol, i.id):
+      return i.`type`
+  quit(fmt"Could not access '{symbol}' from '{typ.id}'")
 
 proc matchAndBuildEnum*(scope: seq[string], typ: Type): string =
   if scope.len > 1:
@@ -264,7 +307,7 @@ proc ksToNimType*(ksType: KsType, typ: Type): NimNode =
   of ktkBArr:
     result = nnkBracketExpr.newTree(ident"seq", ident"byte")
   of ktkUser:
-    result = ident(buildNimTypeId(typ) & join(ksType.scope))
+    result = ident(buildNimTypeId(typ.follow(ksType)))
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
@@ -324,7 +367,7 @@ proc toNim*(expression: Expr): NimNode =
     of "^" : result = ident"xor"
     else   : result = ident(e.strval)
   of knkId: # XXX
-    result = ident(e.strval)
+    result = newDotExpr(ident"this", ident(e.strval))
   of knkEnum: # XXX implement relative matching
     result = newDotExpr(
       ident(matchAndBuildEnum(e.scope[0..^2], st)),
@@ -340,7 +383,8 @@ proc toNim*(expression: Expr): NimNode =
     result = prefix(x, "@")
   of knkMeth:
     result = newTree(nnkCall)
-    for i in 0 ..< e.sons.len:
+    result.add(ident(e.sons[0].strval))
+    for i in 1 ..< e.sons.len:
       result.add(Expr(node: e.sons[i], st: st).toNim)
   of knkIdx:
     result = nnkBracketExpr.newTree(
@@ -348,14 +392,14 @@ proc toNim*(expression: Expr): NimNode =
       Expr(node: e.sons[1], st: st).toNim)
   of knkDotExpr:
     # ! special case because of Nim AST peculiarity
-    if e.sons[1].kind == knkMeth:
-      let x = e.sons[1]
-      x.sons.insert(e.sons[0], 1)
-      result = Expr(node: x, st: st).toNim
+    var (l, r) = (e.sons[0], e.sons[1])
+    if r.kind == knkMeth:
+      r.sons.insert(l, 1)
+      result = Expr(node: r, st: st).toNim
     else:
       result = newDotExpr(
-        Expr(node: e.sons[0], st: st).toNim,
-        Expr(node: e.sons[1], st: st).toNim)
+        Expr(node: l, st: st).toNim,
+        ident(r.strval))
   of knkUnary:
     result = nnkPrefix.newTree(
       Expr(node: e.sons[0], st: st).toNim,
@@ -397,14 +441,8 @@ proc inferType(expression: Expr): KsType =
     result = tstr()
   of knkOp:
     discard
-  of knkId: # investigate id
-    for a in st.seq:
-      if eqIdent(node.strval, a.id):
-        return a.`type`
-    for i in st.instances:
-      if eqIdent(node.strval, i.id):
-        return i.`type`
-    quit(fmt"Identifier {node.strval} not found")
+  of knkId:
+    result = st.access(node.strval)
   of knkEnum: discard # XXX
   of knkArr:
     let
@@ -441,7 +479,16 @@ proc inferType(expression: Expr): KsType =
   of knkIdx: discard # XXX
   of knkCast: result = tstr()#discard # XXX
   of knkDotExpr:
-    result = infertype(Expr(node: node.sons[1], st: st))
+    case node.sons[1].kind
+    of knkId:
+      let
+        kt = infertype(Expr(node: node.sons[0], st: st))
+        t = follow(st, kt)
+      echo t.id
+      result = access(t, node.sons[1].strval)
+    of knkMeth:
+      result = infertype(Expr(node: node.sons[1], st: st))
+    else: discard # XXX
   of knkUnary:
     result = inferType(Expr(node: node.sons[1], st: st))
   of knkInfix:
@@ -631,11 +678,7 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
     if fkIo in result.keys:
       result.io = jsonToExpr(json["io"], st)
     else:
-      result.io = Expr(
-        node: newKsNode(knkDotExpr,
-                        KsNode(kind: knkId, strval: "this"),
-                        KsNode(kind: knkId, strval: "io")),
-        st: st)
+      result.io = Expr(node: KsNode(kind: knkId, strval: "io"), st: st)
 
   # pos
   if fkPos in result.keys:

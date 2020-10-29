@@ -100,8 +100,10 @@ proc parse(field: Field, typ: Type): NimNode =
 proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()
   result.add(
-    newLetStmt(
-      id,
+    newAssignment(
+      newDotExpr(
+        ident"this",
+        id),
       newCall(
         ident"readBytes",
         ps,
@@ -109,21 +111,26 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
           ident"int",
           size))))
   result.add(
-    newLetStmt(
-      ss,
+    newAssignment(
+      newDotExpr(
+        ident"this",
+        ss),
       newCall(
         ident"newKaitaiStream",
-        id)))
+        newDotExpr(
+          ident"this",
+          id))))
 
 proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
   let id = ident(field.id & postfix)
   var posId: NimNode
 
   if fkPos in field.keys:
-    posId = ident(field.id & "Pos")
     result.add(
-      newLetStmt(
-        posId,
+      newAssignment(
+        newDotExpr(
+          ident"this",
+          ident(field.id & "Pos")),
         newCall(
           ident"pos",
           field.io.toNim)))
@@ -147,8 +154,10 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
   case field.repeat
   of rkNone:
     result.add(
-      newLetStmt(
-        id,
+      newAssignment(
+        newDotExpr(
+          ident"this",
+          id),
         parse(field, typ)))
   of rkEos:
     result.add(
@@ -174,7 +183,7 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
           ident"seek"),
         posId))
 
-  result.add(newAssignment(newDotExpr(ident"this", id), id))
+  #result.add(newAssignment(newDotExpr(ident"this", id), id))
 
 proc typeDecl(section: var NimNode, typ: Type) =
   var fields = newTree(nnkRecList)
@@ -197,7 +206,15 @@ proc typeDecl(section: var NimNode, typ: Type) =
     fields.add(
       newIdentDefs(
         ident(a.id),
-        t))
+        t),
+      newIdentDefs(
+        ident(a.id & "Io"),
+        ident(streamTypeName)),
+      newIdentDefs(
+        ident(a.id & "Raw"),
+        nnkBracketExpr.newTree(
+          ident"seq",
+          ident"byte")))
 
   for i in typ.instances:
     fields.add(
@@ -312,31 +329,16 @@ proc readProc(typ: Type): NimNode =
       newColonExpr(
         ident"parent",
         ident"parent"))
-    templates = newStmtList(
-      nnkTemplateDef.newTree(
-        ident"this",
-        newEmptyNode(),
-        newEmptyNode(),
-        nnkFormalParams.newTree(ident"untyped"),
-        newEmptyNode(),
-        newEmptyNode(),
-        ident"result"))
-
-  for i in typ.instances:
-    templates.add(
-      nnkTemplateDef.newTree(
-        ident(i.id),
-        newEmptyNode(),
-        newEmptyNode(),
-        nnkFormalParams.newTree(ident"untyped"),
-        newEmptyNode(),
-        newEmptyNode(),
-        newDotExpr(
-          ident"this",
-          ident(i.id))))
 
   result.body = newStmtList(
-    templates,
+    nnkTemplateDef.newTree(
+      ident"this",
+      newEmptyNode(),
+      newEmptyNode(),
+      nnkFormalParams.newTree(ident"untyped"),
+      newEmptyNode(),
+      newEmptyNode(),
+      ident"result"),
     newAssignment(
       ident"this",
       constructor),
@@ -369,33 +371,6 @@ proc instProc(inst: Field, typ: Type): NimNode =
   result = newProc(ident(inst.id))
   result.params = instProcParams(inst, typ)
 
-  var templates = newStmtList()
-  for a in typ.seq:
-    templates.add(
-      nnkTemplateDef.newTree(
-        ident(a.id),
-        newEmptyNode(),
-        newEmptyNode(),
-        nnkFormalParams.newTree(ident"untyped"),
-        newEmptyNode(),
-        newEmptyNode(),
-        newDotExpr(
-          ident"this",
-          ident(a.id))))
-
-  for i in typ.instances:
-    templates.add(
-      nnkTemplateDef.newTree(
-        ident(i.id),
-        newEmptyNode(),
-        newEmptyNode(),
-        nnkFormalParams.newTree(ident"untyped"),
-        newEmptyNode(),
-        newEmptyNode(),
-        newDotExpr(
-          ident"this",
-          ident(i.id))))
-
   var pa = newStmtList()
   for s in parseField(inst, typ, postfix = "Inst"): pa.add(s)
 
@@ -407,7 +382,6 @@ proc instProc(inst: Field, typ: Type): NimNode =
       ident"true"))
 
   result.body = newStmtList(
-    templates,
     newIfStmt(
      (prefix(
         newDotExpr(
