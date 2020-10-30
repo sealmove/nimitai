@@ -42,8 +42,7 @@ proc parse(field: Field, typ: Type): NimNode =
     result = newCall(
       "read" & $t.kind & $t.bytes & (if t.bytes != 1: $endian else: ""),
       field.io.toNim)
-  of ktkArr: discard # XXX
-  of ktkBArr, ktkStr:
+  of ktkArr, ktkStr: # XXX this only handles byte arrays
     if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
       let term = if fkTerminator in field.keys: field.terminator else: 0
       result = newCall(

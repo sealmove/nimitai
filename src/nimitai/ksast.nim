@@ -136,7 +136,6 @@ type
     ktkFloat = "f"
     ktkStr   = "str"
     ktkArr
-    ktkBArr
     ktkUser
     ktkEnum
   KsType* = ref object
@@ -151,8 +150,6 @@ type
       isZeroTerm*: bool
     of ktkArr:
       elemtype*: KsType
-    of ktkBArr:
-      discard
     of ktkUser:
       usertype*: Type
     of ktkEnum:
@@ -221,9 +218,6 @@ proc tstr(isZeroTerm = false): KsType =
 
 proc tarr(et: KsType): KsType =
   KsType(kind: ktkArr, elemtype: et)
-
-proc tbarr(): KsType =
-  KsType(kind: ktkBArr)
 
 proc tuser(typ: Type, name: string, path: seq[string]): KsType =
   KsType(kind: ktkUser, usertype: typ.follow(name, path))
@@ -327,8 +321,6 @@ proc ksToNimType*(ksType: KsType): NimNode =
     result = ident"string"
   of ktkArr:
     result = nnkBracketExpr.newTree(ident"seq", ksToNimType(ksType.elemtype))
-  of ktkBArr:
-    result = nnkBracketExpr.newTree(ident"seq", ident"byte")
   of ktkUser:
     result = ident(buildNimTypeId(ksType.usertype))
   of ktkEnum:
@@ -363,13 +355,6 @@ proc jsonToExpr(json: JsonNode, typ: Type): Expr =
   of JBool:
     result.node = KsNode(kind: knkBool, boolval: json.getBool)
   else: discard # Should not occur
-
-proc isByteArray(node: KsNode): bool =
-  doAssert node.kind == knkArr
-  for s in node.sons:
-    if s.kind != knkInt or s.intval < 0x00 or s.intval > 0xff:
-      return false
-  return true
 
 proc toNim*(expression: Expr): NimNode =
   let (e, st) = (expression.node, expression.st)
@@ -408,8 +393,6 @@ proc toNim*(expression: Expr): NimNode =
     let x = newTree(nnkBracket)
     for s in e.sons:
       x.add Expr(node: s, st: st).toNim
-    if e.sons != @[] and e.isByteArray:
-      x[0] = newLit(e.sons[0].intval.byte)
     result = prefix(x, "@")
   of knkMeth:
     result = newTree(nnkCall)
@@ -448,7 +431,6 @@ proc toNim*(expression: Expr): NimNode =
         Expr(node: e.sons[1], st: st).toNim),
       nnkElse.newTree(Expr(node: e.sons[2], st: st).toNim))
 
-# XXX this is the hardest part of the whole compiler
 proc inferType(expression: Expr): KsType =
   let (node, kind, st) = (expression.node, expression.node.kind, expression.st)
   case kind
@@ -478,19 +460,10 @@ proc inferType(expression: Expr): KsType =
   of knkEnum:
     result = tenum(st, node.enumscope)
   of knkArr:
-    let
-      types = node.sons.mapIt(inferType(Expr(node: it, st: st)))
-      typekind = types[0].kind
-    var
-      isTrue = true
+    let types = node.sons.mapIt(inferType(Expr(node: it, st: st)))
     for i in 1 ..< types.len:
-      doAssert typekind == types[i].kind
-    if typekind == ktkSInt:
-      for t in types:
-        if t.bytes != 1:
-          isTrue = false
-          break
-    result = if isTrue: tbarr() else: tarr(types[0])
+      doAssert types[0].kind == types[i].kind
+    result = tarr(types[0])
   of knkMeth: # XXX
     doAssert node.sons[0].kind == knkId
     if eqIdent(node.sons[0].strval, "to_s"):
@@ -537,7 +510,6 @@ proc inferType(expression: Expr): KsType =
     #of ktkFloat
     #of ktkStr
     #of ktkArr
-    #of ktkBArr
     #of ktkUser
   of knkTernary:
     let (c, t, f) = (inferType(Expr(node: node.sons[0], st: st)),
@@ -650,7 +622,7 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
     if result.`type`.kind == ktkUser:
       result.`type`.usertype.supertypes.add(st)
   else:
-    result.`type` = tbarr()
+    result.`type` = tarr(tuint(1))
 
   # repeat
   if fkRepeat in result.keys:
