@@ -273,8 +273,17 @@ proc inferType(expression: Expr): KsType =
     of knkMeth:
       case node.sons[1].sons[0].strval
       of "min", "max", "first", "last":
-        doAssert lefttype.kind == ktkArr
-        result = lefttype.elemtype
+        case lefttype.kind
+        of ktkArr:
+          result = lefttype.elemtype
+        of ktkStr:
+          result = tsint(1)
+        else:
+          raise newException(
+            KaitaiError,
+            "Tried to fetch an element from a non-array type")
+      of "reverse":
+        result = lefttype
       else:
         result = inferType(Expr(node: node.sons[1], st: st))
     else: discard # XXX
@@ -365,25 +374,17 @@ proc toNim*(expression: Expr): NimNode =
       case sign
       of true:
         case bytes
-        of 1:
-          x[0] = newCall(ident"int8", x[0])
-        of 2:
-          x[0] = newCall(ident"int16", x[0])
-        of 4:
-          x[0] = newCall(ident"int32", x[0])
-        of 8:
-          x[0] = newCall(ident"int64", x[0])
+        of 1: x[0] = newCall(ident"int8", x[0])
+        of 2: x[0] = newCall(ident"int16", x[0])
+        of 4: x[0] = newCall(ident"int32", x[0])
+        of 8: x[0] = newCall(ident"int64", x[0])
         else: discard
       of false:
         case bytes
-        of 1:
-          x[0] = newCall(ident"uint8", x[0])
-        of 2:
-          x[0] = newCall(ident"uint16", x[0])
-        of 4:
-          x[0] = newCall(ident"uint32", x[0])
-        of 8:
-          x[0] = newCall(ident"uint64", x[0])
+        of 1: x[0] = newCall(ident"uint8", x[0])
+        of 2: x[0] = newCall(ident"uint16", x[0])
+        of 4: x[0] = newCall(ident"uint32", x[0])
+        of 8: x[0] = newCall(ident"uint64", x[0])
         else: discard
     result = prefix(x, "@")
   of knkMeth:

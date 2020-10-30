@@ -58,8 +58,10 @@ proc toKs*(str: string): KsNode =
       for e in elements:
         newNode.add(e)
       s[^1].add newNode
-    meth      <- >("to_s"|"to_i"|"length"|"substring"|"size"|"first"|"last"|"min"|"max") *
-                 &(!(Alpha | '_' | '[')) * newLvl * ?('(' * expr * *(',' * expr) * ')') * S:
+    meth      <- >("to_s" | "to_i" | "length" | "substring" | "size" | "first" |
+                   "last" | "min" | "max" | "reverse") *
+                 &(!(Alpha | '_' | '[')) * newLvl * ?('(' * expr *
+                 *(',' * expr) * ')') * S:
       let
         elements = pop(s)
         newNode = newKsNode(knkMeth, KsNode(kind: knkId, strval: $1))

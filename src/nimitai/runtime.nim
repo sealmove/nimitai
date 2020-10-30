@@ -341,13 +341,17 @@ proc parseInt*(s: string, radix: int): int {.raises: [ValueError].} =
       fmt"base {radix} is not supported; use base 2, 8, 10 or 16")
 
 # Custom operators
-proc `ksdiv`*[T, U](a: T, b: U): auto =
+proc `ksdiv`*[T, U](x: T, y: U): auto =
   when T is float or U is float:
-    a.float / b.float
+    x.float / y.float
   else:
-    floorDiv(a, b.T)
+    floorDiv(x, y.T)
 
 proc `ksmod`*[T: SomeNumber](x, y: T): T = floorMod(x, y)
+
+proc `+`*(x, y: string): string = x & y
+proc `+`*[T: SomeSignedInt, U: SomeUnsignedInt](x: T, y: U): T = x + T(y)
+proc `+`*[U: SomeSignedInt, T: SomeUnsignedInt](x: T, y: U): U = U(x) + y
 
 # Expression language methods
 # Integers
@@ -366,7 +370,6 @@ proc toS*(ba: seq[byte], encoding: string): string =
   convert(x, srcEncoding = encoding)
 
 # Strings
-proc `+`*(x, y: string): string = x & y
 proc length*(s: string): int = s.len
 proc reverse*(s: string): string =
   var s = s
