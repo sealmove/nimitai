@@ -503,7 +503,10 @@ proc inferType(expression: Expr): KsType =
       result = tuint(1) # XXX
     else:
       quit(fmt"Method {node.sons[0].strval} not found")
-  of knkIdx: discard # XXX
+  of knkIdx:
+    let x = infertype(Expr(node: node.sons[0], st: st))
+    doAssert x.kind == ktkArr
+    result = x.elemtype
   of knkCast: result = tstr()#discard # XXX
   of knkDotExpr:
     let lefttype = infertype(Expr(node: node.sons[0], st: st))
@@ -513,7 +516,8 @@ proc inferType(expression: Expr): KsType =
     of knkMeth:
       case node.sons[1].sons[0].strval
       of "min", "max":
-        result = lefttype
+        doAssert lefttype.kind == ktkArr
+        result = lefttype.elemtype
       else:
         result = infertype(Expr(node: node.sons[1], st: st))
     else: discard # XXX
