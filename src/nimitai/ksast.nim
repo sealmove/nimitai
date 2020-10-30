@@ -360,6 +360,13 @@ proc jsonToExpr(json: JsonNode, typ: Type): Expr =
     result.node = KsNode(kind: knkBool, boolval: json.getBool)
   else: discard # Should not occur
 
+proc isByteArray(node: KsNode): bool =
+  doAssert node.kind == knkArr
+  for s in node.sons:
+    if s.kind != knkInt or s.intval < 0x00 or s.intval > 0xff:
+      return false
+  return true
+
 proc toNim*(expression: Expr): NimNode =
   let (e, st) = (expression.node, expression.st)
   case e.kind
@@ -397,6 +404,8 @@ proc toNim*(expression: Expr): NimNode =
     let x = newTree(nnkBracket)
     for s in e.sons:
       x.add Expr(node: s, st: st).toNim
+    if e.sons != @[] and e.isByteArray:
+      x[0] = newLit(e.sons[0].intval.byte)
     result = prefix(x, "@")
   of knkMeth:
     result = newTree(nnkCall)
