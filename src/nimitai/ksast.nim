@@ -318,13 +318,13 @@ proc toNim*(expression: Expr): NimNode =
     result = newStrLitNode(e.strval)
   of knkOp:
     case e.strval
-    of "%" : result = ident"mod"
     of "<<": result = ident"shl"
     of ">>": result = ident"shr"
     of "&" : result = ident"and"
     of "|" : result = ident"or"
     of "^" : result = ident"xor"
     of "/" : result = ident"ksdiv" # depends on runtime
+    of "%" : result = ident"ksmod" # depends on runtime
     else   : result = ident(e.strval)
   of knkId: # XXX
     case e.strval

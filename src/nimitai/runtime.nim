@@ -347,6 +347,8 @@ proc `ksdiv`*[T, U](a: T, b: U): auto =
   else:
     floorDiv(a, b.T)
 
+proc `ksmod`*[T: SomeNumber](x, y: T): T = floorMod(x, y)
+
 # Expression language methods
 # Integers
 proc toS*(i: SomeInteger): string = intToStr(int(i))
