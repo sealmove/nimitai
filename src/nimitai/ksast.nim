@@ -2,112 +2,6 @@ import macros, json, strutils, tables, sequtils, strformat
 import regex
 import types, exprlang
 
-proc walkdown(typ: Type, path: seq[string]): Type =
-  var
-    typ = typ
-    path = path
-  while path != @[]:
-    block walking:
-      for t in typ.types:
-        if eqIdent(path[^1], t.id):
-          typ = t
-          discard pop(path)
-          break walking
-      for e in typ.enums.keys:
-        if eqIdent(path[^1], e):
-          discard pop(path)
-          break walking
-      quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
-  return typ
-
-proc follow(typ: Type, name: string, path: seq[string]): Type =
-  # First search in current's type types
-  for t in typ.types:
-    if eqIdent(name, t.id):
-      return walkdown(t, path)
-  # Then search in current's type enums
-  for e in typ.enums.keys:
-    if eqIdent(name, e):
-      return walkdown(typ, path)
-  # Then check current type itself
-  if eqIdent(name, typ.id):
-    return walkdown(typ, path)
-  # Then go one level up and try again
-  if typ.parent != nil:
-    return follow(typ.parent, name, path)
-  # No match
-  quit(fmt"Could not follow '{name}' from type '{typ.id}'")
-
-proc tbit(bits: int, endian = eNone): KsType =
-  doAssert bits in {1..64}
-  KsType(kind: ktkBit, bits: bits, bitEndian: endian)
-
-proc tuint(bytes: int, endian = eNone): KsType =
-  doAssert bytes in {1,2,4,8}
-  KsType(kind: ktkUInt, bytes: bytes, endian: endian)
-
-proc tsint(bytes: int, endian = eNone): KsType =
-  doAssert bytes in {1,2,4,8}
-  KsType(kind: ktkSInt, bytes: bytes, endian: endian)
-
-proc tfloat(bytes: int, endian = eNone): KsType =
-  doAssert bytes in {4,8}
-  KsType(kind: ktkFloat, bytes: bytes, endian: endian)
-
-proc tstr(isZeroTerm = false): KsType =
-  KsType(kind: ktkStr, isZeroTerm: isZeroTerm)
-
-proc tarr(et: KsType): KsType =
-  KsType(kind: ktkArr, elemtype: et)
-
-proc tuser(typ: Type, name: string, path: seq[string]): KsType =
-  KsType(kind: ktkUser, usertype: typ.follow(name, path))
-
-proc tenum(typ: Type, scope: seq[string]): KsType =
-  let
-    typename = scope[0]
-    enumname = scope[^1]
-  var
-    scope = scope
-    path: seq[string]
-  discard pop(scope)
-  for i in countdown(scope.len - 1, 1):
-    path.add(scope[i])
-
-  KsType(
-    kind: ktkEnum,
-    owningtype: if scope == @[]: typ else: typ.follow(typename, path),
-    enumname: enumname)
-
-proc parseType(s: string, typ: Type): KsType =
-  if s.match(re"u[1248](be|le)?"):
-    result = tuint(parseInt(s[1..1]))
-    if s.match(re".*(be|le)"):
-      result.endian = parseEnum[Endian](s[2..3])
-  elif s.match(re"s[1248](be|le)?"):
-    result = tsint(parseInt(s[1..1]))
-    if s.match(re".*(be|le)"):
-      result.endian = parseEnum[Endian](s[2..3])
-  elif s.match(re"f[48](be|le)?"):
-    result = tfloat(parseInt(s[1..1]))
-    if s.match(re".*(be|le)"):
-      result.endian = parseEnum[Endian](s[2..3])
-  elif s.match(re"b[1-9][0-9]*(be|le)?"):
-    if s.match(re".*(be|le)"):
-      result = tbit(parseInt(s[1..^3]), parseEnum[Endian](s[^2..^1]))
-    else:
-      result = tbit(parseInt(s[1..^1]))
-  elif s.match(re"strz?"):
-    result = tstr(if s.endsWith('z'): true else: false)
-  else:
-    var
-      scope = split(s, "::")
-      path: seq[string]
-    let name = scope[0]
-    for i in countdown(scope.len - 1, 1):
-      path.add(scope[i])
-    result = tuser(typ, name, path)
-
 proc buildNimTypeId*(typ: Type): string =
   var
     it = typ
@@ -192,7 +86,7 @@ proc jsonToExpr(json: JsonNode, typ: Type): Expr =
   result = Expr(st: typ)
   case json.kind
   of JString:
-    result.node = json.getStr.toKs
+    result.node = json.getStr.toKs(typ)
   of JInt:
     result.node = KsNode(kind: knkInt, intval: json.getInt)
   of JFloat:
@@ -200,6 +94,10 @@ proc jsonToExpr(json: JsonNode, typ: Type): Expr =
   of JBool:
     result.node = KsNode(kind: knkBool, boolval: json.getBool)
   else: discard # Should not occur
+
+proc inferType(expression: Expr): KsType
+proc inferType(node: KsNode, st: Type): KsType =
+  inferType(Expr(node: node, st: st))
 
 proc inferType(expression: Expr): KsType =
   let (node, kind, st) = (expression.node, expression.node.kind, expression.st)
@@ -230,7 +128,7 @@ proc inferType(expression: Expr): KsType =
   of knkEnum:
     result = tenum(st, node.enumscope)
   of knkArr:
-    let types = node.sons.mapIt(inferType(Expr(node: it, st: st)))
+    let types = node.sons.mapIt(inferType(it, st))
     case types[0].kind
     of ktkUInt, ktkSInt:
       var
@@ -261,12 +159,13 @@ proc inferType(expression: Expr): KsType =
     else:
       quit(fmt"Method {node.sons[0].strval} not found")
   of knkIdx:
-    let x = inferType(Expr(node: node.sons[0], st: st))
+    let x = inferType(node.sons[0], st)
     doAssert x.kind == ktkArr
     result = x.elemtype
-  of knkCast: result = tstr()#discard # XXX
+  of knkCast:
+    result = node.kstype
   of knkDotExpr:
-    let lefttype = inferType(Expr(node: node.sons[0], st: st))
+    let lefttype = inferType(node.sons[0], st)
     case node.sons[1].kind
     of knkId:
       result = access(lefttype.usertype, node.sons[1].strval)
@@ -285,13 +184,13 @@ proc inferType(expression: Expr): KsType =
       of "reverse":
         result = lefttype
       else:
-        result = inferType(Expr(node: node.sons[1], st: st))
+        result = inferType(node.sons[1], st)
     else: discard # XXX
   of knkUnary:
-    result = inferType(Expr(node: node.sons[1], st: st))
+    result = inferType(node.sons[1], st)
   of knkInfix:
-    let (l, r) = (inferType(Expr(node: node.sons[0], st: st)),
-                  inferType(Expr(node: node.sons[2], st: st)))
+    let (l, r) = (inferType(node.sons[0], st),
+                  inferType(node.sons[2], st))
     case node.sons[1].strval
     of ">=", ">", "<=", "<", "==", "!=":
       result = tbit(1)
@@ -307,12 +206,16 @@ proc inferType(expression: Expr): KsType =
     #of ktkArr
     #of ktkUser
   of knkTernary:
-    let (c, t, f) = (inferType(Expr(node: node.sons[0], st: st)),
-                     inferType(Expr(node: node.sons[1], st: st)),
-                     inferType(Expr(node: node.sons[2], st: st)))
+    let (c, t, f) = (inferType(node.sons[0], st),
+                     inferType(node.sons[1], st),
+                     inferType(node.sons[2], st))
     doAssert (c.kind == ktkBit and c.bits == 1)
     doAssert t.kind == f.kind
     result = t
+
+proc toNim*(expression: Expr): NimNode
+proc toNim*(node: KsNode, st: Type): NimNode =
+  toNim(Expr(node: node, st: st))
 
 proc toNim*(expression: Expr): NimNode =
   let (e, st) = (expression.node, expression.st)
@@ -355,20 +258,22 @@ proc toNim*(expression: Expr): NimNode =
         ident(join(e.enumscope).capitalizeAscii),
         ident(e.enumval))
   of knkCast:
-    discard # XXX
+    result = e.kstype.ksToNimType
   of knkArr:
     # Need to use more fine-grained integer type because conversion is not auto
+    if e.sons == @[]:
+      return nnkBracketExpr.newTree(ident"seq", ident"byte")
     let
       x = newTree(nnkBracket)
-      typeOfFirst = inferType(Expr(node: e.sons[0], st: st))
+      typeOfFirst = inferType(e.sons[0], st)
     for s in e.sons:
-      x.add Expr(node: s, st: st).toNim
-    if e.sons != @[] and typeOfFirst.kind in {ktkUInt, ktkSInt}:
+      x.add toNim(s, st)
+    if typeOfFirst.kind in {ktkUInt, ktkSInt}:
       var
         bytes: int
         sign: bool
       for son in e.sons:
-        let t = inferType(Expr(node: son, st: st))
+        let t = inferType(son, st)
         if t.bytes > bytes: bytes = t.bytes
         if t.kind == ktkSInt: sign = true
       case sign
@@ -391,38 +296,49 @@ proc toNim*(expression: Expr): NimNode =
     result = newTree(nnkCall)
     result.add(ident(e.sons[0].strval))
     for i in 1 ..< e.sons.len:
-      result.add(Expr(node: e.sons[i], st: st).toNim)
+      result.add(toNim(e.sons[i], st))
   of knkIdx:
     result = nnkBracketExpr.newTree(
-      Expr(node: e.sons[0], st: st).toNim,
-      Expr(node: e.sons[1], st: st).toNim)
+      toNim(e.sons[0], st),
+      toNim(e.sons[1], st))
   of knkDotExpr:
     var (l, r) = (e.sons[0], e.sons[1])
     case r.kind
     # ! special case because of Nim AST peculiarity
     of knkMeth:
       r.sons.insert(l, 1)
-      result = Expr(node: r, st: st).toNim
+      result = toNim(r, st)
+    of knkCast:
+      result = newCall(
+        toNim(r, st),
+        toNim(l, st))
     of knkId:
       result = newDotExpr(
-        Expr(node: l, st: st).toNim,
+        toNim(l, st),
         ident(r.strval))
-    else: discard # should not occur
+    of knkIdx:
+      result = newDotExpr(
+        toNim(l, st),
+        toNim(r, st))
+    else:
+      raise newException(
+        KaitaiError, fmt"unexpected '{r.kind}' during transpilation")
+
   of knkUnary:
     result = nnkPrefix.newTree(
-      Expr(node: e.sons[0], st: st).toNim,
-      Expr(node: e.sons[1], st: st).toNim)
+      toNim(e.sons[0], st),
+      toNim(e.sons[1], st))
   of knkInfix:
     result = nnkInfix.newTree(
-      Expr(node: e.sons[1], st: st).toNim,
-      Expr(node: e.sons[0], st: st).toNim,
-      Expr(node: e.sons[2], st: st).toNim)
+      toNim(e.sons[1], st),
+      toNim(e.sons[0], st),
+      toNim(e.sons[2], st))
   of knkTernary:
     result = nnkIfStmt.newTree(
       nnkElifBranch.newTree(
-        Expr(node: e.sons[0], st: st).toNim,
-        Expr(node: e.sons[1], st: st).toNim),
-      nnkElse.newTree(Expr(node: e.sons[2], st: st).toNim))
+        toNim(e.sons[0], st),
+        toNim(e.sons[1], st)),
+      nnkElse.newTree(toNim(e.sons[2], st)))
 
 proc meta(json: JsonNode, defaults: Meta): Meta =
   result = defaults
@@ -523,7 +439,7 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
     let x = json["contents"]
     case x.kind
     of JString:
-      let parsed = x.getStr.toKs
+      let parsed = x.getStr.toKs(st)
       case parsed.kind
       of knkStr:
         for c in parsed.strval:

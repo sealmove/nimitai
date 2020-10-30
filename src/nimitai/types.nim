@@ -1,4 +1,5 @@
-import json, tables
+import macros, json, tables, strutils, strformat
+import regex
 
 type
   TypeKey* = enum
@@ -151,7 +152,7 @@ type
     of knkFloat:
       floatval*: float
     of knkCast:
-      scope*: seq[string]
+      kstype*: KsType
     of knkEnum:
       enumscope*: seq[string]
       enumval*: string
@@ -190,3 +191,110 @@ type
     eLe = "le"
     eBe = "be"
   KaitaiError* = object of Defect
+
+proc walkdown(typ: Type, path: seq[string]): Type =
+  var
+    typ = typ
+    path = path
+  while path != @[]:
+    block walking:
+      for t in typ.types:
+        if eqIdent(path[^1], t.id):
+          typ = t
+          discard pop(path)
+          break walking
+      for e in typ.enums.keys:
+        if eqIdent(path[^1], e):
+          discard pop(path)
+          break walking
+      quit(fmt"Could not walk down to type '{path[^1]}' from type '{typ.id}'")
+  return typ
+
+proc follow(typ: Type, name: string, path: seq[string]): Type =
+  # First search in current's type types
+  for t in typ.types:
+    if eqIdent(name, t.id):
+      return walkdown(t, path)
+  # Then search in current's type enums
+  for e in typ.enums.keys:
+    if eqIdent(name, e):
+      return walkdown(typ, path)
+  # Then check current type itself
+  if eqIdent(name, typ.id):
+    return walkdown(typ, path)
+  # Then go one level up and try again
+  if typ.parent != nil:
+    return follow(typ.parent, name, path)
+  # No match
+  quit(fmt"Could not follow '{name}' from type '{typ.id}'")
+
+proc tbit*(bits: int, endian = eNone): KsType =
+  doAssert bits in {1..64}
+  KsType(kind: ktkBit, bits: bits, bitEndian: endian)
+
+proc tuint*(bytes: int, endian = eNone): KsType =
+  doAssert bytes in {1,2,4,8}
+  KsType(kind: ktkUInt, bytes: bytes, endian: endian)
+
+proc tsint*(bytes: int, endian = eNone): KsType =
+  doAssert bytes in {1,2,4,8}
+  KsType(kind: ktkSInt, bytes: bytes, endian: endian)
+
+proc tfloat*(bytes: int, endian = eNone): KsType =
+  doAssert bytes in {4,8}
+  KsType(kind: ktkFloat, bytes: bytes, endian: endian)
+
+proc tstr*(isZeroTerm = false): KsType =
+  KsType(kind: ktkStr, isZeroTerm: isZeroTerm)
+
+proc tarr*(et: KsType): KsType =
+  KsType(kind: ktkArr, elemtype: et)
+
+proc tuser*(typ: Type, name: string, path: seq[string]): KsType =
+  result = KsType(kind: ktkUser)
+  if typ != nil:
+    result.usertype = typ.follow(name, path)
+
+proc tenum*(typ: Type, scope: seq[string]): KsType =
+  let
+    typename = scope[0]
+    enumname = scope[^1]
+  var
+    scope = scope
+    path: seq[string]
+  discard pop(scope)
+  for i in countdown(scope.len - 1, 1):
+    path.add(scope[i])
+  KsType(
+    kind: ktkEnum,
+    owningtype: if scope == @[]: typ else: typ.follow(typename, path),
+    enumname: enumname)
+
+proc parseType*(s: string, typ: Type): KsType =
+  if s.match(re"u[1248](be|le)?"):
+    result = tuint(parseInt(s[1..1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"s[1248](be|le)?"):
+    result = tsint(parseInt(s[1..1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"f[48](be|le)?"):
+    result = tfloat(parseInt(s[1..1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"b[1-9][0-9]*(be|le)?"):
+    if s.match(re".*(be|le)"):
+      result = tbit(parseInt(s[1..^3]), parseEnum[Endian](s[^2..^1]))
+    else:
+      result = tbit(parseInt(s[1..^1]))
+  elif s.match(re"strz?"):
+    result = tstr(if s.endsWith('z'): true else: false)
+  else:
+    var
+      scope = split(s, "::")
+      path: seq[string]
+    let name = scope[0]
+    for i in countdown(scope.len - 1, 1):
+      path.add(scope[i])
+    result = tuser(typ, name, path)
