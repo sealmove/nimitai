@@ -388,7 +388,7 @@ proc toNim*(expression: Expr): NimNode =
     of "^" : result = ident"xor"
     else   : result = ident(e.strval)
   of knkId: # XXX
-    result = newDotExpr(ident"this", ident(e.strval))
+    result = newDotExpr(ident"this", ident(e.strval.normalize))
   of knkEnum: # XXX implement relative matching
     if st != nil:
       result = newDotExpr(
