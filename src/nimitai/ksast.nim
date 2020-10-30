@@ -1,165 +1,6 @@
 import macros, json, strutils, tables, sequtils, strformat
 import regex
-import exprlang
-
-type
-  TypeKey* = enum
-    tkId        = "id"
-    tkTypes     = "types"
-    tkMeta      = "meta"
-    tkDoc       = "doc"
-    tkDocRef    = "doc-ref"
-    tkParams    = "params"
-    tkSeq       = "seq"
-    tkInstances = "instances"
-    tkEnums     = "enums"
-  Type* = ref object
-    keys*       : set[TypeKey]
-    supertypes* : seq[Type]
-    parent*     : Type
-    id*         : string
-    types*      : seq[Type]
-    meta*       : Meta
-    doc*        : string
-    docRef*     : string
-    params*     : JsonNode # XXX
-    seq*        : seq[Field]
-    instances*  : seq[Field]
-    enums*      : Table[string, OrderedTable[int, VerboseEnum]]
-  MetaKey* = enum
-    mkApplication   = "application"
-    mkBitEndian     = "bit-endian"
-    mkEncoding      = "encoding"
-    mkEndian        = "endian"
-    mkFileExtension = "file-extension"
-    mkId            = "id"
-    mkImports       = "imports"
-    mkKsDebug       = "ks-debug"
-    mkKsOpaqueTypes = "ks-opaque-types"
-    mkKsVersion     = "ks-version"
-    mkLicense       = "license"
-    mkTitle         = "title"
-    mkXref          = "xref"
-  Meta = ref object
-    keys*          : set[MetaKey]
-    id*            : string
-    title*         : string
-    application*   : seq[string]
-    fileExtension* : seq[string]
-    xref*          : JsonNode # XXX
-    license*       : string
-    ksVersion*     : string
-    ksDebug*       : bool
-    ksOpaqueTypes* : bool
-    imports*       : seq[string]
-    encoding*      : string
-    endian*        : Endian
-    bitEndian*     : Endian
-  RepeatKind* = enum
-    rkNone
-    rkEos   = "eos"
-    rkExpr  = "expr"
-    rkUntil = "until"
-  FieldKey* = enum
-    fkConsume     = "consume"
-    fkContents    = "contents"
-    fkDoc         = "doc"
-    fkDocRef      = "doc-ref"
-    fkEncoding    = "encoding"
-    fkEnum        = "enum"
-    fkEosError    = "eos-error"
-    fkId          = "id"
-    fkIf          = "if"
-    fkInclude     = "include"
-    fkIo          = "io"
-    fkPadRight    = "pad-right"
-    fkPos         = "pos"
-    fkProcess     = "process"
-    fkRepeat      = "repeat"
-    fkRepeatExpr  = "repeat-expr"
-    fkRepeatUntil = "repeat-until"
-    fkSize        = "size"
-    fkSizeEos     = "size-eos"
-    fkTerminator  = "terminator"
-    fkType        = "type"
-    fkValue       = "value"
-  FieldKind* = enum
-    fkAttr, fkInst
-  Field* = ref object
-    case kind*: FieldKind
-    of fkAttr:
-      discard
-    of fkInst:
-      pos*  : Expr
-      value*: Expr
-    keys*        : set[FieldKey]
-    st           : Type
-    id*          : string
-    doc*         : string
-    docRef*      : string
-    contents*    : seq[byte]
-    `type`*      : KsType
-    repeat*      : RepeatKind
-    repeatExpr*  : Expr
-    repeatUntil* : Expr
-    `if`*        : Expr
-    size*        : Expr
-    sizeEos*     : bool
-    process*     : proc()
-    `enum`*      : seq[string]
-    encoding*    : string
-    padRight*    : byte
-    terminator*  : byte
-    consume*     : bool
-    `include`*   : bool
-    eosError*    : bool
-    io*          : Expr
-  VerboseEnumKey* = enum
-    vekId     = "id"
-    vekDoc    = "doc"
-    vekDocRef = "doc-ref"
-    vekOrigId = "-orig-id"
-  VerboseEnum* = ref object
-    keys*   : set[VerboseEnumKey]
-    id*     : string
-    doc*    : string
-    docRef* : string
-    origId* : string
-
-  Expr* = ref object
-    node* : KsNode
-    st*   : Type
-  KsTypeKind* = enum
-    ktkBit   = "b"
-    ktkUInt  = "u"
-    ktkSInt  = "s"
-    ktkFloat = "f"
-    ktkStr   = "str"
-    ktkArr
-    ktkUser
-    ktkEnum
-  KsType* = ref object
-    case kind*: KsTypeKind
-    of ktkBit:
-      bits*: int
-      bitEndian*: Endian
-    of ktkUInt, ktkSInt, ktkFloat:
-      bytes*: int
-      endian*: Endian
-    of ktkStr:
-      isZeroTerm*: bool
-    of ktkArr:
-      elemtype*: KsType
-    of ktkUser:
-      usertype*: Type
-    of ktkEnum:
-      owningtype*: Type
-      enumname*: string
-  Endian* = enum
-    eNone
-    eLe = "le"
-    eBe = "be"
-  KaitaiError* = object of Defect
+import types, exprlang
 
 proc walkdown(typ: Type, path: seq[string]): Type =
   var
@@ -360,12 +201,16 @@ proc jsonToExpr(json: JsonNode, typ: Type): Expr =
     result.node = KsNode(kind: knkBool, boolval: json.getBool)
   else: discard # Should not occur
 
-proc isByteArray(node: KsNode): bool =
-  doAssert node.kind == knkArr
-  for s in node.sons:
-    if s.kind != knkInt or s.intval < 0x00 or s.intval > 0xff:
-      return false
-  return true
+proc bytesToFit(n: BiggestInt): int =
+  case n
+  of -0x80 .. 0xff:
+    1
+  of -0x8000 .. -0x81, 0x100 .. 0x7fff:
+    2
+  of -0x8000_0000 .. -0x8001, 0x8000 .. 0x7fff_ffff:
+    4
+  of low(int) .. -0x8000_0001, 0x8000_0000 .. high(int):
+    8
 
 proc toNim*(expression: Expr): NimNode =
   let (e, st) = (expression.node, expression.st)
@@ -409,11 +254,24 @@ proc toNim*(expression: Expr): NimNode =
   of knkCast:
     discard # XXX
   of knkArr:
+    # Need to use more fine-grained integer type because conversion is not auto
     let x = newTree(nnkBracket)
     for s in e.sons:
       x.add Expr(node: s, st: st).toNim
-    if e.sons != @[] and e.isByteArray:
-      x[0] = newLit(e.sons[0].intval.byte)
+    if e.sons != @[] and e.sons[0].kind == knkInt:
+      var bytes: int
+      for son in e.sons:
+        bytes = bytesToFit(son.intval)
+      case bytes
+      of 1:
+        x[0] = newLit(e.sons[0].intval.int8)
+      of 2:
+        x[0] = newLit(e.sons[0].intval.int16)
+      of 4:
+        x[0] = newLit(e.sons[0].intval.int32)
+      of 8:
+        x[0] = newLit(e.sons[0].intval.int64)
+      else: discard
     result = prefix(x, "@")
   of knkMeth:
     result = newTree(nnkCall)
@@ -482,9 +340,21 @@ proc inferType(expression: Expr): KsType =
     result = tenum(st, node.enumscope)
   of knkArr:
     let types = node.sons.mapIt(inferType(Expr(node: it, st: st)))
-    for i in 1 ..< types.len:
-      doAssert types[0].kind == types[i].kind
-    result = tarr(types[0])
+    case types[0].kind
+    of ktkUInt, ktkSInt:
+      var
+        bytes: int
+        signed: bool
+      for t in types:
+        bytes = t.bytes
+        if t.kind == ktkSInt:
+          signed = true
+      if signed:
+        result = tarr(tsint(bytes))
+      else:
+        result = tarr(tuint(bytes))
+    else:
+      result = tarr(types[0])
   of knkMeth: # XXX
     doAssert node.sons[0].kind == knkId
     if eqIdent(node.sons[0].strval, "to_s"):
@@ -497,29 +367,25 @@ proc inferType(expression: Expr): KsType =
       result = tstr()
     elif eqIdent(node.sons[0].strval, "size"):
       result = tsint(8)
-    elif eqIdent(node.sons[0].strval, "first"):
-      result = tuint(1) # XXX
-    elif eqIdent(node.sons[0].strval, "last"):
-      result = tuint(1) # XXX
     else:
       quit(fmt"Method {node.sons[0].strval} not found")
   of knkIdx:
-    let x = infertype(Expr(node: node.sons[0], st: st))
+    let x = inferType(Expr(node: node.sons[0], st: st))
     doAssert x.kind == ktkArr
     result = x.elemtype
   of knkCast: result = tstr()#discard # XXX
   of knkDotExpr:
-    let lefttype = infertype(Expr(node: node.sons[0], st: st))
+    let lefttype = inferType(Expr(node: node.sons[0], st: st))
     case node.sons[1].kind
     of knkId:
       result = access(lefttype.usertype, node.sons[1].strval)
     of knkMeth:
       case node.sons[1].sons[0].strval
-      of "min", "max":
+      of "min", "max", "first", "last":
         doAssert lefttype.kind == ktkArr
         result = lefttype.elemtype
       else:
-        result = infertype(Expr(node: node.sons[1], st: st))
+        result = inferType(Expr(node: node.sons[1], st: st))
     else: discard # XXX
   of knkUnary:
     result = inferType(Expr(node: node.sons[1], st: st))

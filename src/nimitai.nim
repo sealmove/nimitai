@@ -1,5 +1,5 @@
 import json, macros, tables
-import nimitai/ksast
+import nimitai/[types, ksast]
 
 # XXX add --> template this: untyped = result
 

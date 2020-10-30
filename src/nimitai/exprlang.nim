@@ -3,42 +3,9 @@
 import parseutils, macros, strformat
 import strutils except parseBiggestInt
 import npeg
+import types
 
-type
-  KsNodeKind* = enum
-    knkBool
-    knkInt
-    knkFloat
-    knkStr
-    knkOp
-    knkId
-    knkEnum
-    knkCast
-    knkArr
-    knkMeth
-    knkIdx
-    knkDotExpr
-    knkUnary
-    knkInfix
-    knkTernary
-  KsNode* = ref object
-    case kind*: KsNodeKind
-    of knkBool:
-      boolval*: bool
-    of knkInt:
-      intval*: BiggestInt
-    of knkFloat:
-      floatval*: float
-    of knkCast:
-      scope*: seq[string]
-    of knkEnum:
-      enumscope*: seq[string]
-      enumval*: string
-    of knkStr, knkOp, knkId:
-      strval*: string
-    else:
-      sons*: seq[KsNode]
-  ParsingError* = object of CatchableError
+type ParsingError* = object of CatchableError
 
 proc debug*(ks: KsNode, n = 0) =
   let k = " ".repeat(n) & ($ks.kind)[3..^1]
