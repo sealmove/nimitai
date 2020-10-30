@@ -41,7 +41,7 @@ proc test(json: JsonNode): NimNode =
           ident"check",
           infix(
             Expr(node: toKs(a["actual"].getStr)).toNim,
-            "==",
+            "~=",
             nodeExpected)))
 
   newStmtList(
