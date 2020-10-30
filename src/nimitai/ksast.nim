@@ -324,6 +324,7 @@ proc toNim*(expression: Expr): NimNode =
     of "&" : result = ident"and"
     of "|" : result = ident"or"
     of "^" : result = ident"xor"
+    of "/" : result = ident"ksdiv" # depends on runtime
     else   : result = ident(e.strval)
   of knkId: # XXX
     case e.strval

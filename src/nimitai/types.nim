@@ -1,4 +1,5 @@
 import json, tables
+
 type
   TypeKey* = enum
     tkId        = "id"

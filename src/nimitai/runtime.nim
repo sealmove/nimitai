@@ -1,6 +1,6 @@
 import
   streams, endians, sequtils, bitops, strutils, strformat, options, encodings,
-  algorithm
+  algorithm, math
 
 type
   KaitaiStruct* {.inheritable.} = ref object
@@ -341,7 +341,11 @@ proc parseInt*(s: string, radix: int): int {.raises: [ValueError].} =
       fmt"base {radix} is not supported; use base 2, 8, 10 or 16")
 
 # Custom operators
-proc `/`*[T: SomeOrdinal, U: SomeOrdinal](a: T, b: U): T = a div b.T
+proc `ksdiv`*[T, U](a: T, b: U): auto =
+  when T is float or U is float:
+    a.float / b.float
+  else:
+    floorDiv(a, b.T)
 
 # Expression language methods
 # Integers
