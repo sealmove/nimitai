@@ -181,6 +181,6 @@ proc toKs*(str: string): KsNode =
   elif s[^1].len != 1:
     raise newException(ParsingError, str & &" (items: {s[0].len})")
   result = s[^1][0]
-  debug(result)
+  #debug(result)
 
-static: discard "-5 / 3".toKs
+#static: discard "-5 / 3".toKs

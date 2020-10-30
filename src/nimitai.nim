@@ -171,7 +171,8 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
             field.io.toNim),
           "not"),
         newCall(
-          newDotExpr(id, ident"add"),
+          ident"add",
+          newDotExpr(ident"this", id),
           parse(field, typ))))
   of rkExpr:
     discard
@@ -206,11 +207,13 @@ proc typeDecl(section: var NimNode, typ: Type) =
       parentType(typ)))
 
   for a in typ.seq:
-    let t =
+    var t =
       if fkEnum in a.keys:
         ident(matchAndBuildEnum(a.`enum`, typ))
       else:
         a.`type`.ksToNimType
+    if fkRepeat in a.keys:
+      t = nnkBracketExpr.newTree(ident"seq", t)
     fields.add(
       newIdentDefs(
         ident(a.id),
