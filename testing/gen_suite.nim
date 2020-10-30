@@ -31,6 +31,8 @@ proc test(json: JsonNode): NimNode =
         nodeExpected = Expr(node: expected.getStr.toKs).toNim
       of JInt:
         nodeExpected = newLit(expected.getInt)
+      of JFloat:
+        nodeExpected = newLit(expected.getFloat)
       of JBool:
         nodeExpected = newLit(expected.getBool)
       of JNull:

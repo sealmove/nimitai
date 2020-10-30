@@ -354,6 +354,8 @@ proc jsonToExpr(json: JsonNode, typ: Type): Expr =
     result.node = json.getStr.toKs
   of JInt:
     result.node = KsNode(kind: knkInt, intval: json.getInt)
+  of JFloat:
+    result.node = KsNode(kind: knkFloat, floatval: json.getFloat)
   of JBool:
     result.node = KsNode(kind: knkBool, boolval: json.getBool)
   else: discard # Should not occur
