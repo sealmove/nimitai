@@ -150,4 +150,4 @@ proc toKs*(str: string): KsNode =
   result = s[^1][0]
   #debug(result)
 
-#static: discard "-5 / 3".toKs
+#static: discard "[0x42, 0x1337, -251658241, -1]".toKs

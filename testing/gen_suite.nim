@@ -1,5 +1,5 @@
 import os, strformat, strutils, macros, json, algorithm
-import ../src/nimitai/[exprlang, ksast]
+import ../src/nimitai/[types, ksast, exprlang]
 
 proc test(json: JsonNode): NimNode =
   let
