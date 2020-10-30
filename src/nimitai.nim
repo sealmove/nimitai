@@ -15,12 +15,12 @@ proc parentType(typ: Type): NimNode =
 proc parse(field: Field, typ: Type): NimNode =
   if fkValue in field.keys:
     let t = field.`type`.ksToNimType
-    if t.kind == nnkBracketExpr:
-      return field.value.toNim
-    else:
-      return newCall(
-        field.`type`.ksToNimType,
-        field.value.toNim)
+    #if t.kind == nnkBracketExpr or fkRepeat in field.keys:
+    return field.value.toNim
+    #else:
+    #  return newCall(
+    #    field.`type`.ksToNimType,
+    #    field.value.toNim)
 
   let t = field.`type`
   case t.kind
@@ -66,12 +66,14 @@ proc parse(field: Field, typ: Type): NimNode =
       result = newCall(
         ident"readBytesFull",
         field.io.toNim)
+    elif fkRepeat in field.keys:
+      discard
     elif fkContents in field.keys:
       result = newCall(
         ident"ensureFixedContents",
         field.io.toNim,
         newLit(field.contents))
-    else:
+    elif fkSize in field.keys:
       result = newCall(
         ident"readBytes",
         field.io.toNim,
@@ -100,7 +102,6 @@ proc parse(field: Field, typ: Type): NimNode =
     result = newCall(
       ident(matchAndBuildEnum(field.`enum`, typ)),
       result)
-
 
 proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()

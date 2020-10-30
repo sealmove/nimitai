@@ -89,8 +89,8 @@ type
     of fkAttr:
       discard
     of fkInst:
-      pos*  : Expr
-      value*: Expr
+      pos*  : KsNode
+      value*: KsNode
     keys*        : set[FieldKey]
     st*          : Type
     id*          : string
@@ -99,10 +99,10 @@ type
     contents*    : seq[byte]
     `type`*      : KsType
     repeat*      : RepeatKind
-    repeatExpr*  : Expr
-    repeatUntil* : Expr
-    `if`*        : Expr
-    size*        : Expr
+    repeatExpr*  : KsNode
+    repeatUntil* : KsNode
+    `if`*        : KsNode
+    size*        : KsNode
     sizeEos*     : bool
     process*     : proc()
     `enum`*      : seq[string]
@@ -112,7 +112,7 @@ type
     consume*     : bool
     `include`*   : bool
     eosError*    : bool
-    io*          : Expr
+    io*          : KsNode
   VerboseEnumKey* = enum
     vekId     = "id"
     vekDoc    = "doc"
@@ -124,9 +124,6 @@ type
     doc*    : string
     docRef* : string
     origId* : string
-  Expr* = ref object
-    node* : KsNode
-    st*   : Type
   KsNodeKind* = enum
     knkBool
     knkInt
@@ -160,6 +157,7 @@ type
       strval*: string
     else:
       sons*: seq[KsNode]
+    cx*: Type
   KsTypeKind* = enum
     ktkBit   = "b"
     ktkUInt  = "u"

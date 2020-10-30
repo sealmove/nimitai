@@ -28,7 +28,7 @@ proc test(json: JsonNode): NimNode =
       var nodeExpected: NimNode
       case expected.kind
       of JString:
-        nodeExpected = Expr(node: expected.getStr.toKs(nil)).toNim
+        nodeExpected = expected.getStr.toKs(nil).toNim
       of JInt:
         nodeExpected = newLit(expected.getInt)
       of JFloat:
@@ -42,7 +42,7 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           infix(
-            Expr(node: a["actual"].getStr.toKs(nil)).toNim,
+            a["actual"].getStr.toKs(nil).toNim,
             "~=",
             nodeExpected)))
 

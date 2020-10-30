@@ -1,5 +1,4 @@
 import macros, json, strutils, tables, sequtils, strformat
-import regex
 import types, exprlang
 
 proc buildNimTypeId*(typ: Type): string =
@@ -82,26 +81,20 @@ proc jsonToByte(json: JsonNode): byte =
   else:
     result = 0
 
-proc jsonToExpr(json: JsonNode, typ: Type): Expr =
-  result = Expr(st: typ)
+proc jsonToExpr(json: JsonNode, typ: Type): KsNode =
   case json.kind
   of JString:
-    result.node = json.getStr.toKs(typ)
+    result = json.getStr.toKs(typ)
   of JInt:
-    result.node = KsNode(kind: knkInt, intval: json.getInt)
+    result = KsNode(kind: knkInt, intval: json.getInt, cx: typ)
   of JFloat:
-    result.node = KsNode(kind: knkFloat, floatval: json.getFloat)
+    result = KsNode(kind: knkFloat, floatval: json.getFloat, cx: typ)
   of JBool:
-    result.node = KsNode(kind: knkBool, boolval: json.getBool)
+    result = KsNode(kind: knkBool, boolval: json.getBool, cx: typ)
   else: discard # Should not occur
 
-proc inferType(expression: Expr): KsType
-proc inferType(node: KsNode, st: Type): KsType =
-  inferType(Expr(node: node, st: st))
-
-proc inferType(expression: Expr): KsType =
-  let (node, kind, st) = (expression.node, expression.node.kind, expression.st)
-  case kind
+proc inferType(node: KsNode): KsType =
+  case node.kind
   of knkBool:
     result = tbit(1)
   # XXX what if it doesn't fit into an int? (use uint)
@@ -124,11 +117,11 @@ proc inferType(expression: Expr): KsType =
   of knkOp:
     discard
   of knkId:
-    result = st.access(node.strval)
+    result = node.cx.access(node.strval)
   of knkEnum:
-    result = tenum(st, node.enumscope)
+    result = tenum(node.cx, node.enumscope)
   of knkArr:
-    let types = node.sons.mapIt(inferType(it, st))
+    let types = node.sons.mapIt(inferType(it))
     case types[0].kind
     of ktkUInt, ktkSInt:
       var
@@ -159,13 +152,13 @@ proc inferType(expression: Expr): KsType =
     else:
       quit(fmt"Method {node.sons[0].strval} not found")
   of knkIdx:
-    let x = inferType(node.sons[0], st)
+    let x = inferType(node.sons[0])
     doAssert x.kind == ktkArr
     result = x.elemtype
   of knkCast:
     result = node.kstype
   of knkDotExpr:
-    let lefttype = inferType(node.sons[0], st)
+    let lefttype = inferType(node.sons[0])
     case node.sons[1].kind
     of knkId:
       result = access(lefttype.usertype, node.sons[1].strval)
@@ -178,19 +171,21 @@ proc inferType(expression: Expr): KsType =
         of ktkStr:
           result = tsint(1)
         else:
-          raise newException(
-            KaitaiError,
-            "Tried to fetch an element from a non-array type")
+          result = lefttype
+          #raise newException(
+          #  KaitaiError,
+          #  fmt"Method '{node.sons[1].sons[0].strval}' " &
+          #  fmt"tried to fetch an element from non-array type '{lefttype.kind}'")
       of "reverse":
         result = lefttype
       else:
-        result = inferType(node.sons[1], st)
+        result = inferType(node.sons[1])
     else: discard # XXX
   of knkUnary:
-    result = inferType(node.sons[1], st)
+    result = inferType(node.sons[1])
   of knkInfix:
-    let (l, r) = (inferType(node.sons[0], st),
-                  inferType(node.sons[2], st))
+    let (l, r) = (inferType(node.sons[0]),
+                  inferType(node.sons[2]))
     case node.sons[1].strval
     of ">=", ">", "<=", "<", "==", "!=":
       result = tbit(1)
@@ -206,30 +201,25 @@ proc inferType(expression: Expr): KsType =
     #of ktkArr
     #of ktkUser
   of knkTernary:
-    let (c, t, f) = (inferType(node.sons[0], st),
-                     inferType(node.sons[1], st),
-                     inferType(node.sons[2], st))
+    let (c, t, f) = (inferType(node.sons[0]),
+                     inferType(node.sons[1]),
+                     inferType(node.sons[2]))
     doAssert (c.kind == ktkBit and c.bits == 1)
     doAssert t.kind == f.kind
     result = t
 
-proc toNim*(expression: Expr): NimNode
-proc toNim*(node: KsNode, st: Type): NimNode =
-  toNim(Expr(node: node, st: st))
-
-proc toNim*(expression: Expr): NimNode =
-  let (e, st) = (expression.node, expression.st)
-  case e.kind
+proc toNim*(node: KsNode): NimNode =
+  case node.kind
   of knkBool:
-    result = newLit(e.boolval)
+    result = newLit(node.boolval)
   of knkInt:
-    result = newIntLitNode(e.intval)
+    result = newIntLitNode(node.intval)
   of knkFloat:
-    result = newFloatLitNode(e.floatval)
+    result = newFloatLitNode(node.floatval)
   of knkStr:
-    result = newStrLitNode(e.strval)
+    result = newStrLitNode(node.strval)
   of knkOp:
-    case e.strval
+    case node.strval
     of "<<": result = ident"shl"
     of ">>": result = ident"shr"
     of "&" : result = ident"and"
@@ -237,9 +227,9 @@ proc toNim*(expression: Expr): NimNode =
     of "^" : result = ident"xor"
     of "/" : result = ident"ksdiv" # depends on runtime
     of "%" : result = ident"ksmod" # depends on runtime
-    else   : result = ident(e.strval)
+    else   : result = ident(node.strval)
   of knkId: # XXX
-    case e.strval
+    case node.strval
     of "_parent":
       result = newDotExpr(ident"this", ident"parent")
     of "_root":
@@ -247,33 +237,33 @@ proc toNim*(expression: Expr): NimNode =
     of "_":
       result = ident"x"
     else:
-      result = newDotExpr(ident"this", ident(e.strval))
+      result = newDotExpr(ident"this", ident(node.strval))
   of knkEnum: # XXX implement relative matching
-    if st != nil:
+    if node.cx != nil:
       result = newDotExpr(
-        ident(matchAndBuildEnum(e.enumscope, st)),
-        ident(e.enumval))
+        ident(matchAndBuildEnum(node.enumscope, node.cx)),
+        ident(node.enumval))
     else: # needed for generating tests
       result = newDotExpr(
-        ident(join(e.enumscope).capitalizeAscii),
-        ident(e.enumval))
+        ident(join(node.enumscope).capitalizeAscii),
+        ident(node.enumval))
   of knkCast:
-    result = e.kstype.ksToNimType
+    result = node.kstype.ksToNimType
   of knkArr:
     # Need to use more fine-grained integer type because conversion is not auto
-    if e.sons == @[]:
+    if node.sons == @[]:
       return nnkBracketExpr.newTree(ident"seq", ident"byte")
     let
       x = newTree(nnkBracket)
-      typeOfFirst = inferType(e.sons[0], st)
-    for s in e.sons:
-      x.add toNim(s, st)
+      typeOfFirst = inferType(node.sons[0])
+    for s in node.sons:
+      x.add toNim(s)
     if typeOfFirst.kind in {ktkUInt, ktkSInt}:
       var
         bytes: int
         sign: bool
-      for son in e.sons:
-        let t = inferType(son, st)
+      for son in node.sons:
+        let t = inferType(son)
         if t.bytes > bytes: bytes = t.bytes
         if t.kind == ktkSInt: sign = true
       case sign
@@ -294,51 +284,51 @@ proc toNim*(expression: Expr): NimNode =
     result = prefix(x, "@")
   of knkMeth:
     result = newTree(nnkCall)
-    result.add(ident(e.sons[0].strval))
-    for i in 1 ..< e.sons.len:
-      result.add(toNim(e.sons[i], st))
+    result.add(ident(node.sons[0].strval))
+    for i in 1 ..< node.sons.len:
+      result.add(toNim(node.sons[i]))
   of knkIdx:
     result = nnkBracketExpr.newTree(
-      toNim(e.sons[0], st),
-      toNim(e.sons[1], st))
+      toNim(node.sons[0]),
+      toNim(node.sons[1]))
   of knkDotExpr:
-    var (l, r) = (e.sons[0], e.sons[1])
+    var (l, r) = (node.sons[0], node.sons[1])
     case r.kind
     # ! special case because of Nim AST peculiarity
     of knkMeth:
       r.sons.insert(l, 1)
-      result = toNim(r, st)
+      result = toNim(r)
     of knkCast:
       result = newCall(
-        toNim(r, st),
-        toNim(l, st))
+        toNim(r),
+        toNim(l))
     of knkId:
       result = newDotExpr(
-        toNim(l, st),
+        toNim(l),
         ident(r.strval))
     of knkIdx:
       result = newDotExpr(
-        toNim(l, st),
-        toNim(r, st))
+        toNim(l),
+        toNim(r))
     else:
       raise newException(
         KaitaiError, fmt"unexpected '{r.kind}' during transpilation")
 
   of knkUnary:
     result = nnkPrefix.newTree(
-      toNim(e.sons[0], st),
-      toNim(e.sons[1], st))
+      toNim(node.sons[0]),
+      toNim(node.sons[1]))
   of knkInfix:
     result = nnkInfix.newTree(
-      toNim(e.sons[1], st),
-      toNim(e.sons[0], st),
-      toNim(e.sons[2], st))
+      toNim(node.sons[1]),
+      toNim(node.sons[0]),
+      toNim(node.sons[2]))
   of knkTernary:
     result = nnkIfStmt.newTree(
       nnkElifBranch.newTree(
-        toNim(e.sons[0], st),
-        toNim(e.sons[1], st)),
-      nnkElse.newTree(toNim(e.sons[2], st)))
+        toNim(node.sons[0]),
+        toNim(node.sons[1])),
+      nnkElse.newTree(toNim(node.sons[2])))
 
 proc meta(json: JsonNode, defaults: Meta): Meta =
   result = defaults
@@ -520,12 +510,12 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
 
   # io XXX
   if fkSize in result.keys:
-    result.io = Expr(node: KsNode(kind: knkId, strval: result.id & "io"), st: st)
+    result.io = KsNode(kind: knkId, strval: result.id & "io", cx: st)
   else:
     if fkIo in result.keys:
       result.io = jsonToExpr(json["io"], st)
     else:
-      result.io = Expr(node: KsNode(kind: knkId, strval: "io"), st: st)
+      result.io = KsNode(kind: knkId, strval: "io", cx: st)
 
   # pos
   if fkPos in result.keys:

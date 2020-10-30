@@ -6,7 +6,7 @@ import npeg
 import types
 
 type
-  Context = object
+  State = object
     ps: seq[seq[KsNode]]
     typ: Type
   ParsingError* = object of CatchableError
@@ -38,9 +38,9 @@ proc add(node: KsNode, children: varargs[KsNode]) =
   for c in children:
     node.sons.add(c)
 
-proc newKsNode*(kind: KsNodeKind, children: varargs[KsNode]): KsNode =
+proc newKsNode*(kind: KsNodeKind, cx: Type, children: varargs[KsNode]): KsNode =
   doAssert isFatherKind(kind)
-  result = KsNode(kind: kind)
+  result = KsNode(kind: kind, cx: cx)
   for c in children:
     result.add(c)
 
@@ -49,7 +49,7 @@ proc `[]`(node: KsNode, index: int): KsNode =
   node.sons[index]
 
 proc toKs*(str: string, typ: Type): KsNode =
-  let p = peg(G, s: Context):
+  let p = peg(G, s: State):
     # Non-terminal
     G         <- S * expr * !1
     expr      <- S * prefix * *infix
@@ -58,7 +58,7 @@ proc toKs*(str: string, typ: Type): KsNode =
     arr       <- '[' * S * newLvl * *(expr * *(',' * expr)) * S * ']' * S:
       let
         elements = pop(s.ps)
-        newNode = newKsNode(knkArr)
+        newNode = newKsNode(knkArr, s.typ)
       for e in elements:
         newNode.add(e)
       s.ps[^1].add newNode
@@ -68,14 +68,14 @@ proc toKs*(str: string, typ: Type): KsNode =
                  *(',' * expr) * ')') * S:
       let
         elements = pop(s.ps)
-        newNode = newKsNode(knkMeth, KsNode(kind: knkId, strval: $1))
+        newNode = newKsNode(knkMeth, s.typ, KsNode(kind: knkId, strval: $1, cx: s.typ))
       for e in elements:
         newNode.add(e)
       s.ps[^1].add newNode
     idx       <- >id * S * '[' * expr * ']' * S:
-      s.ps[^1].add newKsNode(knkIdx, KsNode(kind: knkId, strval: $1), pop(s.ps[^1]))
+      s.ps[^1].add newKsNode(knkIdx, s.typ, KsNode(kind: knkId, strval: $1, cx: s.typ), pop(s.ps[^1]))
     unary     <- (>("+"|"-"|"not") * S * expr * S) ^ 9:
-      s.ps[^1].add newKsNode(knkUnary, KsNode(kind: knkOp, strval: $1), pop(s.ps[^1]))
+      s.ps[^1].add newKsNode(knkUnary, s.typ, KsNode(kind: knkOp, strval: $1, cx: s.typ), pop(s.ps[^1]))
     parExpr   <- ('(' * expr * ')' * S) ^ 0
     infix     <- >("?") * S * expr ^ 1 * ":" * S          * expr      |
                  >("or" | "^")                            * expr ^  2 |
@@ -89,48 +89,48 @@ proc toKs*(str: string, typ: Type): KsNode =
       case $1
       of ".":
         let (r, l) = (pop(s.ps[^1]), pop(s.ps[^1]))
-        s.ps[^1].add newKsNode(knkDotExpr, l, r)
+        s.ps[^1].add newKsNode(knkDotExpr, s.typ, l, r)
       of "?":
         let (second, first, condition) = (pop(s.ps[^1]), pop(s.ps[^1]), pop(s.ps[^1]))
-        s.ps[^1].add newKsNode(knkTernary, condition, first, second)
+        s.ps[^1].add newKsNode(knkTernary, s.typ, condition, first, second)
       else:
         let (r, l) = (pop(s.ps[^1]), pop(s.ps[^1]))
-        s.ps[^1].add newKsNode(knkInfix, l, KsNode(kind: knkOp, strval: $1), r)
+        s.ps[^1].add newKsNode(knkInfix, s.typ, l, KsNode(kind: knkOp, strval: $1, cx: s.typ), r)
 
     # Terminal
     tBool     <- >("true" | "false") * S:
-      s.ps[^1].add KsNode(kind: knkBool, boolval: parseBool($1))
+      s.ps[^1].add KsNode(kind: knkBool, boolval: parseBool($1), cx: s.typ)
     tFloat    <- >(int * '.' * int * ?('e' * ?{'+', '-'} * int)) * S:
       var f: BiggestFloat
       assert len($1) == parseBiggestFloat($1, f)
-      s.ps[^1].add KsNode(kind: knkFloat, floatval: f)
+      s.ps[^1].add KsNode(kind: knkFloat, floatval: f, cx: s.typ)
     tInt      <- (tBin | tOct | tHex | tDec) * S
     tBin      <- bin:
       var b: BiggestInt
       assert len($0) == parseBin[BiggestInt]($0, b)
-      s.ps[^1].add KsNode(kind: knkInt, intval: b)
+      s.ps[^1].add KsNode(kind: knkInt, intval: b, cx: s.typ)
     tOct      <- oct:
       var o: BiggestInt
       assert len($0) == parseOct[BiggestInt]($0, o)
-      s.ps[^1].add KsNode(kind: knkInt, intval: o)
+      s.ps[^1].add KsNode(kind: knkInt, intval: o, cx: s.typ)
     tDec      <- dec:
       var d: BiggestInt
       assert len($0) == parseBiggestInt($0, d)
-      s.ps[^1].add KsNode(kind: knkInt, intval: d)
+      s.ps[^1].add KsNode(kind: knkInt, intval: d, cx: s.typ)
     tHex      <- hex:
       var x: BiggestInt
       assert len($0) == parseHex[BiggestInt]($0, x)
-      s.ps[^1].add KsNode(kind: knkInt, intval: x)
+      s.ps[^1].add KsNode(kind: knkInt, intval: x, cx: s.typ)
     tStr      <- (('\"' * >*(Print - '\"') * '\"') |
                   ('\'' * >*(Print - '\'') * '\'')) * S:
-      s.ps[^1].add KsNode(kind: knkStr, strval: $1)
+      s.ps[^1].add KsNode(kind: knkStr, strval: $1, cx: s.typ)
     tId       <- >id * S:
-      s.ps[^1].add KsNode(kind: knkId, strval: $1)
-    tEnum     <- >(id * "::" * id * *("::" * id)) * S:
+      s.ps[^1].add KsNode(kind: knkId, strval: $1, cx: s.typ)
+    tEnum     <- >enumer * S:
       let x = split($1, "::")
-      s.ps[^1].add KsNode(kind: knkEnum, enumscope: x[0..^2], enumval: x[^1])
-    tCast     <- "as<" * S * >(id * *("::" * id)) * S * '>' * S:
-      s.ps[^1].add KsNode(kind: knkCast, kstype: parseType($1, s.typ))
+      s.ps[^1].add KsNode(kind: knkEnum, enumscope: x[0..^2], enumval: x[^1], cx: s.typ)
+    tCast     <- "as<" * S * >typ * S * '>' * S:
+      s.ps[^1].add KsNode(kind: knkCast, kstype: parseType($1, s.typ), cx: s.typ)
 
     # Aux
     S        <- *Space
@@ -140,12 +140,18 @@ proc toKs*(str: string, typ: Type): KsNode =
     dec      <- Digit * *(?'_' * Digit)
     hex      <- "0x" * +(Xdigit | '_')
     id       <- (Lower | '_') * *(Alnum | '_')
+    enumer   <- id * "::" * id * *("::" * id)
+    prim     <- {'u','s'} * {'1','2','4','8'} * ?("be"|"le") |
+                'f' * {'4','8'} * ?("be"|"le") |
+                'b' * {'1'..'9'} * *Digit |
+                "str" * ?'z'
+    typ      <- prim | enumer | id
 
     # Aux with side-effects
     newLvl   <- 0:
       s.ps.add newSeq[KsNode]()
 
-  var s = Context(typ: typ)
+  var s = State(typ: typ)
   s.ps.add newSeq[KsNode]()
   if not p.match(str, s).ok:
     raise newException(ParsingError, str)
