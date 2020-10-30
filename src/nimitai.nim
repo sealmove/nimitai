@@ -66,6 +66,11 @@ proc parse(field: Field, typ: Type): NimNode =
       result = newCall(
         ident"readBytesFull",
         field.io.toNim)
+    elif fkContents in field.keys:
+      result = newCall(
+        ident"ensureFixedContents",
+        field.io.toNim,
+        newLit(field.contents))
     else:
       result = newCall(
         ident"readBytes",

@@ -5,7 +5,7 @@
   "seq": [
     {
       "id": "normal",
-      "contents": "PACK-1"
+      "contents": "\"PACK-1\""
     },
     {
       "id": "high_bit_8",

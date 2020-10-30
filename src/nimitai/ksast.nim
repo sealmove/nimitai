@@ -341,7 +341,9 @@ proc jsonToByte(json: JsonNode): byte =
   of JString:
     result = json.getStr.parseBinOctDecHex.byte
   of JInt:
-    result = json.getInt.byte
+    let x = json.getInt
+    doAssert x >= 0 and x <= 255
+    result = x.byte
   else:
     result = 0
 
@@ -614,7 +616,24 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   if fkDocRef in result.keys:
     result.docRef = json["doc-ref"].getStr
 
-  # XXX contents
+  if fkContents in result.keys:
+    let x = json["contents"]
+    case x.kind
+    of JString:
+      let parsed = x.getStr.toKs
+      case parsed.kind
+      of knkStr:
+        for c in parsed.strval:
+          result.contents.add(c.byte)
+      of knkArr:
+        for son in parsed.sons:
+          doAssert son.kind == knkInt
+          result.contents.add(son.intval.byte)
+      else: discard # should not occur
+    of JArray:
+      for e in x:
+        result.contents.add(e.jsonToByte)
+    else: discard # should not occur
 
   # type
   if fkType in result.keys:
