@@ -47,7 +47,6 @@ proc test(json: JsonNode): NimNode =
   newStmtList(
     nnkImportStmt.newTree(
       ident"json",
-      ident"lenientops",
       ident"../../testutils",
       infix(
         ident"../../../src",

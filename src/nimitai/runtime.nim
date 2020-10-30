@@ -340,6 +340,9 @@ proc parseInt*(s: string, radix: int): int {.raises: [ValueError].} =
     raise newException(ValueError,
       fmt"base {radix} is not supported; use base 2, 8, 10 or 16")
 
+# Custom operators
+proc `/`*[T: SomeOrdinal, U: SomeOrdinal](a: T, b: U): T = a div b.T
+
 # Expression language methods
 # Integers
 proc toS*(i: SomeInteger): string = intToStr(int(i))

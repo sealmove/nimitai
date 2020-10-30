@@ -10,9 +10,3 @@ proc `~=`*[T, U](a: T, b: U): bool =
     return true
   else:
     return a == b.T
-
-proc `/`*[T: SomeOrdinal, U: SomeOrdinal](a: T, b: U): T =
-  when T is U:
-    system.`/`(a, b)
-  else:
-    system.`/`(a, b.T)
