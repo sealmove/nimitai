@@ -388,7 +388,15 @@ proc toNim*(expression: Expr): NimNode =
     of "^" : result = ident"xor"
     else   : result = ident(e.strval)
   of knkId: # XXX
-    result = newDotExpr(ident"this", ident(e.strval.normalize))
+    case e.strval
+    of "_parent":
+      result = newDotExpr(ident"this", ident"parent")
+    of "_root":
+      result = newDotExpr(ident"this", ident"root")
+    of "_":
+      result = ident"x"
+    else:
+      result = newDotExpr(ident"this", ident(e.strval))
   of knkEnum: # XXX implement relative matching
     if st != nil:
       result = newDotExpr(
@@ -498,12 +506,16 @@ proc inferType(expression: Expr): KsType =
   of knkIdx: discard # XXX
   of knkCast: result = tstr()#discard # XXX
   of knkDotExpr:
+    let lefttype = infertype(Expr(node: node.sons[0], st: st))
     case node.sons[1].kind
     of knkId:
-      let kt = infertype(Expr(node: node.sons[0], st: st))
-      result = access(kt.usertype, node.sons[1].strval)
+      result = access(lefttype.usertype, node.sons[1].strval)
     of knkMeth:
-      result = infertype(Expr(node: node.sons[1], st: st))
+      case node.sons[1].sons[0].strval
+      of "min", "max":
+        result = lefttype
+      else:
+        result = infertype(Expr(node: node.sons[1], st: st))
     else: discard # XXX
   of knkUnary:
     result = inferType(Expr(node: node.sons[1], st: st))
@@ -658,9 +670,11 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   if fkRepeat in result.keys:
     result.repeat = parseEnum[RepeatKind](json["repeat"].getStr)
 
-  # XXX repeat-expr
+  if fkRepeatExpr in result.keys:
+    result.repeatExpr = jsonToExpr(json["repeat-expr"], result.st)
 
-  # XXX repeat-until
+  if fkRepeatUntil in result.keys:
+    result.repeatUntil = jsonToExpr(json["repeat-until"], result.st)
 
   # if
   if fkIf in result.keys:

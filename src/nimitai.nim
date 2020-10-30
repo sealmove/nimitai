@@ -104,7 +104,7 @@ proc parse(field: Field, typ: Type): NimNode =
 
 proc substream(id, ps, ss, size: NimNode): NimNode =
   result = newStmtList()
-  result.add(
+  result.add([
     newAssignment(
       newDotExpr(
         ident"this",
@@ -114,8 +114,7 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
         ps,
         newCall(
           ident"int",
-          size))))
-  result.add(
+          size))),
     newAssignment(
       newDotExpr(
         ident"this",
@@ -124,21 +123,20 @@ proc substream(id, ps, ss, size: NimNode): NimNode =
         ident"newKaitaiStream",
         newDotExpr(
           ident"this",
-          id))))
+          id)))])
 
 proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
   let id = ident(field.id & postfix)
 
   if fkPos in field.keys:
-    result.add(
+    result.add([
       newLetStmt(
         ident(field.id & "SavePos"),
         newCall(
           ident"pos",
           newDotExpr(
             ident"this",
-            ident"io"))))
-    result.add(
+            ident"io"))),
       newCall(
         ident"seek",
         newDotExpr(
@@ -146,7 +144,7 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
           ident"io"),
         newCall(
           ident"int",
-          field.pos.toNim)))
+          field.pos.toNim))])
 
   if fkSize in field.keys:
     let stmts = substream(
@@ -179,10 +177,49 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
           newDotExpr(ident"this", id),
           parse(field, typ))))
   of rkExpr:
-    discard
+    result.add([
+      newLetStmt(
+        ident"expr",
+        field.repeatExpr.toNim),
+      newCall(
+        ident"setlen",
+        newDotExpr(ident"this", id),
+        ident"expr"),
+      nnkForStmt.newTree(
+        ident"i",
+        infix(
+          newLit(0),
+          "..<",
+          ident"expr"),
+        newAssignment(
+          nnkBracketExpr.newTree(
+            newDotExpr(ident"this", id),
+            ident"i"),
+          parse(field, typ)))])
   of rkUntil:
-    discard
-
+    result.add(
+      newBlockStmt(
+        newEmptyNode(),
+        newStmtList(
+          newVarStmt(
+            ident"x",
+            parse(field, typ)),
+          newCall(
+            ident"add",
+            newDotExpr(ident"this", id),
+            ident"x"),
+          nnkWhileStmt.newTree(
+            prefix(
+              field.repeatUntil.toNim,
+              "not"),
+            newStmtList(
+              newAssignment(
+                ident"x",
+                parse(field, typ)),
+              newCall(
+                ident"add",
+                newDotExpr(ident"this", id),
+                ident"x"))))))
   if fkPos in field.keys:
     result.add(
       newCall(
