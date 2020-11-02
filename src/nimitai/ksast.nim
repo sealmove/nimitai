@@ -173,8 +173,8 @@ proc inferType(node: KsNode): KsType =
       result = access(lefttype.usertype, node.sons[1].strval)
     of knkMeth:
       case node.sons[1].sons[0].strval
-      of "min", "max", "first", "last", "reverse":
-        result = inferType(node.sons[0])
+      of "min", "max", "first", "last", "reverse", "get":
+        result = inferType(node.sons[0]).elemtype
       else:
         result = inferType(node.sons[1])
     else: discard # XXX
@@ -225,7 +225,7 @@ proc toNim*(node: KsNode): NimNode =
     of "/" : result = ident"ksdiv" # depends on runtime
     of "%" : result = ident"ksmod" # depends on runtime
     else   : result = ident(node.strval)
-  of knkId: # XXX
+  of knkId:
     case node.strval
     of "null":
       result = ident"nil"
@@ -239,7 +239,7 @@ proc toNim*(node: KsNode): NimNode =
       result = ident"x"
     else:
       result = newDotExpr(ident"this", ident(node.strval))
-  of knkEnum: # XXX implement relative matching
+  of knkEnum:
     if node.cx != nil:
       result = newDotExpr(
         ident(matchAndBuildEnum(node.enumscope, node.cx)),

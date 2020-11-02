@@ -63,7 +63,7 @@ proc toKs*(str: string, typ: Type): KsNode =
         newNode.add(e)
       s.ps[^1].add newNode
     meth      <- >("to_s" | "to_i" | "length" | "substring" | "size" | "first" |
-                   "last" | "min" | "max" | "reverse" | "eof") *
+                   "last" | "min" | "max" | "reverse" | "eof" | "get") *
                  &(!(Alpha | '_' | '[')) * newLvl * ?('(' * expr *
                  *(',' * expr) * ')') * S:
       let

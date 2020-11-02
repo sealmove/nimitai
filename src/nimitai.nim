@@ -82,7 +82,7 @@ proc parseExpr(io: NimNode; field: Field): NimNode =
       ident(matchAndBuildEnum(field.`enum`, field.st)),
       result)
 
-  if fkIf in field.keys and fkValue notin field.keys:
+  if fkIf in field.keys:
     result = newCall(
       ident"some",
       result)
@@ -207,8 +207,8 @@ proc parseField(field: Field): NimNode =
           ident"int",
           ident(field.id & "SavePos"))))
 
-  # It wraps all statements
-  if fkIf in field.keys:
+  # It wraps all statements; this is handled seperately for instances
+  if field.kind == fkAttr and fkIf in field.keys:
     parseStmts = newIfStmt((field.`if`.toNim, parseStmts))
 
   result.add(parseStmts)
@@ -243,10 +243,13 @@ proc typeDecl(section: var NimNode, typ: Type) =
         t))
 
   for i in typ.instances:
+    var t = i.`type`.toNim
+    if fkIf in i.keys:
+      t = nnkBracketExpr.newTree(ident"Option", t)
     fields.add(
       newIdentDefs(
         ident(i.id & "Inst"),
-        i.`type`.toNim),
+        t),
       newIdentDefs(
         ident(i.id & "Cached"),
         ident"bool"))
@@ -367,9 +370,11 @@ proc readProc(typ: Type): NimNode =
 proc instProcParams(inst: Field, typ: Type): NimNode =
   let id = buildNimTypeId(typ)
   var t = inst.`type`.toNim
+  if fkIf in inst.keys:
+    t = nnkBracketExpr.newTree(ident"Option", t)
 
   result = nnkFormalParams.newTree(
-    inst.`type`.toNim,
+    t,
     newIdentDefs(
       ident"this",
       ident(id)))
@@ -388,6 +393,18 @@ proc instProc(inst: Field, typ: Type): NimNode =
   result = newProc(ident(inst.id))
   result.params = instProcParams(inst, typ)
 
+  var condition = prefix(
+    newDotExpr(
+      ident"this",
+      ident(inst.id & "Cached")),
+    "not")
+
+  if fkIf in inst.keys:
+    condition = infix(
+      condition,
+      "and",
+      inst.`if`.toNim)
+
   var pa = newStmtList()
   for s in parseField(inst): pa.add(s)
 
@@ -399,13 +416,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
       ident"true"))
 
   result.body = newStmtList(
-    newIfStmt(
-     (prefix(
-        newDotExpr(
-          ident"this",
-          ident(inst.id & "Cached")),
-        "not"),
-      pa)),
+    newIfStmt((condition, pa)),
     nnkReturnStmt.newTree(
       newDotExpr(
         ident"this",
