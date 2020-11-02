@@ -79,7 +79,7 @@ proc parseExpr(io: NimNode; field: Field): NimNode =
 
   # They wrap parseExpr (careful, order matters)
   # if fkProcess in field.keys: XXX
-  if fkEnum in field.keys:
+  if fkEnum in field.keys and fkValue notin field.keys:
     result = newCall(
       ident(matchAndBuildEnum(field.`enum`, field.st)),
       result)
