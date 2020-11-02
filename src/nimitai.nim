@@ -109,12 +109,12 @@ proc parseField(field: Field): NimNode =
     result.add(newCommentStmtNode(field.docRef))
 
   if fkSize in field.keys or fkSizeEos in field.keys:
-    let size = newCall(ident"int", field.size.toNim)
-    var data =
-      if fkSize in field.keys:
-        newCall(ident"readBytes", io, size)
-      else:
-        newCall(ident"readBytesFull", io)
+    var data: NimNode
+    if fkSize in field.keys:
+      let size = newCall(ident"int", field.size.toNim)
+      data = newCall(ident"readBytes", io, size)
+    else:
+      data = newCall(ident"readBytesFull", io)
 
     if fkPadRight in field.keys and fkTerminator notin field.keys:
       data = newCall(

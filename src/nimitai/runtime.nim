@@ -1,6 +1,6 @@
 import
-  streams, endians, sequtils, bitops, strutils, strformat, options, encodings,
-  algorithm, math
+  streams, endians, sequtils, bitops, strutils, strformat, encodings, algorithm,
+  math
 
 type
   KaitaiStruct* {.inheritable.} = ref object
