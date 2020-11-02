@@ -1,4 +1,4 @@
-import fenv
+import fenv, options
 
 proc `~=`*[T, U](a: T, b: U): bool =
   when T is U:
@@ -6,6 +6,8 @@ proc `~=`*[T, U](a: T, b: U): bool =
       return abs(a - b) <= epsilon(T)
     else:
       return a == b
+  elif T is Option:
+    return get(a) ~= b
   elif T is seq:
     if a.len != b.len:
       return false
@@ -14,4 +16,4 @@ proc `~=`*[T, U](a: T, b: U): bool =
         return false
     return true
   else:
-    return a == b.T
+    return a ~= b.T

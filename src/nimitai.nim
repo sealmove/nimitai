@@ -82,6 +82,11 @@ proc parseExpr(io: NimNode; field: Field): NimNode =
       ident(matchAndBuildEnum(field.`enum`, field.st)),
       result)
 
+  if fkIf in field.keys:
+    result = newCall(
+      ident"some",
+      result)
+
 proc parseField(field: Field): NimNode =
   result = newStmtList()
   var
@@ -230,6 +235,8 @@ proc typeDecl(section: var NimNode, typ: Type) =
         a.`type`.toNim
     if fkRepeat in a.keys:
       t = nnkBracketExpr.newTree(ident"seq", t)
+    if fkIf in a.keys:
+      t = nnkBracketExpr.newTree(ident"Option", t)
     fields.add(
       newIdentDefs(
         ident(a.id),

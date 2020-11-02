@@ -1,5 +1,5 @@
 import os, strformat, strutils, macros, json, algorithm
-import ../src/nimitai/[types, ksast, exprlang]
+import ../src/nimitai/[ksast, exprlang]
 
 proc test(json: JsonNode): NimNode =
   let
@@ -40,31 +40,32 @@ proc test(json: JsonNode): NimNode =
 
   if json.hasKey("asserts"):
     for a in json["asserts"]:
-      let expected = a["expected"]
-      var nodeExpected: NimNode
-      case expected.kind
+      let actual = a["actual"].getStr.toKs(nil).toNim
+      var expected: NimNode
+      case a["expected"].kind
       of JString:
-        nodeExpected = expected.getStr.toKs(nil).toNim
+        expected = a["expected"].getStr.toKs(nil).toNim
       of JInt:
-        nodeExpected = newLit(expected.getInt)
+        expected = newLit(a["expected"].getInt)
       of JFloat:
-        nodeExpected = newLit(expected.getFloat)
+        expected = newLit(a["expected"].getFloat)
       of JBool:
-        nodeExpected = newLit(expected.getBool)
+        expected = newLit(a["expected"].getBool)
       of JNull:
-        nodeExpected = newNilLit()
+        expected = newNilLit()
       else: discard # Should not occur
       stmts.add(
         newCall(
           ident"check",
-          infix(
-            a["actual"].getStr.toKs(nil).toNim,
-            "~=",
-            nodeExpected)))
+          if expected.kind == nnkIdent and eqIdent(expected, "nil"):
+            newCall(ident"isNone", actual)
+          else:
+            infix(actual, "~=", expected)))
 
   newStmtList(
     nnkImportStmt.newTree(
       ident"json",
+      ident"options",
       ident"../../testutils",
       infix(
         ident"../../../src",
