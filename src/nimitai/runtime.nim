@@ -12,7 +12,7 @@ type
     bitsLeft: int
   KaitaiError* = object of Defect
 
-proc toString(bytes: seq[byte]): string =
+proc toString*(bytes: seq[byte]): string =
   result = newStringOfCap(len(bytes))
   for b in bytes:
     add(result, char(b))
