@@ -108,6 +108,17 @@ proc parseField(field: Field): NimNode =
   if fkDocRef in field.keys:
     result.add(newCommentStmtNode(field.docRef))
 
+  # This is not coded as a wrapper because the value of `io` changes
+  if fkPos in field.keys:
+    parseStmts.add(
+      newLetStmt(
+        ident(field.id & "SavePos"),
+        newCall(ident"pos", io)),
+      newCall(
+        ident"seek",
+        io,
+        newCall(ident"int", field.pos.toNim)))
+
   if fkSize in field.keys or fkSizeEos in field.keys:
     var data: NimNode
     if fkSize in field.keys:
@@ -183,17 +194,9 @@ proc parseField(field: Field): NimNode =
                 field.repeatUntil.toNim,
                 nnkBreakStmt.newTree(newEmptyNode()))))))))
 
-  # It wraps all statements
+  # This is not coded as a wrapper because the value of `io` changes
   if fkPos in field.keys:
-    parseStmts = newStmtList(
-      newLetStmt(
-        ident(field.id & "SavePos"),
-        newCall(ident"pos", io)),
-      newCall(
-        ident"seek",
-        io,
-        newCall(ident"int", field.pos.toNim)),
-      parseStmts,
+    parseStmts.add(
       newCall(
         ident"seek",
         io,
