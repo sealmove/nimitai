@@ -164,19 +164,7 @@ proc inferType(node: KsNode): KsType =
       result = access(lefttype.usertype, node.sons[1].strval)
     of knkMeth:
       case node.sons[1].sons[0].strval
-      of "min", "max", "first", "last":
-        case lefttype.kind
-        of ktkArr:
-          result = lefttype.elemtype
-        of ktkStr:
-          result = tsint(1)
-        else:
-          result = lefttype
-          #raise newException(
-          #  KaitaiError,
-          #  fmt"Method '{node.sons[1].sons[0].strval}' " &
-          #  fmt"tried to fetch an element from non-array type '{lefttype.kind}'")
-      of "reverse":
+      of "min", "max", "first", "last", "reverse":
         result = lefttype
       else:
         result = inferType(node.sons[1])
