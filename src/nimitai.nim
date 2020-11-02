@@ -145,19 +145,22 @@ proc parseField(field: Field): NimNode =
         KaitaiError,
         "'repeat' kind is 'expr' but no 'repeat-expr' key found")
     parseStmts.add(
-      newLetStmt(
-        ident"expr",
-        field.repeatExpr.toNim),
-      newCall(ident"setlen", f, ident"expr"),
-      nnkForStmt.newTree(
-        ident"i",
-        infix(
-          newLit(0),
-          "..<",
-          ident"expr"),
-        newAssignment(
-          nnkBracketExpr.newTree(f, ident"i"),
-          parseExpr(io, field))))
+      newBlockStmt(
+        newEmptyNode(),
+        newStmtList(
+          newLetStmt(
+            ident"expr",
+            field.repeatExpr.toNim),
+          newCall(ident"setlen", f, ident"expr"),
+          nnkForStmt.newTree(
+            ident"i",
+            infix(
+              newLit(0),
+              "..<",
+              ident"expr"),
+            newAssignment(
+              nnkBracketExpr.newTree(f, ident"i"),
+              parseExpr(io, field))))))
   of rkUntil:
     if fkRepeatUntil notin field.keys:
       raise newException(

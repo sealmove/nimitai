@@ -11,6 +11,7 @@ type
     bits: uint64
     bitsLeft: int
   KaitaiError* = object of Defect
+  EndOfStreamError* = object of KaitaiError
 
 proc toString*(bytes: seq[byte]): string =
   result = newStringOfCap(len(bytes))
@@ -50,7 +51,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[2, byte]
       bufferOut: array[2, byte]
-    doAssert ks.io.readData(addr(bufferIn), 2) == 2
+    if ks.io.readData(addr(bufferIn), 2) != 2:
+      raise newException(EndOfStreamError, "readS2Le")
     swapEndian16(addr(bufferOut), addr(bufferIn))
     result = cast[int16](bufferOut)
 
@@ -58,7 +60,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[4, byte]
       bufferOut: array[4, byte]
-    doAssert ks.io.readData(addr(bufferIn), 4) == 4
+    if ks.io.readData(addr(bufferIn), 4) != 4:
+      raise newException(EndOfStreamError, "readS4Le")
     swapEndian32(addr(bufferOut), addr(bufferIn))
     result = cast[int32](bufferOut)
 
@@ -66,7 +69,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[8, byte]
       bufferOut: array[8, byte]
-    doAssert ks.io.readData(addr(bufferIn), 8) == 8
+    if ks.io.readData(addr(bufferIn), 8) != 8:
+      raise newException(EndOfStreamError, "readS8Le")
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[int64](bufferOut)
 else:
@@ -74,7 +78,8 @@ else:
     var
       bufferIn: array[2, byte]
       bufferOut: array[2, byte]
-    doAssert ks.io.readData(addr(bufferIn), 2) == 2
+    if ks.io.readData(addr(bufferIn), 2) != 2:
+      raise newException(EndOfStreamError, "readS2Be")
     swapEndian16(addr(bufferOut), addr(bufferIn))
     result = cast[int16](bufferOut)
 
@@ -82,7 +87,8 @@ else:
     var
       bufferIn: array[4, byte]
       bufferOut: array[4, byte]
-    doAssert ks.io.readData(addr(bufferIn), 4) == 4
+    if ks.io.readData(addr(bufferIn), 4) != 4:
+      raise newException(EndOfStreamError, "readS4Be")
     swapEndian32(addr(bufferOut), addr(bufferIn))
     result = cast[int32](bufferOut)
 
@@ -90,7 +96,8 @@ else:
     var
       bufferIn: array[8, byte]
       bufferOut: array[8, byte]
-    doAssert ks.io.readData(addr(bufferIn), 8) == 8
+    if ks.io.readData(addr(bufferIn), 8) != 8:
+      raise newException(EndOfStreamError, "readS8Be")
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[int64](bufferOut)
 
@@ -110,7 +117,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[2, byte]
       bufferOut: array[2, byte]
-    doAssert ks.io.readData(addr(bufferIn), 2) == 2
+    if ks.io.readData(addr(bufferIn), 2) != 2:
+      raise newException(EndOfStreamError, "readU2Le")
     swapEndian16(addr(bufferOut), addr(bufferIn))
     result = cast[uint16](bufferOut)
 
@@ -118,7 +126,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[4, byte]
       bufferOut: array[4, byte]
-    doAssert ks.io.readData(addr(bufferIn), 4) == 4
+    if ks.io.readData(addr(bufferIn), 4) != 4:
+      raise newException(EndOfStreamError, "readU4Le")
     swapEndian32(addr(bufferOut), addr(bufferIn))
     result = cast[uint32](bufferOut)
 
@@ -126,7 +135,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[8, byte]
       bufferOut: array[8, byte]
-    doAssert ks.io.readData(addr(bufferIn), 8) == 8
+    if ks.io.readData(addr(bufferIn), 8) != 8:
+      raise newException(EndOfStreamError, "readU8Le")
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[uint64](bufferOut)
 else:
@@ -134,7 +144,8 @@ else:
     var
       bufferIn: array[2, byte]
       bufferOut: array[2, byte]
-    doAssert ks.io.readData(addr(bufferIn), 2) == 2
+    if ks.io.readData(addr(bufferIn), 2) != 2:
+      raise newException(EndOfStreamError, "readU2Be")
     swapEndian16(addr(bufferOut), addr(bufferIn))
     result = cast[uint16](bufferOut)
 
@@ -142,7 +153,8 @@ else:
     var
       bufferIn: array[4, byte]
       bufferOut: array[4, byte]
-    doAssert ks.io.readData(addr(bufferIn), 4) == 4
+    if ks.io.readData(addr(bufferIn), 4) != 4:
+      raise newException(EndOfStreamError, "readU4Be")
     swapEndian32(addr(bufferOut), addr(bufferIn))
     result = cast[uint32](bufferOut)
 
@@ -150,7 +162,8 @@ else:
     var
       bufferIn: array[8, byte]
       bufferOut: array[8, byte]
-    doAssert ks.io.readData(addr(bufferIn), 8) == 8
+    if ks.io.readData(addr(bufferIn), 8) != 8:
+      raise newException(EndOfStreamError, "readU8Be")
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[uint64](bufferOut)
 
@@ -167,7 +180,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[4, byte]
       bufferOut: array[4, byte]
-    doAssert ks.io.readData(addr(bufferIn), 4) == 4
+    if ks.io.readData(addr(bufferIn), 4) != 4:
+      raise newException(EndOfStreamError, "readF4Le")
     swapEndian32(addr(bufferOut), addr(bufferIn))
     result = cast[float32](bufferOut)
 
@@ -175,7 +189,8 @@ when system.cpuEndian == bigEndian:
     var
       bufferIn: array[8, byte]
       bufferOut: array[8, byte]
-    doAssert ks.io.readData(addr(bufferIn), 8) == 8
+    if ks.io.readData(addr(bufferIn), 8) != 8:
+      raise newException(EndOfStreamError, "readF8Le")
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[float64](bufferOut)
 else:
@@ -183,7 +198,8 @@ else:
     var
       bufferIn: array[4, byte]
       bufferOut: array[4, byte]
-    doAssert ks.io.readData(addr(bufferIn), 4) == 4
+    if ks.io.readData(addr(bufferIn), 4) != 4:
+      raise newException(EndOfStreamError, "readF4Be")
     swapEndian32(addr(bufferOut), addr(bufferIn))
     result = cast[float32](bufferOut)
 
@@ -191,7 +207,8 @@ else:
     var
       bufferIn: array[8, byte]
       bufferOut: array[8, byte]
-    doAssert ks.io.readData(addr(bufferIn), 8) == 8
+    if ks.io.readData(addr(bufferIn), 8) != 8:
+      raise newException(EndOfStreamError, "readF8Be")
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[float64](bufferOut)
 
@@ -212,7 +229,8 @@ proc readBitsIntBe*(ks: KaitaiStream, n: int): uint64 =
   if bitsNeeded > 0:
     var bytesNeeded = ((bitsNeeded - 1) div 8) + 1;
     var buf: array[8, byte]
-    doAssert ks.io.readData(addr(buf), bytesNeeded) == bytesNeeded
+    if ks.io.readData(addr(buf), bytesNeeded) != bytesNeeded:
+      raise newException(EndOfStreamError, "readBitsIntBe")
     for i in 0..<bytesNeeded:
       ks.bits = ks.bits shl 8
       ks.bits = ks.bits or buf[i]
@@ -232,7 +250,8 @@ proc readBitsIntLe*(ks: KaitaiStream, n: int): uint64 =
   if bitsNeeded > 0:
     var bytesNeeded = ((bitsNeeded - 1) div 8) + 1;
     var buf: array[8, byte]
-    doAssert ks.io.readData(addr(buf), bytesNeeded) == bytesNeeded
+    if ks.io.readData(addr(buf), bytesNeeded) != bytesNeeded:
+      raise newException(EndOfStreamError, "readBitsIntLe")
     for i in 0..<bytesNeeded:
       ks.bits = ks.bits or (uint64(buf[i]) shl ks.bitsLeft)
       inc(ks.bitsLeft, 8)
@@ -250,7 +269,8 @@ proc readBitsIntLe*(ks: KaitaiStream, n: int): uint64 =
 proc readBytes*(ks: KaitaiStream, n: int): seq[byte] =
   if n == 0: return
   result = newSeq[byte](n)
-  doAssert ks.io.readData(addr(result[0]), n) == n
+  if ks.io.readData(addr(result[0]), n) != n:
+      raise newException(EndOfStreamError, "readBytes")
 
 proc readBytesFull*(ks: KaitaiStream): seq[byte] =
   const bufferSize = 1024

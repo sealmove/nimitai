@@ -14,13 +14,29 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"readFile",
           newLit(&"specs/{id}.ksj")))),
-    newLetStmt(
+    nnkVarSection.newTree(
+      newIdentDefs(
+        ident"this",
+        ident(id.capitalizeAscii))))
+
+  var userObjLetStmt =
+    newAssignment(
       newIdentNode("this"),
       newCall(
         newDotExpr(
           ident(id.capitalizeAscii),
           newIdentNode("fromFile")),
-        newLit(&"subjects/{data}"))))
+        newLit(&"subjects/{data}")))
+
+  if json.hasKey("exception"):
+    let exception = ident(json["exception"].getStr)
+    userObjLetStmt = nnkTryStmt.newTree(
+      userObjLetStmt,
+      nnkExceptBranch.newTree(
+        exception,
+        nnkDiscardStmt.newTree(newEmptyNode())))
+
+  stmts.add(userObjLetStmt)
 
   if json.hasKey("asserts"):
     for a in json["asserts"]:
