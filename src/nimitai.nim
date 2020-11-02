@@ -82,7 +82,7 @@ proc parseExpr(io: NimNode; field: Field): NimNode =
       ident(matchAndBuildEnum(field.`enum`, field.st)),
       result)
 
-  if fkIf in field.keys:
+  if fkIf in field.keys and fkValue notin field.keys:
     result = newCall(
       ident"some",
       result)
