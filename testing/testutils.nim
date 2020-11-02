@@ -1,6 +1,11 @@
+import fenv
+
 proc `~=`*[T, U](a: T, b: U): bool =
   when T is U:
-    return a == b
+    when T is SomeFloat:
+      return abs(a - b) <= epsilon(T)
+    else:
+      return a == b
   elif T is seq:
     if a.len != b.len:
       return false
