@@ -1,191 +1,154 @@
 import json, macros, tables
 import nimitai/[types, ksast]
 
-# XXX add --> template this: untyped = result
-
 const
   rootTypeName = "KaitaiStruct"
   streamTypeName = "KaitaiStream"
 
-proc parentType(typ: Type): NimNode =
-  if typ.supertypes.len != 1:
-    return ident(rootTypeName)
-  return ident(buildNimTypeId(typ.supertypes[0]))
+proc parseByteArray(io: NimNode; field: Field): NimNode =
+  let
+    term = if fkTerminator in field.keys: field.terminator else: 0
+    incl = field.`include`
+    cons = field.consume
+    eoserr = field.eosError
+  result = newCall(
+    ident"readBytesTerm",
+    io,
+    newLit(term),
+    newLit(incl),
+    newLit(cons),
+    newLit(eoserr))
 
-proc parse(field: Field, typ: Type): NimNode =
-  if fkValue in field.keys:
-    let t = field.`type`.ksToNimType
-    #if t.kind == nnkBracketExpr or fkRepeat in field.keys:
-    return field.value.toNim
-    #else:
-    #  return newCall(
-    #    field.`type`.ksToNimType,
-    #    field.value.toNim)
-
-  let t = field.`type`
-  case t.kind
+proc parseTyped(io: NimNode; field: Field): NimNode =
+  let
+    meta = field.st.meta
+    raw = ident(field.id & "Raw")
+    kst = field.`type`
+  case kst.kind
   of ktkBit:
     let suffix =
-      if t.bitEndian == eNone:
-        $typ.meta.bitEndian
+      if kst.bitEndian == eNone:
+        $meta.bitEndian
       else:
-        $t.bitEndian
-    result = newCall(
-      "readBitsInt" & suffix,
-      field.io.toNim,
-      newLit(t.bits))
+        $kst.bitEndian
+    result = newCall("readBitsInt" & suffix, io, newLit(kst.bits))
+
     # Bool
-    if t.bits == 1:
+    if kst.bits == 1:
       result = newCall(ident"bool", result)
+
   of ktkUInt, ktkSInt, ktkFloat:
-    let endian = if t.endian == eNone: typ.meta.endian else: t.endian
+    let endian = if kst.endian == eNone: meta.endian else: kst.endian
     result = newCall(
-      "read" & $t.kind & $t.bytes & (if t.bytes != 1: $endian else: ""),
-      field.io.toNim)
-  of ktkArr, ktkStr: # XXX this only handles byte arrays
-    if fkTerminator in field.keys or (t.kind == ktkStr and t.isZeroTerm):
-      let term = if fkTerminator in field.keys: field.terminator else: 0
-      result = newCall(
-        ident"readBytesTerm",
-        field.io.toNim,
-        newLit(term),
-        newLit(field.`include`),
-        newLit(field.consume),
-        newLit(field.eosError))
-    elif fkPadRight in field.keys:
-      result = newCall(
-        ident"bytesStripRight",
-        newCall(
-          ident"readBytes",
-          field.io.toNim,
-          newCall(
-            ident"int",
-            field.size.toNim)),
-        newLit(field.padRight))
-    elif field.sizeEos:
-      result = newCall(
-        ident"readBytesFull",
-        field.io.toNim)
-    elif fkRepeat in field.keys:
-      discard
-    elif fkContents in field.keys:
-      result = newCall(
-        ident"ensureFixedContents",
-        field.io.toNim,
-        newLit(field.contents))
-    elif fkSize in field.keys:
-      result = newCall(
-        ident"readBytes",
-        field.io.toNim,
-        newCall(
-          ident"int",
-          field.size.toNim))
-    if t.kind == ktkStr:
-      let enc = if fkEncoding in field.keys: field.encoding
-                else: "UTF-8"
-      result = newCall(
-        ident"encode",
-        result,
-        newStrLitNode(enc))
+      "read" & $kst.kind & $kst.bytes & (if kst.bytes != 1: $endian else: ""),
+      io)
+
+  of ktkStr:
+    if fkTerminator in field.keys or kst.isZeroTerm:
+      result = parseByteArray(io, field)
+    else:
+      result = raw
+    result = newCall(ident"toString", result)
+
+  #if fkEncoding in field.keys
+  #if fkEosError in field.keys
+
+  of ktkArr: discard #XXX
   of ktkUser, ktkEnum:
     result = newCall(
-      newDotExpr(
-        field.`type`.ksToNimType,
-        ident"read"),
-      field.io.toNim,
+      ident"read",
+      kst.toNim,
+      io,
       newDotExpr(
         ident"this",
         ident"root"),
       ident"this")
 
+proc parseExpr(io: NimNode; field: Field): NimNode =
+  if fkType in field.keys:
+    result = parseTyped(io, field)
+  elif fkContents in field.keys:
+    result = newCall(ident"ensureFixedContents", io, newLit(field.contents))
+  elif fkValue in field.keys:
+    result = newCall(field.`type`.toNim, field.value.toNim)
+  elif fkTerminator in field.keys:
+    let term = if fkTerminator in field.keys: field.terminator else: 0
+    result = parseByteArray(io, field)
+  else:
+    result = ident(field.id & "Raw")
+
+  # They wrap parseExpr (careful, order matters)
+  # if fkProcess in field.keys: XXX
   if fkEnum in field.keys:
     result = newCall(
-      ident(matchAndBuildEnum(field.`enum`, typ)),
+      ident(matchAndBuildEnum(field.`enum`, field.st)),
       result)
 
-proc substream(id, ps, ss, size: NimNode): NimNode =
+proc parseField(field: Field): NimNode =
   result = newStmtList()
-  result.add([
-    newAssignment(
-      newDotExpr(
-        ident"this",
-        id),
-      newCall(
-        ident"readBytes",
-        ps,
-        newCall(
-          ident"int",
-          size))),
-    newAssignment(
-      newDotExpr(
-        ident"this",
-        ss),
-      newCall(
-        ident"newKaitaiStream",
-        newDotExpr(
-          ident"this",
-          id)))])
+  var
+    parseStmts = newStmtList()
+    io = field.io.toNim
+  let
+    f = newDotExpr(
+      ident"this",
+      ident(
+        if field.kind == fkAttr:
+          field.id
+        else:
+          field.id & "Inst"))
+    meta = field.st.meta
+    raw = ident(field.id & "Raw")
+    kst = field.`type`
 
-proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
-  let id = ident(field.id & postfix)
+  # They just add to beginning of body
+  if fkDoc in field.keys:
+    result.add(newCommentStmtNode(field.doc))
 
-  if fkPos in field.keys:
-    result.add([
-      newLetStmt(
-        ident(field.id & "SavePos"),
-        newCall(
-          ident"pos",
-          newDotExpr(
-            ident"this",
-            ident"io"))),
-      newCall(
-        ident"seek",
-        newDotExpr(
-          ident"this",
-          ident"io"),
-        newCall(
-          ident"int",
-          field.pos.toNim))])
+  if fkDocRef in field.keys:
+    result.add(newCommentStmtNode(field.docRef))
 
-  if fkSize in field.keys:
-    let stmts = substream(
-      ident(field.id & "Raw"),
-      newDotExpr(
-        ident"this",
-        ident"io"),
-      ident(field.id & "Io"),
-      field.size.toNim)
-    for s in stmts: result.add(s)
+  if fkSize in field.keys or fkSizeEos in field.keys:
+    let size = newCall(ident"int", field.size.toNim)
+    var data =
+      if fkSize in field.keys:
+        newCall(ident"readBytes", io, size)
+      else:
+        newCall(ident"readBytesFull", io)
 
+    if fkPadRight in field.keys and fkTerminator notin field.keys:
+      data = newCall(
+        ident"bytesStripRight",
+        data,
+        newLit(field.padRight))
+
+    parseStmts.add(newLetStmt(raw, data))
+
+    io = ident(field.id & "Io")
+    parseStmts.add(newLetStmt(io, newCall(ident"newKaitaiStream", raw)))
+        
+  # They define extra structuring around the parsing core
   case field.repeat
   of rkNone:
-    result.add(
-      newAssignment(
-        newDotExpr(
-          ident"this",
-          id),
-        parse(field, typ)))
+    parseStmts.add(newAssignment(f, parseExpr(io, field)))
   of rkEos:
-    result.add(
+    parseStmts.add(
       nnkWhileStmt.newTree(
-        prefix(
-          newCall(
-            ident"eof",
-            field.io.toNim),
-          "not"),
+        prefix(newCall(ident"eof", io), "not"),
         newCall(
           ident"add",
-          newDotExpr(ident"this", id),
-          parse(field, typ))))
+          f,
+          parseExpr(io, field))))
   of rkExpr:
-    result.add([
+    if fkRepeatExpr notin field.keys:
+      raise newException(
+        KaitaiError,
+        "'repeat' kind is 'expr' but no 'repeat-expr' key found")
+    parseStmts.add(
       newLetStmt(
         ident"expr",
         field.repeatExpr.toNim),
-      newCall(
-        ident"setlen",
-        newDotExpr(ident"this", id),
-        ident"expr"),
+      newCall(ident"setlen", f, ident"expr"),
       nnkForStmt.newTree(
         ident"i",
         infix(
@@ -193,51 +156,56 @@ proc parseField(field: Field, typ: Type, postfix = ""): seq[NimNode] =
           "..<",
           ident"expr"),
         newAssignment(
-          nnkBracketExpr.newTree(
-            newDotExpr(ident"this", id),
-            ident"i"),
-          parse(field, typ)))])
+          nnkBracketExpr.newTree(f, ident"i"),
+          parseExpr(io, field))))
   of rkUntil:
-    result.add(
+    if fkRepeatUntil notin field.keys:
+      raise newException(
+        KaitaiError,
+        "'repeat' kind is 'until' but no 'repeat-expr' key found")
+    parseStmts.add(
       newBlockStmt(
         newEmptyNode(),
         newStmtList(
-          newVarStmt(
-            ident"x",
-            parse(field, typ)),
-          newCall(
-            ident"add",
-            newDotExpr(ident"this", id),
-            ident"x"),
+          nnkVarSection.newTree(
+            newIdentDefs(
+              ident"x",
+              kst.toNim)),
           nnkWhileStmt.newTree(
-            prefix(
-              field.repeatUntil.toNim,
-              "not"),
+            ident"true",
             newStmtList(
-              newAssignment(
-                ident"x",
-                parse(field, typ)),
-              newCall(
-                ident"add",
-                newDotExpr(ident"this", id),
-                ident"x"))))))
+              newAssignment(ident"x", parseExpr(io, field)),
+              newCall(ident"add", f, ident"x"),
+              newIfStmt((field.repeatUntil.toNim, newTree(nnkBreakStmt))))))))
+
+  # It wraps all statements
   if fkPos in field.keys:
-    result.add(
+    parseStmts = newStmtList(
+      newLetStmt(
+        ident(field.id & "SavePos"),
+        newCall(ident"pos", io)),
       newCall(
         ident"seek",
-        newDotExpr(
-          ident"this",
-          ident"io"),
+        io,
+        newCall(ident"int", field.pos.toNim)),
+      parseStmts,
+      newCall(
+        ident"seek",
+        io,
         newCall(
           ident"int",
           ident(field.id & "SavePos"))))
 
+  # It wraps all statements
   if fkIf in field.keys:
-    var stmts = newStmtList()
-    for s in result: stmts.add(s)
-    result.setLen(1)
-    result[0] = newIfStmt(
-      (field.`if`.toNim, stmts))
+    parseStmts = newIfStmt((field.`if`.toNim, parseStmts))
+
+  result.add(parseStmts)
+
+proc parentType(typ: Type): NimNode =
+  if typ.supertypes.len != 1:
+    return ident(rootTypeName)
+  return ident(buildNimTypeId(typ.supertypes[0]))
 
 proc typeDecl(section: var NimNode, typ: Type) =
   var fields = newTree(nnkRecList)
@@ -253,35 +221,19 @@ proc typeDecl(section: var NimNode, typ: Type) =
       if fkEnum in a.keys:
         ident(matchAndBuildEnum(a.`enum`, typ))
       else:
-        a.`type`.ksToNimType
+        a.`type`.toNim
     if fkRepeat in a.keys:
       t = nnkBracketExpr.newTree(ident"seq", t)
     fields.add(
       newIdentDefs(
         ident(a.id),
-        t),
-      newIdentDefs(
-        ident(a.id & "Io"),
-        ident(streamTypeName)),
-      newIdentDefs(
-        ident(a.id & "Raw"),
-        nnkBracketExpr.newTree(
-          ident"seq",
-          ident"byte")))
+        t))
 
   for i in typ.instances:
     fields.add(
       newIdentDefs(
-        ident(i.id & "Io"),
-        ident(streamTypeName)),
-      newIdentDefs(
-        ident(i.id & "Raw"),
-        nnkBracketExpr.newTree(
-          ident"seq",
-          ident"byte")),
-      newIdentDefs(
         ident(i.id & "Inst"),
-        i.`type`.ksToNimType),
+        i.`type`.toNim),
       newIdentDefs(
         ident(i.id & "Cached"),
         ident"bool"))
@@ -336,16 +288,6 @@ proc readProcParams(typ: Type): NimNode =
       ident"parent",
       parentType(typ)))
 
-proc instProcParams(inst: Field, typ: Type): NimNode =
-  let id = buildNimTypeId(typ)
-  var t = inst.`type`.ksToNimType
-
-  result = nnkFormalParams.newTree(
-    inst.`type`.ksToNimType,
-    newIdentDefs(
-      ident"this",
-      ident(id)))
-
 proc readProcFw(typ: Type): NimNode =
   result = nnkProcDef.newTree(
     ident"read",
@@ -355,23 +297,6 @@ proc readProcFw(typ: Type): NimNode =
     newEmptyNode(),
     newEmptyNode(),
     newEmptyNode())
-
-proc instProcFw(inst: Field, typ: Type): NimNode =
-  result = nnkProcDef.newTree(
-    ident(inst.id),
-    newEmptyNode(),
-    newEmptyNode(),
-    instProcParams(inst, typ),
-    newEmptyNode(),
-    newEmptyNode(),
-    newEmptyNode())
-
-proc procFwDecl(stmtList: var NimNode, typ: Type) =
-  for c in typ.types:
-    procFwDecl(stmtList, c)
-  stmtList.add(readProcFw(typ))
-  for i in typ.instances:
-    stmtList.add(instProcFw(i, typ))
 
 proc readProc(typ: Type): NimNode =
   result = newProc(name = ident"read")
@@ -423,15 +348,35 @@ proc readProc(typ: Type): NimNode =
           newCall(
             ident"alignToByte",
             newDotExpr(ident"this", ident"io")))
-    let stmts = parseField(typ.seq[i], typ)
+    let stmts = parseField(typ.seq[i])
     for s in stmts: result.body.add(s)
+
+proc instProcParams(inst: Field, typ: Type): NimNode =
+  let id = buildNimTypeId(typ)
+  var t = inst.`type`.toNim
+
+  result = nnkFormalParams.newTree(
+    inst.`type`.toNim,
+    newIdentDefs(
+      ident"this",
+      ident(id)))
+
+proc instProcFw(inst: Field, typ: Type): NimNode =
+  result = nnkProcDef.newTree(
+    ident(inst.id),
+    newEmptyNode(),
+    newEmptyNode(),
+    instProcParams(inst, typ),
+    newEmptyNode(),
+    newEmptyNode(),
+    newEmptyNode())
 
 proc instProc(inst: Field, typ: Type): NimNode =
   result = newProc(ident(inst.id))
   result.params = instProcParams(inst, typ)
 
   var pa = newStmtList()
-  for s in parseField(inst, typ, postfix = "Inst"): pa.add(s)
+  for s in parseField(inst): pa.add(s)
 
   pa.add(
     newAssignment(
@@ -452,6 +397,13 @@ proc instProc(inst: Field, typ: Type): NimNode =
       newDotExpr(
         ident"this",
         ident(inst.id & "Inst"))))
+
+proc procFwDecl(stmtList: var NimNode, typ: Type) =
+  for c in typ.types:
+    procFwDecl(stmtList, c)
+  stmtList.add(readProcFw(typ))
+  for i in typ.instances:
+    stmtList.add(instProcFw(i, typ))
 
 proc procDecl(stmtList: var NimNode, typ: Type) =
   for c in typ.types:

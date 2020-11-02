@@ -38,7 +38,7 @@ proc matchAndBuildEnum*(scope: seq[string], typ: Type): string =
   let e = scope.join("::")
   quit(fmt"Enum {e} not found")
 
-proc ksToNimType*(ksType: KsType): NimNode =
+proc toNim*(ksType: KsType): NimNode =
   case ksType.kind
   of ktkBit:
     if ksType.bits == 1:
@@ -54,7 +54,7 @@ proc ksToNimType*(ksType: KsType): NimNode =
   of ktkStr:
     result = ident"string"
   of ktkArr:
-    result = nnkBracketExpr.newTree(ident"seq", ksToNimType(ksType.elemtype))
+    result = nnkBracketExpr.newTree(ident"seq", toNim(ksType.elemtype))
   of ktkUser:
     result = ident(buildNimTypeId(ksType.usertype))
   of ktkEnum:
@@ -234,6 +234,8 @@ proc toNim*(node: KsNode): NimNode =
       result = newDotExpr(ident"this", ident"parent")
     of "_root":
       result = newDotExpr(ident"this", ident"root")
+    of "_io":
+      result = newDotExpr(ident"this", ident"io")
     of "_":
       result = ident"x"
     else:
@@ -248,7 +250,7 @@ proc toNim*(node: KsNode): NimNode =
         ident(join(node.enumscope).capitalizeAscii),
         ident(node.enumval))
   of knkCast:
-    result = node.kstype.ksToNimType
+    result = node.kstype.toNim
   of knkArr:
     # Need to use more fine-grained integer type because conversion is not auto
     if node.sons == @[]:
@@ -333,19 +335,15 @@ proc toNim*(node: KsNode): NimNode =
 proc meta(json: JsonNode, defaults: Meta): Meta =
   result = defaults
 
-  # keys
   for key in json.keys:
     result.keys.incl(parseEnum[MetaKey](key))
 
-  # id
   if mkId in result.keys:
     result.id = json["id"].getStr
 
-  # title
   if mkTitle in result.keys:
     result.title = json["title"].getStr
 
-  # application
   if mkApplication in result.keys:
     let jnode = json["application"]
     case jnode.kind
@@ -356,7 +354,6 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
       result.application.add(jnode.getStr)
     else: discard # should not occur
 
-  # file-extension
   if mkFileExtension in result.keys:
     let jnode = json["file-extension"]
     case jnode.kind
@@ -367,27 +364,21 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
       result.fileExtension.add(jnode.getStr)
     else: discard # should not occur
 
-  # xref
   if mkXref in result.keys:
     result.xref = json["xref"] # XXX
 
-  # license
   if mkLicense in result.keys:
     result.license = json["license"].getStr
 
-  # ks-version
   if mkKsVersion in result.keys:
     result.ksVersion = json["ks-version"].getStr
 
-  # ks-debug
   if mkKsDebug in result.keys:
     result.ksDebug = json["ks-debug"].getBool
 
-  # ks-opaque-types
   if mkKsOpaqueTypes in result.keys:
     result.ksOpaqueTypes = json["ks-debug"].getBool
 
-  # imports
   if mkImports in result.keys:
     let jnode = json["imports"]
     case jnode.kind
@@ -398,30 +389,24 @@ proc meta(json: JsonNode, defaults: Meta): Meta =
       result.imports.add(jnode.getStr)
     else: discard # should not occur
 
-  # encoding
   if mkEncoding in result.keys:
     result.encoding = json["encoding"].getStr
 
-  # endian
   if mkEndian in result.keys:
     result.endian = parseEnum[Endian](json["endian"].getStr)
 
-  # bit-endian
   if mkBitEndian in result.keys:
     result.bitEndian = parseEnum[Endian](json["bit-endian"].getStr)
 
 proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   result = Field(kind: kind, id: id, st: st)
 
-  # keys
   for key in json.keys:
     result.keys.incl(parseEnum[FieldKey](key))
 
-  # doc
   if fkDoc in result.keys:
     result.doc = json["doc"].getStr
 
-  # doc-ref
   if fkDocRef in result.keys:
     result.docRef = json["doc-ref"].getStr
 
@@ -452,7 +437,6 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   else:
     result.`type` = tarr(tuint(1))
 
-  # repeat
   if fkRepeat in result.keys:
     result.repeat = parseEnum[RepeatKind](json["repeat"].getStr)
 
@@ -462,66 +446,50 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
   if fkRepeatUntil in result.keys:
     result.repeatUntil = jsonToExpr(json["repeat-until"], result.st)
 
-  # if
   if fkIf in result.keys:
     result.`if` = jsonToExpr(json["if"], result.st)
 
-  # size
   if fkSize in result.keys:
     result.size = jsonToExpr(json["size"], result.st)
 
-  # size-eos
   if fkSizeEos in result.keys:
     result.sizeEos = json["size-eos"].getBool
 
   # XXX process
 
-  # enum
   if fkEnum in result.keys:
     result.`enum` = split(json["enum"].getStr, "::")
 
-  # encoding
   if fkEncoding in result.keys:
     result.encoding = json["encoding"].getStr
 
-  # pad-right
   if fkPadRight in result.keys:
     result.padRight = jsonToByte(json["pad-right"])
 
-  # terminator
   if fkTerminator in result.keys:
     result.terminator = jsonToByte(json["terminator"])
 
-  # consume
   if fkConsume in result.keys:
     result.consume = json["consume"].getBool
   else:
     result.consume = true
 
-  # include
   if fkInclude in result.keys:
     result.`include` = json["include"].getBool
 
-  # eos-error
   if fkEosError in result.keys:
     result.eosError = json["eos-error"].getBool
   else:
     result.eosError = true
 
-  # io XXX
-  if fkSize in result.keys:
-    result.io = KsNode(kind: knkId, strval: result.id & "io", cx: st)
+  if fkIo in result.keys:
+    result.io = jsonToExpr(json["io"], st)
   else:
-    if fkIo in result.keys:
-      result.io = jsonToExpr(json["io"], st)
-    else:
-      result.io = KsNode(kind: knkId, strval: "io", cx: st)
+    result.io = KsNode(kind: knkId, strval: "io", cx: st)
 
-  # pos
   if fkPos in result.keys:
     result.pos = jsonToExpr(json["pos"], st)
 
-  # value
   if fkValue in result.keys:
     result.value = jsonToExpr(json["value"], st)
     result.`type` = inferType(result.value)
@@ -531,28 +499,22 @@ proc verboseEnum(json: JsonNode): VerboseEnum =
   for key in json.keys:
     result.keys.incl(parseEnum[VerboseEnumKey](key))
 
-  # id
   if vekId in result.keys:
     result.id = json["id"].getStr
 
-  # doc
   if vekDoc in result.keys:
     result.doc = json["doc"].getStr
 
-  # doc-ref
   if vekDocRef in result.keys:
     result.docRef = json["doc-ref"].getStr
 
-  # -orig-id
   if vekDocRef in result.keys:
     result.origId = json["-orig-id"].getStr
 
 proc fillType(typ: Type, json: JsonNode) =
-  # keys
   for key in json.keys:
     typ.keys.incl(parseEnum[TypeKey](key))
 
-  # meta
   if typ.parent == nil:
     let defaults = Meta(bitEndian: eBe)
     if tkMeta in typ.keys:
@@ -565,7 +527,6 @@ proc fillType(typ: Type, json: JsonNode) =
     else:
       typ.meta = typ.parent.meta
 
-  # enums
   if tkEnums in typ.keys:
     typ.enums = initTable[string, OrderedTable[int, VerboseEnum]]()
     for name, consts in json["enums"]:
@@ -578,7 +539,6 @@ proc fillType(typ: Type, json: JsonNode) =
           typ.enums[name][parseBinOctDecHex(n)] = verboseEnum(ve)
         else: discard # should not occur
 
-  # types
   if tkTypes in typ.keys:
     # Need to construct tree with ids and fill in the rest of the info in a
     # separate step because attributes can reference the ids from the 'type' key
@@ -591,26 +551,22 @@ proc fillType(typ: Type, json: JsonNode) =
       fillType(typ.types[i], v)
       inc i
 
-  # seq
   if tkSeq in typ.keys:
     for a in json["seq"].items:
       typ.seq.add(field(fkAttr, a["id"].getStr, typ, a))
 
-  # instances
   if tkInstances in typ.keys:
     for k, v in json["instances"].pairs:
       typ.instances.add(field(fkInst, k, typ, v))
 
-  # doc
   if tkDoc in typ.keys:
     typ.doc = json["doc"].getStr
 
-  # doc-ref
   if tkDocRef in typ.keys:
     typ.docRef = json["doc-ref"].getStr
 
-  # params
-  typ.params = json.getOrDefault("params") # XXX
+ # XXX
+  typ.params = json.getOrDefault("params")
 
 proc toType*(json: JsonNode): Type =
   if not json.hasKey("meta"):

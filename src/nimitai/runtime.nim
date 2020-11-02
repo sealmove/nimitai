@@ -17,18 +17,6 @@ proc toString(bytes: seq[byte]): string =
   for b in bytes:
     add(result, char(b))
 
-converter toOption*[T: not Option](x: T): Option[T] = some(x)
-
-proc `<=`*(x, y: seq[byte]): bool = x.toString <= y.toString
-proc `<`*(x, y: seq[byte]): bool = x.toString <= y.toString
-proc `-`*(n: byte): byte = byte(255'u8 - n + 1)
-proc `%%%`*[T, U: SomeInteger](a: T, b: U): U =
-  if a >= T(0):
-    result = a.U mod b;
-  else:
-    let x = if b >= U(0): b else: -b
-    result = x - 1 + U(a + 1) mod b;
-
 proc newKaitaiFileStream*(f: File): KaitaiStream =
   KaitaiStream(io: newFileStream(f), bits: 0, bitsLeft: 0)
 proc newKaitaiFileStream*(filename: string): KaitaiStream =
@@ -346,12 +334,20 @@ proc `ksdiv`*[T, U](x: T, y: U): auto =
     x.float / y.float
   else:
     floorDiv(x, y.T)
-
 proc `ksmod`*[T: SomeNumber](x, y: T): T = floorMod(x, y)
-
+proc `<=`*(x, y: seq[byte]): bool = x.toString <= y.toString
+proc `<`*(x, y: seq[byte]): bool = x.toString <= y.toString
 proc `+`*(x, y: string): string = x & y
 proc `+`*[T: SomeSignedInt, U: SomeUnsignedInt](x: T, y: U): T = x + T(y)
 proc `+`*[U: SomeSignedInt, T: SomeUnsignedInt](x: T, y: U): U = U(x) + y
+proc `-`*(n: byte): byte = byte(255'u8 - n + 1)
+#proc `%%%`*[T, U: SomeInteger](a: T, b: U): U =
+#  if a >= T(0):
+#    result = a.U mod b;
+#  else:
+#    let x = if b >= U(0): b else: -b
+#    result = x - 1 + U(a + 1) mod b;
+
 
 # Expression language methods
 # Integers
@@ -364,10 +360,7 @@ proc toI*(f: float): int = int(f)
 proc length*(ba: seq[byte]): int = ba.len
 
 proc toS*(ba: seq[byte], encoding: string): string =
-  var x: string
-  for b in ba:
-    x.add b.char
-  convert(x, srcEncoding = encoding)
+  convert(ba.toString, srcEncoding = encoding)
 
 # Strings
 proc length*(s: string): int = s.len
