@@ -165,7 +165,7 @@ proc parseField(field: Field): NimNode =
     if fkRepeatUntil notin field.keys:
       raise newException(
         KaitaiError,
-        "'repeat' kind is 'until' but no 'repeat-expr' key found")
+        "'repeat' kind is 'until' but no 'repeat-until' key found")
     parseStmts.add(
       newBlockStmt(
         newEmptyNode(),
@@ -179,7 +179,9 @@ proc parseField(field: Field): NimNode =
             newStmtList(
               newAssignment(ident"x", parseExpr(io, field)),
               newCall(ident"add", f, ident"x"),
-              newIfStmt((field.repeatUntil.toNim, newTree(nnkBreakStmt))))))))
+              newIfStmt((
+                field.repeatUntil.toNim,
+                nnkBreakStmt.newTree(newEmptyNode()))))))))
 
   # It wraps all statements
   if fkPos in field.keys:

@@ -40,12 +40,22 @@ proc size*(ks: KaitaiStream): int =
   setPosition(ks.io, p)
 
 # Signed integer numbers
-proc readS1*(ks: KaitaiStream): int8 = readInt8(ks.io)
+proc readS1*(ks: KaitaiStream): int8 =
+  try: result = readInt8(ks.io)
+  except: raise newException(EndOfStreamError, "readS1")
 
 when system.cpuEndian == bigEndian:
-  proc readS2Be*(ks: KaitaiStream): int16 = readInt16(ks.io)
-  proc readS4Be*(ks: KaitaiStream): int32 = readInt32(ks.io)
-  proc readS8Be*(ks: KaitaiStream): int64 = readInt64(ks.io)
+  proc readS2Be*(ks: KaitaiStream): int16 =
+    try: result = readInt16(ks.io)
+    except: raise newException(EndOfStreamError, "readS2Be")
+
+  proc readS4Be*(ks: KaitaiStream): int32 =
+    try: result = readInt32(ks.io)
+    except: raise newException(EndOfStreamError, "readS4Be")
+
+  proc readS8Be*(ks: KaitaiStream): int64 =
+    try: result = readInt64(ks.io)
+    except: raise newException(EndOfStreamError, "readS8Be")
 
   proc readS2Le*(ks: KaitaiStream): int16 =
     var
@@ -101,17 +111,33 @@ else:
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[int64](bufferOut)
 
-  proc readS2Le*(ks: KaitaiStream): int16 = readInt16(ks.io)
-  proc readS4Le*(ks: KaitaiStream): int32 = readInt32(ks.io)
+  proc readS2Le*(ks: KaitaiStream): int16 =
+    try: result = readInt16(ks.io)
+    except: raise newException(EndOfStreamError, "readS2Le")
+
+  proc readS4Le*(ks: KaitaiStream): int32 =
+    try: result = readInt32(ks.io)
+    except: raise newException(EndOfStreamError, "readS4Le")
+
   proc readS8Le*(ks: KaitaiStream): int64 = readInt64(ks.io)
 
 # Unsigned integer numbers
-proc readU1*(ks: KaitaiStream): uint8 = readUint8(ks.io)
+proc readU1*(ks: KaitaiStream): uint8 =
+  try: result = readUint8(ks.io)
+  except: raise newException(EndOfStreamError, "readU1")
 
 when system.cpuEndian == bigEndian:
-  proc readU2Be*(ks: KaitaiStream): uint16 = readUint16(ks.io)
-  proc readU4Be*(ks: KaitaiStream): uint32 = readUint32(ks.io)
-  proc readU8Be*(ks: KaitaiStream): uint64 = readUint64(ks.io)
+  proc readU2Be*(ks: KaitaiStream): uint16 =
+    try: result = readUInt16(ks.io)
+    except: raise newException(EndOfStreamError, "readU2Be")
+
+  proc readU4Be*(ks: KaitaiStream): uint32 =
+    try: result = readUInt32(ks.io)
+    except: raise newException(EndOfStreamError, "readU4Be")
+
+  proc readU8Be*(ks: KaitaiStream): uint64 =
+    try: result = readUInt64(ks.io)
+    except: raise newException(EndOfStreamError, "readU8Be")
 
   proc readU2Le*(ks: KaitaiStream): uint16 =
     var
@@ -167,14 +193,27 @@ else:
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[uint64](bufferOut)
 
-  proc readU2Le*(ks: KaitaiStream): uint16 = readUint16(ks.io)
-  proc readU4Le*(ks: KaitaiStream): uint32 = readUint32(ks.io)
-  proc readU8Le*(ks: KaitaiStream): uint64 = readUint64(ks.io)
+  proc readU2Le*(ks: KaitaiStream): uint16 =
+    try: result = readUint16(ks.io)
+    except: raise newException(EndOfStreamError, "readU2Le")
+
+  proc readU4Le*(ks: KaitaiStream): uint32 =
+    try: result = readUint32(ks.io)
+    except: raise newException(EndOfStreamError, "readU4Le")
+
+  proc readU8Le*(ks: KaitaiStream): uint64 =
+    try: result = readUint64(ks.io)
+    except: raise newException(EndOfStreamError, "readU8Le")
 
 # Floating point numbers
 when system.cpuEndian == bigEndian:
-  proc readF4Be*(ks: KaitaiStream): float32 = readFloat32(ks.io)
-  proc readF8Be*(ks: KaitaiStream): float64 = readFloat64(ks.io)
+  proc readF4Be*(ks: KaitaiStream): float32 =
+    try: result = readFloat32(ks.io)
+    except: raise newException(EndOfStreamError, "readF4Be")
+
+  proc readF8Be*(ks: KaitaiStream): float64 =
+    try: result = readFloat64(ks.io)
+    except: raise newException(EndOfStreamError, "readF8Be")
 
   proc readF4Le*(ks: KaitaiStream): float32 =
     var
@@ -212,8 +251,13 @@ else:
     swapEndian64(addr(bufferOut), addr(bufferIn))
     result = cast[float64](bufferOut)
 
-  proc readF4Le*(ks: KaitaiStream): float32 = readFloat32(ks.io)
-  proc readF8Le*(ks: KaitaiStream): float64 = readFloat64(ks.io)
+  proc readF4Le*(ks: KaitaiStream): float32 =
+    try: result = readFloat32(ks.io)
+    except: raise newException(EndOfStreamError, "readF4Le")
+
+  proc readF8Le*(ks: KaitaiStream): float64 =
+    try: result = readFloat64(ks.io)
+    except: raise newException(EndOfStreamError, "readF8Le")
 
 # Unaligned bit values
 proc align_to_byte*(ks: KaitaiStream) =
