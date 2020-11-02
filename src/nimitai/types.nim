@@ -1,6 +1,10 @@
 import macros, json, tables, strutils, strformat
 import regex
 
+const
+  rootTypeName* = "KaitaiStruct"
+  streamTypeName* = "KaitaiStream"
+
 type
   TypeKey* = enum
     tkId        = "id"
@@ -167,6 +171,7 @@ type
     ktkArr
     ktkUser
     ktkEnum
+    ktkStream
   KsType* = ref object
     case kind*: KsTypeKind
     of ktkBit:
@@ -184,6 +189,8 @@ type
     of ktkEnum:
       owningtype*: Type
       enumname*: string
+    of ktkStream:
+      discard
   Endian* = enum
     eNone
     eLe = "le"
@@ -252,6 +259,9 @@ proc tuser*(typ: Type, name: string, path: seq[string]): KsType =
   result = KsType(kind: ktkUser)
   if typ != nil:
     result.usertype = typ.follow(name, path)
+
+proc tstream*(): KsType =
+  KsType(kind: ktkStream)
 
 proc tenum*(typ: Type, scope: seq[string]): KsType =
   let

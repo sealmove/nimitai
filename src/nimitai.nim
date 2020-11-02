@@ -1,10 +1,6 @@
 import json, macros, tables
 import nimitai/[types, ksast]
 
-const
-  rootTypeName = "KaitaiStruct"
-  streamTypeName = "KaitaiStream"
-
 proc parseByteArray(io: NimNode; field: Field): NimNode =
   let
     term = if fkTerminator in field.keys: field.terminator else: 0
@@ -63,6 +59,8 @@ proc parseTyped(io: NimNode; field: Field): NimNode =
         ident"this",
         ident"root"),
       ident"this")
+
+  of ktkStream: discard #XXX
 
 proc parseExpr(io: NimNode; field: Field): NimNode =
   if fkType in field.keys:

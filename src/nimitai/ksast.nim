@@ -59,6 +59,8 @@ proc toNim*(ksType: KsType): NimNode =
     result = ident(buildNimTypeId(ksType.usertype))
   of ktkEnum:
     result = ident(buildNimTypeId(ksType.owningtype) & ksType.enumname)
+  of ktkStream:
+    result = ident(streamTypeName)
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
@@ -117,7 +119,11 @@ proc inferType(node: KsNode): KsType =
   of knkOp:
     discard
   of knkId:
-    result = node.cx.access(node.strval)
+    case node.strval
+    of "_io":
+      result = tstream()
+    else:
+      result = node.cx.access(node.strval)
   of knkEnum:
     result = tenum(node.cx, node.enumscope)
   of knkArr:
@@ -137,18 +143,21 @@ proc inferType(node: KsNode): KsType =
         result = tarr(tuint(bytes))
     else:
       result = tarr(types[0])
-  of knkMeth: # XXX
+  of knkMeth:
     doAssert node.sons[0].kind == knkId
-    if eqIdent(node.sons[0].strval, "to_s"):
+    case node.sons[0].strval
+    of "to_s":
       result = tstr()
-    elif eqIdent(node.sons[0].strval, "to_i"):
+    of "to_i":
       result = tsint(8)
-    elif eqIdent(node.sons[0].strval, "length"):
+    of "length":
       result = tsint(8)
-    elif eqIdent(node.sons[0].strval, "substring"):
+    of "substring":
       result = tstr()
-    elif eqIdent(node.sons[0].strval, "size"):
+    of "size":
       result = tsint(8)
+    of "eof":
+      result = tuint(1)
     else:
       quit(fmt"Method {node.sons[0].strval} not found")
   of knkIdx:
@@ -165,7 +174,7 @@ proc inferType(node: KsNode): KsType =
     of knkMeth:
       case node.sons[1].sons[0].strval
       of "min", "max", "first", "last", "reverse":
-        result = lefttype
+        result = inferType(node.sons[0])
       else:
         result = inferType(node.sons[1])
     else: discard # XXX
@@ -218,6 +227,8 @@ proc toNim*(node: KsNode): NimNode =
     else   : result = ident(node.strval)
   of knkId: # XXX
     case node.strval
+    of "null":
+      result = ident"nil"
     of "_parent":
       result = newDotExpr(ident"this", ident"parent")
     of "_root":
