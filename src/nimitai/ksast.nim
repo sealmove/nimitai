@@ -428,14 +428,6 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
         result.contents.add(e.jsonToByte)
     else: discard # should not occur
 
-  # type
-  if fkType in result.keys:
-    result.`type` = parseType(json["type"].getStr, result.st)
-    if result.`type`.kind == ktkUser:
-      result.`type`.usertype.supertypes.add(st)
-  else:
-    result.`type` = tarr(tuint(1))
-
   if fkRepeat in result.keys:
     result.repeat = parseEnum[RepeatKind](json["repeat"].getStr)
 
@@ -444,6 +436,15 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
 
   if fkRepeatUntil in result.keys:
     result.repeatUntil = jsonToExpr(json["repeat-until"], result.st)
+
+  if fkType in result.keys:
+    result.`type` = parseType(json["type"].getStr, result.st)
+    if result.`type`.kind == ktkUser:
+      result.`type`.usertype.supertypes.add(st)
+    if result.repeat != rkNone:
+      result.`type` = tarr(result.`type`)
+  else:
+    result.`type` = tarr(tuint(1))
 
   if fkIf in result.keys:
     result.`if` = jsonToExpr(json["if"], result.st)

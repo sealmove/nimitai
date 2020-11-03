@@ -1,5 +1,5 @@
 import os, strformat, strutils, macros, json, algorithm
-import ../src/nimitai/[ksast, exprlang]
+import ../src/nimitai/[ksast, exprlang, identutils]
 
 proc test(json: JsonNode): NimNode =
   let
@@ -58,14 +58,14 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           if expected.kind == nnkIdent and eqIdent(expected, "nil"):
-            newCall(ident"isNone", actual)
+            actual[^1] = isParsedId(actual[^1].strval)
+            infix(actual, "==", ident"false")
           else:
             infix(actual, "~=", expected)))
 
   newStmtList(
     nnkImportStmt.newTree(
       ident"json",
-      ident"options",
       ident"../../testutils",
       infix(
         ident"../../../src",

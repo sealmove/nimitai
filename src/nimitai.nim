@@ -1,5 +1,5 @@
 import json, macros, tables
-import nimitai/[types, ksast]
+import nimitai/[types, ksast, identutils]
 
 proc parseByteArray(io: NimNode; field: Field): NimNode =
   let
@@ -19,7 +19,8 @@ proc parseTyped(io: NimNode; field: Field): NimNode =
   let
     meta = field.st.meta
     raw = ident(field.id & "Raw")
-    kst = field.`type`
+    kst = if field.repeat == rkNone: field.`type` else: field.`type`.elemtype
+
   case kst.kind
   of ktkBit:
     let suffix =
@@ -45,11 +46,11 @@ proc parseTyped(io: NimNode; field: Field): NimNode =
     else:
       result = raw
     result = newCall(ident"toString", result)
-
   #if fkEncoding in field.keys
   #if fkEosError in field.keys
 
-  of ktkArr: discard #XXX
+  of ktkArr: discard
+
   of ktkUser, ktkEnum:
     result = newCall(
       ident"read",
@@ -82,11 +83,6 @@ proc parseExpr(io: NimNode; field: Field): NimNode =
       ident(matchAndBuildEnum(field.`enum`, field.st)),
       result)
 
-  if fkIf in field.keys:
-    result = newCall(
-      ident"some",
-      result)
-
 proc parseField(field: Field): NimNode =
   result = newStmtList()
   var
@@ -95,11 +91,10 @@ proc parseField(field: Field): NimNode =
   let
     f = newDotExpr(
       ident"this",
-      ident(
-        if field.kind == fkAttr:
-          field.id
-        else:
-          field.id & "Inst"))
+      if field.kind == fkAttr:
+        ident(field.id)
+      else:
+        instId(field.id))
     meta = field.st.meta
     raw = ident(field.id & "Raw")
     kst = field.`type`
@@ -207,8 +202,15 @@ proc parseField(field: Field): NimNode =
           ident"int",
           ident(field.id & "SavePos"))))
 
-  # It wraps all statements; this is handled seperately for instances
+  # It wraps all statements; this is handled seperately for instances because
+  # they always have an if for caching
   if field.kind == fkAttr and fkIf in field.keys:
+    parseStmts.add(
+      newAssignment(
+        newDotExpr(
+          ident"this",
+          isParsedId(field.id)),
+        ident"true"))
     parseStmts = newIfStmt((field.`if`.toNim, parseStmts))
 
   result.add(parseStmts)
@@ -233,25 +235,18 @@ proc typeDecl(section: var NimNode, typ: Type) =
         ident(matchAndBuildEnum(a.`enum`, typ))
       else:
         a.`type`.toNim
-    if fkRepeat in a.keys:
-      t = nnkBracketExpr.newTree(ident"seq", t)
+    fields.add(newIdentDefs(ident(a.id), t))
     if fkIf in a.keys:
-      t = nnkBracketExpr.newTree(ident"Option", t)
-    fields.add(
-      newIdentDefs(
-        ident(a.id),
-        t))
+      fields.add(newIdentDefs(isParsedId(a.id), ident"bool"))
 
   for i in typ.instances:
     var t = i.`type`.toNim
-    if fkIf in i.keys:
-      t = nnkBracketExpr.newTree(ident"Option", t)
     fields.add(
       newIdentDefs(
-        ident(i.id & "Inst"),
+        instId(i.id),
         t),
       newIdentDefs(
-        ident(i.id & "Cached"),
+        isParsedId(i.id),
         ident"bool"))
 
   section.add nnkTypeDef.newTree(
@@ -370,8 +365,6 @@ proc readProc(typ: Type): NimNode =
 proc instProcParams(inst: Field, typ: Type): NimNode =
   let id = buildNimTypeId(typ)
   var t = inst.`type`.toNim
-  if fkIf in inst.keys:
-    t = nnkBracketExpr.newTree(ident"Option", t)
 
   result = nnkFormalParams.newTree(
     t,
@@ -396,7 +389,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
   var condition = prefix(
     newDotExpr(
       ident"this",
-      ident(inst.id & "Cached")),
+      isParsedId(inst.id)),
     "not")
 
   if fkIf in inst.keys:
@@ -412,7 +405,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
     newAssignment(
       newDotExpr(
         ident"this",
-        ident(inst.id & "Cached")),
+        isParsedId(inst.id)),
       ident"true"))
 
   result.body = newStmtList(
@@ -420,7 +413,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
     nnkReturnStmt.newTree(
       newDotExpr(
         ident"this",
-        ident(inst.id & "Inst"))))
+        instId(inst.id))))
 
 proc procFwDecl(stmtList: var NimNode, typ: Type) =
   for c in typ.types:
