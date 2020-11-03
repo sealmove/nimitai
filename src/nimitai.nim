@@ -153,7 +153,7 @@ proc parseField(field: Field): NimNode =
       raise newException(
         KaitaiError,
         "'repeat' kind is 'expr' but no 'repeat-expr' key found")
-    parseStmts.add(
+    parseStmts =
       newBlockStmt(
         newEmptyNode(),
         newStmtList(
@@ -162,20 +162,22 @@ proc parseField(field: Field): NimNode =
             field.repeatExpr.toNim),
           newCall(ident"setlen", f, ident"expr"),
           nnkForStmt.newTree(
-            ident"i",
+            ident"index",
             infix(
               newLit(0),
               "..<",
               ident"expr"),
-            newAssignment(
-              nnkBracketExpr.newTree(f, ident"i"),
-              parseExpr(io, field))))))
+            newStmtList(
+              parseStmts,
+              newAssignment(
+                nnkBracketExpr.newTree(f, ident"index"),
+                parseExpr(io, field))))))
   of rkUntil:
     if fkRepeatUntil notin field.keys:
       raise newException(
         KaitaiError,
         "'repeat' kind is 'until' but no 'repeat-until' key found")
-    parseStmts.add(
+    parseStmts =
       newBlockStmt(
         newEmptyNode(),
         newStmtList(
@@ -186,11 +188,12 @@ proc parseField(field: Field): NimNode =
           nnkWhileStmt.newTree(
             ident"true",
             newStmtList(
+              parseStmts,
               newAssignment(ident"x", parseExpr(io, field)),
               newCall(ident"add", f, ident"x"),
               newIfStmt((
                 field.repeatUntil.toNim,
-                nnkBreakStmt.newTree(newEmptyNode()))))))))
+                nnkBreakStmt.newTree(newEmptyNode())))))))
 
   # This is not coded as a wrapper because the value of `io` changes
   if fkPos in field.keys:

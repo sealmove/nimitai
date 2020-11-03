@@ -1,5 +1,5 @@
 import macros, json, strutils, tables, sequtils, strformat
-import types, exprlang
+import types, exprlang, identutils
 
 proc buildNimTypeId*(typ: Type): string =
   var
@@ -236,16 +236,12 @@ proc toNim*(node: KsNode): NimNode =
     case node.strval
     of "null":
       result = ident"nil"
-    of "_parent":
-      result = newDotExpr(ident"this", ident"parent")
-    of "_root":
-      result = newDotExpr(ident"this", ident"root")
-    of "_io":
-      result = newDotExpr(ident"this", ident"io")
     of "_":
       result = ident"x"
+    of "_index":
+      result = ident"index"
     else:
-      result = newDotExpr(ident"this", ident(node.strval))
+      result = newDotExpr(ident"this", ident(normId(node.strval)))
   of knkEnum:
     if node.cx != nil:
       result = newDotExpr(
