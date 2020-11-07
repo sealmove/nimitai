@@ -11,7 +11,7 @@
       "expected": "0x66"
     },
     {
-      "actual": "ut.value",
+      "actual": "ut.c0",
       "expected": "[0x72, 0x00, 0x49, 0x42]"
     }
   ]

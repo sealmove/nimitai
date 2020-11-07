@@ -11,11 +11,11 @@
       "expected": "0x11"
     },
     {
-      "actual": "chunks[0].body.as<switch_manual_int_size_else::chunk::chunk_meta>.title",
+      "actual": "chunks[0].body.c0.title",
       "expected": "\"Stuff\""
     },
     {
-      "actual": "chunks[0].body.as<switch_manual_int_size_else::chunk::chunk_meta>.author",
+      "actual": "chunks[0].body.c0.author",
       "expected": "\"Me\""
     },
     {
@@ -23,7 +23,7 @@
       "expected": "0x22"
     },
     {
-      "actual": "chunks[1].body.as<switch_manual_int_size_else::chunk::chunk_dir>.entries",
+      "actual": "chunks[1].body.c1.entries",
       "expected": "[\"AAAA\", \"BBBB\", \"CCCC\"]"
     },
     {
@@ -31,7 +31,7 @@
       "expected": "0x33"
     },
     {
-      "actual": "chunks[2].body.as<switch_manual_int_size_else::chunk::dummy>.rest",
+      "actual": "chunks[2].body.c2.rest",
       "expected": "[0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80]"
     },
     {
@@ -39,7 +39,7 @@
       "expected": "0xff"
     },
     {
-      "actual": "chunks[3].body.as<switch_manual_int_size_else::chunk::dummy>.rest",
+      "actual": "chunks[3].body.c2.rest",
       "expected": "[].as<bytes>"
     }
   ]

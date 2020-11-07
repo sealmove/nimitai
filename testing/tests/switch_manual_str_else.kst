@@ -11,7 +11,7 @@
       "expected": "\"S\""
     },
     {
-      "actual": "opcodes[0].body.as<switch_manual_str_else::opcode::strval>.value",
+      "actual": "opcodes[0].body.c1.value",
       "expected": "\"foo\""
     },
     {
@@ -19,7 +19,7 @@
       "expected": "\"X\""
     },
     {
-      "actual": "opcodes[1].body.as<switch_manual_str_else::opcode::noneval>.filler",
+      "actual": "opcodes[1].body.c2.filler",
       "expected": "0x42"
     },
     {
@@ -27,7 +27,7 @@
       "expected": "\"Y\""
     },
     {
-      "actual": "opcodes[2].body.as<switch_manual_str_else::opcode::noneval>.filler",
+      "actual": "opcodes[2].body.c2.filler",
       "expected": "0xcafe"
     },
     {
@@ -35,7 +35,7 @@
       "expected": "\"I\""
     },
     {
-      "actual": "opcodes[3].body.as<switch_manual_str_else::opcode::intval>.value",
+      "actual": "opcodes[3].body.c0.value",
       "expected": 7
     }
   ]

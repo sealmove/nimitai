@@ -7,7 +7,7 @@
       "expected": 1
     },
     {
-      "actual": "data.as<debug_switch_user::one>.val",
+      "actual": "data.one.val",
       "expected": -190
     }
   ]

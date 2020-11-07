@@ -11,7 +11,7 @@
       "expected": 7
     },
     {
-      "actual": "main.buf.as<nav_parent_switch_cast::foo::one>.branch.flag",
+      "actual": "main.buf.c1.branch.flag",
       "expected": 7
     }
   ]

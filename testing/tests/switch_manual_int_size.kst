@@ -11,11 +11,11 @@
       "expected": "0x11"
     },
     {
-      "actual": "chunks[0].body.as<switch_manual_int_size::chunk::chunk_meta>.title",
+      "actual": "chunks[0].body.c0.title",
       "expected": "\"Stuff\""
     },
     {
-      "actual": "chunks[0].body.as<switch_manual_int_size::chunk::chunk_meta>.author",
+      "actual": "chunks[0].body.c0.author",
       "expected": "\"Me\""
     },
     {
@@ -23,7 +23,7 @@
       "expected": "0x22"
     },
     {
-      "actual": "chunks[1].body.as<switch_manual_int_size::chunk::chunk_dir>.entries",
+      "actual": "chunks[1].body.c1.entries",
       "expected": "['AAAA', 'BBBB', 'CCCC']"
     },
     {

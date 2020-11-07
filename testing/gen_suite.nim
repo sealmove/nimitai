@@ -58,7 +58,7 @@ proc test(json: JsonNode): NimNode =
         newCall(
           ident"check",
           if expected.kind == nnkIdent and eqIdent(expected, "nil"):
-            actual[^1] = isParsedId(actual[^1].strval)
+            actual[^1] = ident(isParsedId(actual[^1].strval))
             infix(actual, "==", ident"false")
           else:
             infix(actual, "~=", expected)))

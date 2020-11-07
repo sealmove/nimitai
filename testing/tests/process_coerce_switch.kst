@@ -11,7 +11,7 @@
       "expected": 0
     },
     {
-      "actual": "buf.as<process_coerce_switch::foo>.bar",
+      "actual": "buf.c0.bar",
       "expected": "[0x41, 0x41, 0x41, 0x41]"
     }
   ]

@@ -11,7 +11,7 @@
       "expected": 1
     },
     {
-      "actual": "opcodes[0].body",
+      "actual": "opcodes[0].body.c0",
       "expected": 7
     },
     {
@@ -19,7 +19,7 @@
       "expected": 2
     },
     {
-      "actual": "opcodes[1].body",
+      "actual": "opcodes[1].body.c1",
       "expected": "0x4040"
     },
     {
@@ -27,7 +27,7 @@
       "expected": 4
     },
     {
-      "actual": "opcodes[2].body",
+      "actual": "opcodes[2].body.c2",
       "expected": 4919
     },
     {
@@ -35,7 +35,7 @@
       "expected": 8
     },
     {
-      "actual": "opcodes[3].body",
+      "actual": "opcodes[3].body.c3",
       "expected": 4919
     }
   ]

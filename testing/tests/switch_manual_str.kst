@@ -11,7 +11,7 @@
       "expected": "\"S\""
     },
     {
-      "actual": "opcodes[0].body.as<switch_manual_str::opcode::strval>.value",
+      "actual": "opcodes[0].body.c1.value",
       "expected": "\"foobar\""
     },
     {
@@ -19,7 +19,7 @@
       "expected": "\"I\""
     },
     {
-      "actual": "opcodes[1].body.as<switch_manual_str::opcode::intval>.value",
+      "actual": "opcodes[1].body.c0.value",
       "expected": "0x42"
     },
     {
@@ -27,7 +27,7 @@
       "expected": "\"I\""
     },
     {
-      "actual": "opcodes[2].body.as<switch_manual_str::opcode::intval>.value",
+      "actual": "opcodes[2].body.c0.value",
       "expected": "0x37"
     },
     {
@@ -35,7 +35,7 @@
       "expected": "\"S\""
     },
     {
-      "actual": "opcodes[3].body.as<switch_manual_str::opcode::strval>.value",
+      "actual": "opcodes[3].body.c1.value",
       "expected": "\"\""
     }
   ]

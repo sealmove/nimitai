@@ -7,7 +7,7 @@
       "expected": 1
     },
     {
-      "actual": "len",
+      "actual": "len.c0",
       "expected": 7
     },
     {
