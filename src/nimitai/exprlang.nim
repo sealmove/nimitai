@@ -1,8 +1,8 @@
 # Kaitai Struct Expression Language
 
-import parseutils, macros, strformat
+import parseutils, macros, strformat, json
 import strutils except parseBiggestInt
-import npeg
+import npeg, regex
 import types
 
 type
@@ -47,6 +47,35 @@ proc newKsNode*(kind: KsNodeKind, cx: Type, children: varargs[KsNode]): KsNode =
 proc `[]`(node: KsNode, index: int): KsNode =
   doAssert isFatherKind(node.kind)
   node.sons[index]
+
+proc parseType*(s: string, typ: Type): KsType =
+  if s.match(re"u[1248](be|le)?"):
+    result = tuint(parseInt(s[1..1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"s[1248](be|le)?"):
+    result = tsint(parseInt(s[1..1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"f[48](be|le)?"):
+    result = tfloat(parseInt(s[1..1]))
+    if s.match(re".*(be|le)"):
+      result.endian = parseEnum[Endian](s[2..3])
+  elif s.match(re"b[1-9][0-9]*(be|le)?"):
+    if s.match(re".*(be|le)"):
+      result = tbit(parseInt(s[1..^3]), parseEnum[Endian](s[^2..^1]))
+    else:
+      result = tbit(parseInt(s[1..^1]))
+  elif s.match(re"strz?"):
+    result = tstr(if s.endsWith('z'): true else: false)
+  else:
+    var
+      scope = split(s, "::")
+      path: seq[string]
+    let name = scope[0]
+    for i in countdown(scope.len - 1, 1):
+      path.add(scope[i])
+    result = tuser(typ, name, path)
 
 proc toKs*(str: string, typ: Type): KsNode =
   let p = peg(G, s: State):
@@ -161,5 +190,15 @@ proc toKs*(str: string, typ: Type): KsNode =
     raise newException(ParsingError, str & &" (items: {s.ps[0].len})")
   result = s.ps[^1][0]
   #debug(result)
+
+proc parseType*(json: JsonNode, typ: Type): KsType =
+  case json.kind
+  of JString: result = parseType(json.getStr, typ)
+  of JObject:
+    let on = json["switch-on"].getStr.toKs(typ)
+    result = KsType(kind: ktkSwitch, on: on)
+    for k, v in json["cases"]:
+      result.cases.add((k.toKs(typ), parseType(v, typ)))
+  else: discard # should not occur
 
 #static: discard "[0x42, 0x1337, -251658241, -1]".toKs(nil)

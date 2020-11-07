@@ -63,25 +63,7 @@ proc parseTyped(io: NimNode; field: Field): NimNode =
 
   of ktkStream: discard #XXX
 
-proc parseExpr(io: NimNode; field: Field): NimNode =
-  if fkType in field.keys:
-    result = parseTyped(io, field)
-  elif fkContents in field.keys:
-    result = newCall(ident"ensureFixedContents", io, newLit(field.contents))
-  elif fkValue in field.keys:
-    result = newCall(field.`type`.toNim, field.value.toNim)
-  elif fkTerminator in field.keys:
-    let term = if fkTerminator in field.keys: field.terminator else: 0
-    result = parseByteArray(io, field)
-  else:
-    result = ident(field.id & "Raw")
-
-  # They wrap parseExpr (careful, order matters)
-  # if fkProcess in field.keys: XXX
-  if fkEnum in field.keys and fkValue notin field.keys:
-    result = newCall(
-      ident(matchAndBuildEnum(field.`enum`, field.st)),
-      result)
+  of ktkSwitch: discard #XXX
 
 proc parseField(field: Field): NimNode =
   result = newStmtList()
@@ -91,10 +73,11 @@ proc parseField(field: Field): NimNode =
   let
     f = newDotExpr(
       ident"this",
-      if field.kind == fkAttr:
-        ident(field.id)
-      else:
-        instId(field.id))
+      ident(
+        if field.kind == fkAttr:
+          field.id
+        else:
+          instId(field.id)))
     meta = field.st.meta
     raw = ident(field.id & "Raw")
     kst = field.`type`
@@ -135,11 +118,31 @@ proc parseField(field: Field): NimNode =
 
     io = ident(field.id & "Io")
     parseStmts.add(newLetStmt(io, newCall(ident"newKaitaiStream", raw)))
-        
+
+  var parseExpr: NimNode
+  if fkType in field.keys:
+    parseExpr = parseTyped(io, field)
+  elif fkContents in field.keys:
+    parseExpr = newCall(ident"ensureFixedContents", io, newLit(field.contents))
+  elif fkValue in field.keys:
+    parseExpr = newCall(field.`type`.toNim, field.value.toNim)
+  elif fkTerminator in field.keys:
+    let term = if fkTerminator in field.keys: field.terminator else: 0
+    parseExpr = parseByteArray(io, field)
+  else:
+    parseExpr = ident(field.id & "Raw")
+
+  # They wrap parseExpr (careful, order matters)
+  # if fkProcess in field.keys: XXX
+  if fkEnum in field.keys and fkValue notin field.keys:
+    parseExpr = newCall(
+      ident(matchAndBuildEnum(field.`enum`, field.st)), parseExpr)
+  # if fkProcess
+
   # They define extra structuring around the parsing core
   case field.repeat
   of rkNone:
-    parseStmts.add(newAssignment(f, parseExpr(io, field)))
+    parseStmts.add(newAssignment(f, parseExpr))
   of rkEos:
     parseStmts.add(
       nnkWhileStmt.newTree(
@@ -147,7 +150,7 @@ proc parseField(field: Field): NimNode =
         newCall(
           ident"add",
           f,
-          parseExpr(io, field))))
+          parseExpr)))
   of rkExpr:
     if fkRepeatExpr notin field.keys:
       raise newException(
@@ -171,7 +174,7 @@ proc parseField(field: Field): NimNode =
               parseStmts,
               newAssignment(
                 nnkBracketExpr.newTree(f, ident"index"),
-                parseExpr(io, field))))))
+                parseExpr)))))
   of rkUntil:
     if fkRepeatUntil notin field.keys:
       raise newException(
@@ -189,7 +192,7 @@ proc parseField(field: Field): NimNode =
             ident"true",
             newStmtList(
               parseStmts,
-              newAssignment(ident"x", parseExpr(io, field)),
+              newAssignment(ident"x", parseExpr),
               newCall(ident"add", f, ident"x"),
               newIfStmt((
                 field.repeatUntil.toNim,
@@ -212,7 +215,7 @@ proc parseField(field: Field): NimNode =
       newAssignment(
         newDotExpr(
           ident"this",
-          isParsedId(field.id)),
+          ident(isParsedId(field.id))),
         ident"true"))
     parseStmts = newIfStmt((field.`if`.toNim, parseStmts))
 
@@ -233,24 +236,59 @@ proc typeDecl(section: var NimNode, typ: Type) =
       parentType(typ)))
 
   for a in typ.seq:
+    if a.`type`.kind == ktkSwitch:
+      let vdid = ident(variantDiscrId(id, a.id))
+
+      # declare enum for the discrimination
+      var enumty = nnkEnumTy.newTree(newEmptyNode())
+      for i in 0 ..< a.`type`.cases.len:
+        enumty.add ident("case" & $i)
+
+      section.add nnkTypeDef.newTree(
+        nnkPragmaExpr.newTree(
+          vdid,
+          nnkPragma.newTree(ident"pure")),
+        newEmptyNode(),
+        enumty)
+
+      # declare a type for the field to encapsulate variants
+      var rec = nnkRecCase.newTree(newIdentDefs(ident"discr", vdid))
+      for i in 0 ..< a.`type`.cases.len:
+        rec.add nnkOfBranch.newTree(
+          newDotExpr(vdid, ident("case" & $i)),
+          newIdentDefs(
+            ident("c" & $i),
+            a.`type`.cases[i].t.toNim))
+
+      section.add nnkTypeDef.newTree(
+        ident(variantId(id, a.id)),
+        newEmptyNode(),
+        nnkRefTy.newTree(
+          nnkObjectTy.newTree(
+            newEmptyNode(),
+            newEmptyNode(),
+            nnkRecList.newTree(rec))))
+
     var t =
-      if fkEnum in a.keys:
+      if a.`type`.kind == ktkSwitch:
+        ident(variantId(id, a.id))
+      elif fkEnum in a.keys:
         ident(matchAndBuildEnum(a.`enum`, typ))
       else:
         a.`type`.toNim
-    fields.add(newIdentDefs(ident(a.id), t))
+    fields.add newIdentDefs(ident(a.id), t)
+
     if fkIf in a.keys:
-      fields.add(newIdentDefs(isParsedId(a.id), ident"bool"))
+      fields.add newIdentDefs(ident(isParsedId(a.id)), ident"bool")
 
   for i in typ.instances:
     var t = i.`type`.toNim
-    fields.add(
-      newIdentDefs(
-        instId(i.id),
+    fields.add newIdentDefs(
+        ident(instId(i.id)),
         t),
       newIdentDefs(
-        isParsedId(i.id),
-        ident"bool"))
+        ident(isParsedId(i.id)),
+        ident"bool")
 
   section.add nnkTypeDef.newTree(
     ident(id),
@@ -318,15 +356,14 @@ proc readProc(typ: Type): NimNode =
 
   let id = buildNimTypeId(typ)
 
-  var
-    constructor = nnkObjConstr.newTree(
-      ident(id),
-      newColonExpr(
-        ident"io",
-        ident"io"),
-      newColonExpr(
-        ident"parent",
-        ident"parent"))
+  var constructor = nnkObjConstr.newTree(
+    ident(id),
+    newColonExpr(
+      ident"io",
+      ident"io"),
+    newColonExpr(
+      ident"parent",
+      ident"parent"))
 
   result.body = newStmtList(
     nnkTemplateDef.newTree(
@@ -356,12 +393,15 @@ proc readProc(typ: Type): NimNode =
 
   for i in 0 ..< typ.seq.len:
     # Check if we are transitioning from a bit attribute to a regular one
-    if i != 0:
-      if typ.seq[i-1].`type`.kind == ktkBit and typ.seq[i].`type`.kind != ktkBit:
-        result.body.add(
-          newCall(
-            ident"alignToByte",
-            newDotExpr(ident"this", ident"io")))
+    if i != 0 and
+       typ.seq[i-1].`type`.kind == ktkBit and
+       typ.seq[i].`type`.kind != ktkBit:
+      # This might be a bug when switching between ktkSwitch and non-ktkSwitch
+      # field; need to check this senario # XXX
+      result.body.add(
+        newCall(
+          ident"alignToByte",
+          newDotExpr(ident"this", ident"io")))
     let stmts = parseField(typ.seq[i])
     for s in stmts: result.body.add(s)
 
@@ -392,7 +432,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
   var condition = prefix(
     newDotExpr(
       ident"this",
-      isParsedId(inst.id)),
+      ident(isParsedId(inst.id))),
     "not")
 
   if fkIf in inst.keys:
@@ -408,7 +448,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
     newAssignment(
       newDotExpr(
         ident"this",
-        isParsedId(inst.id)),
+        ident(isParsedId(inst.id))),
       ident"true"))
 
   result.body = newStmtList(
@@ -416,7 +456,7 @@ proc instProc(inst: Field, typ: Type): NimNode =
     nnkReturnStmt.newTree(
       newDotExpr(
         ident"this",
-        instId(inst.id))))
+        ident(instId(inst.id)))))
 
 proc procFwDecl(stmtList: var NimNode, typ: Type) =
   for c in typ.types:

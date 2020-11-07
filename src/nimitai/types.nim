@@ -1,5 +1,4 @@
-import macros, json, tables, strutils, strformat
-import regex
+import macros, json, tables, strformat
 
 const
   rootTypeName* = "KaitaiStruct"
@@ -172,6 +171,7 @@ type
     ktkUser
     ktkEnum
     ktkStream
+    ktkSwitch
   KsType* = ref object
     case kind*: KsTypeKind
     of ktkBit:
@@ -189,6 +189,9 @@ type
     of ktkEnum:
       owningtype*: Type
       enumname*: string
+    of ktkSwitch:
+      on*: KsNode
+      cases*: seq[tuple[v: KsNode, t: KsType]]
     of ktkStream:
       discard
   Endian* = enum
@@ -277,32 +280,3 @@ proc tenum*(typ: Type, scope: seq[string]): KsType =
     kind: ktkEnum,
     owningtype: if scope == @[]: typ else: typ.follow(typename, path),
     enumname: enumname)
-
-proc parseType*(s: string, typ: Type): KsType =
-  if s.match(re"u[1248](be|le)?"):
-    result = tuint(parseInt(s[1..1]))
-    if s.match(re".*(be|le)"):
-      result.endian = parseEnum[Endian](s[2..3])
-  elif s.match(re"s[1248](be|le)?"):
-    result = tsint(parseInt(s[1..1]))
-    if s.match(re".*(be|le)"):
-      result.endian = parseEnum[Endian](s[2..3])
-  elif s.match(re"f[48](be|le)?"):
-    result = tfloat(parseInt(s[1..1]))
-    if s.match(re".*(be|le)"):
-      result.endian = parseEnum[Endian](s[2..3])
-  elif s.match(re"b[1-9][0-9]*(be|le)?"):
-    if s.match(re".*(be|le)"):
-      result = tbit(parseInt(s[1..^3]), parseEnum[Endian](s[^2..^1]))
-    else:
-      result = tbit(parseInt(s[1..^1]))
-  elif s.match(re"strz?"):
-    result = tstr(if s.endsWith('z'): true else: false)
-  else:
-    var
-      scope = split(s, "::")
-      path: seq[string]
-    let name = scope[0]
-    for i in countdown(scope.len - 1, 1):
-      path.add(scope[i])
-    result = tuser(typ, name, path)

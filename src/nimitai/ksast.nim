@@ -1,4 +1,4 @@
-import macros, json, strutils, tables, sequtils, strformat
+import macros, json, strutils, tables, sequtils, strformat, algorithm
 import types, exprlang, identutils
 
 proc buildNimTypeId*(typ: Type): string =
@@ -10,8 +10,8 @@ proc buildNimTypeId*(typ: Type): string =
     stack.add(it.id)
     it = it.parent
 
-  while stack != @[]:
-    result &= pop(stack).capitalizeAscii
+  reverse(stack)
+  result = stack.mapIt(it.normId.capitalizeAscii).join("_")
 
 proc access(typ: Type, symbol: string): KsType =
   for a in typ.seq:
@@ -38,6 +38,16 @@ proc matchAndBuildEnum*(scope: seq[string], typ: Type): string =
   let e = scope.join("::")
   quit(fmt"Enum {e} not found")
 
+proc addSupertype(kst: KsType, st: Type) =
+  case kst.kind
+  of ktkUser:
+    kst.usertype.supertypes.add(st)
+  of ktkSwitch:
+    for c in kst.cases:
+      c.t.addSupertype(st)
+  else:
+    discard
+
 proc toNim*(ksType: KsType): NimNode =
   case ksType.kind
   of ktkBit:
@@ -61,6 +71,8 @@ proc toNim*(ksType: KsType): NimNode =
     result = ident(buildNimTypeId(ksType.owningtype) & ksType.enumname)
   of ktkStream:
     result = ident(streamTypeName)
+  of ktkSwitch:
+    discard #XXX
 
 proc removeLeadingUnderscores(s: var string) =
   while s[0] == '_':
@@ -242,6 +254,7 @@ proc toNim*(node: KsNode): NimNode =
       result = ident"index"
     else:
       result = newDotExpr(ident"this", ident(normId(node.strval)))
+      #result = ident(normId(node.strval))
   of knkEnum:
     if node.cx != nil:
       result = newDotExpr(
@@ -441,9 +454,9 @@ proc field(kind: FieldKind, id: string, st: Type, json: JsonNode): Field =
     result.repeatUntil = jsonToExpr(json["repeat-until"], result.st)
 
   if fkType in result.keys:
-    result.`type` = parseType(json["type"].getStr, result.st)
-    if result.`type`.kind == ktkUser:
-      result.`type`.usertype.supertypes.add(st)
+    result.`type` = parseType(json["type"], result.st)
+    if result.`type`.kind in {ktkUser, ktkSwitch}:
+      result.`type`.addSupertype(st)
     if result.repeat != rkNone:
       result.`type` = tarr(result.`type`)
   else:

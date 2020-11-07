@@ -1,4 +1,4 @@
-import macros, strutils
+import strutils
 
 proc normId*(s: string): string =
   result = s
@@ -11,8 +11,14 @@ proc normId*(s: string): string =
       result[i] = result[i].toUpperAscii
     inc i
 
-proc isParsedId*(s: string): NimNode =
-  ident("is" & s.normId.capitalizeAscii)
+proc isParsedId*(s: string): string =
+  "is" & s.normId.capitalizeAscii
 
-proc instId*(s: string): NimNode =
-  ident(s.normId & "Inst")
+proc instId*(s: string): string =
+  s.normId & "Inst"
+
+proc variantId*(t, f: string): string =
+  t & "_" & f.capitalizeAscii
+
+proc variantDiscrId*(t, f: string): string =
+  variantId(t, f) & "Discr"
