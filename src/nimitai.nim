@@ -15,11 +15,9 @@ proc parseByteArray(io: NimNode; field: Field): NimNode =
     newLit(cons),
     newLit(eoserr))
 
-proc parseTyped(io: NimNode; field: Field): NimNode =
-  let
-    meta = field.st.meta
-    raw = ident(field.id & "Raw")
-    kst = if field.repeat == rkNone: field.`type` else: field.`type`.elemtype
+proc parseTyped(io: NimNode; meta: Meta, id, ancestorNimId: string,
+                kst: KsType): NimNode =
+  let raw = ident(id & "Raw")
 
   case kst.kind
   of ktkBit:
@@ -41,11 +39,12 @@ proc parseTyped(io: NimNode; field: Field): NimNode =
       io)
 
   of ktkStr:
-    if fkTerminator in field.keys or kst.isZeroTerm:
-      result = parseByteArray(io, field)
-    else:
-      result = raw
-    result = newCall(ident"toString", result)
+    #if fkTerminator in field.keys or kst.isZeroTerm:
+    #  result = parseByteArray(io, field)
+    #else:
+    #  result = raw
+    #result = newCall(ident"toString", result)
+    result = newCall(ident"toString", raw)
   #if fkEncoding in field.keys
   #if fkEosError in field.keys
 
@@ -63,7 +62,36 @@ proc parseTyped(io: NimNode; field: Field): NimNode =
 
   of ktkStream: discard #XXX
 
-  of ktkSwitch: discard #XXX
+  of ktkSwitch:
+    result = newTree(nnkIfStmt)
+    for i in 0 ..< kst.cases.len:
+      result.add nnkElifBranch.newTree(
+        infix(
+          kst.on.toNim,
+          "==",
+          kst.cases[i].v.toNim),
+        nnkObjConstr.newTree(
+          ident(variantId(ancestorNimId, id)),
+          nnkExprColonExpr.newTree(
+            ident"discr",
+            newDotExpr(
+              ident(variantDiscrId(ancestorNimId, id)),
+              ident("case" & $i))),
+          nnkExprColonExpr.newTree(
+            ident("c" & $i),
+            parseTyped(io, meta, id, ancestorNimId, kst.cases[i].t))))
+    result.add nnkElse.newTree(
+      nnkObjConstr.newTree(
+        ident(variantId(ancestorNimId, id)),
+        nnkExprColonExpr.newTree(
+          ident"discr",
+          newDotExpr(
+            ident(variantDiscrId(ancestorNimId, id)),
+            ident("case0"))),
+        nnkExprColonExpr.newTree(
+          ident("c0"),
+          parseTyped(io, meta, id, ancestorNimId, kst.cases[0].t))))
+
 
 proc parseField(field: Field): NimNode =
   result = newStmtList()
@@ -121,7 +149,12 @@ proc parseField(field: Field): NimNode =
 
   var parseExpr: NimNode
   if fkType in field.keys:
-    parseExpr = parseTyped(io, field)
+    parseExpr = parseTyped(
+      io,
+      field.st.meta,
+      field.id,
+      buildNimTypeId(field.st),
+      if field.repeat == rkNone: field.`type` else: field.`type`.elemtype)
   elif fkContents in field.keys:
     parseExpr = newCall(ident"ensureFixedContents", io, newLit(field.contents))
   elif fkValue in field.keys:
