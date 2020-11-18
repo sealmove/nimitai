@@ -1,4 +1,4 @@
-# <p align="center">nimitai</p>
+# <p align="center">nimitai (STALLED)</p>
 
 ## Introduction
 Nimitai is a compile-time parser generator for binary data. It transforms JSON objects into parsing procedures.  
@@ -10,16 +10,16 @@ Each input object should describe a binary format according to [Kaitai Struct](h
 | `proc createDynlib(spec: JsonNode, path: string)` | dynamic library |
 | `proc outputModule(spec: JsonNode): string` | nim module (source code) |
 
+## Status
+The project is stalled indefinitely because Kaitai Struct semantics are not idiomatic for Nim and therefore it is not worth the effort (there are better native solutions; see [binaryparse](https://github.com/PMunch/binaryparse/))
+
 ## Writing specs
 Being ubiquitous and easily parsable, JSON is a great base format, and there is even a CT parser [in Nim stdlib](https://nim-lang.org/docs/json.html). However, writing in JSON is not appealing at all. Luckily there are a couple of nice JSON superset, and nimitai can work in conjuction with any CT parser that outputs `JsonNode`. The end-goal is to use nimitai alongside a YAML compiler in order to leverage the excellent [Kaitai Struct IDE](https://ide.kaitai.io/). Sadly, we don't have one that works at compile-time yet. The plan is to refactor [NimYAML](https://github.com/flyx/NimYAML). Nevertheless, nimitai can progress independently.
 
 ![Data flow](flow.svg)
 
-## Advantages over Kaitai Struct
-1. **High quality idiomatic Nim code generation at the AST level**  
-Something I couldn't achieve for Nim with Kaitai Struct because it's made with Java-like languages in mind. After all, Kaitai Struct is not as language-agnostic as it claims to be.
-2. **Pluggable spec-as-compiler**  
-Instead of being an external compiler, nimitai is a CT library which means you don't have to mess with makefiles or similar mechanisms - everything is done within the language. The moment you tweak your spec, your project that links to it has a brand new compiler! No scripts needed at all.
+## Motivation
+**Pluggable spec-as-compiler**: Instead of being an external compiler, nimitai is a CT library which means you don't have to mess with makefiles or similar mechanisms - everything is done within the language. The moment you tweak your spec, your project that links to it has a brand new compiler! No scripts needed at all.
 
 ## Example
 
