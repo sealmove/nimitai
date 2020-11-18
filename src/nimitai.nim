@@ -1,6 +1,9 @@
 import json, macros, tables
 import nimitai/[types, ksast, identutils]
 
+proc needRaw(f: Field): bool =
+  fkSize in f.keys or fkSizeEos in f.keys or f.`type`.kind == ktkStr
+
 proc parseByteArray(io: NimNode; field: Field): NimNode =
   let
     term = if fkTerminator in field.keys: field.terminator else: 0
@@ -39,11 +42,6 @@ proc parseTyped(io: NimNode; meta: Meta, id, ancestorNimId: string,
       io)
 
   of ktkStr:
-    #if fkTerminator in field.keys or kst.isZeroTerm:
-    #  result = parseByteArray(io, field)
-    #else:
-    #  result = raw
-    #result = newCall(ident"toString", result)
     result = newCall(ident"toString", raw)
   #if fkEncoding in field.keys
   #if fkEosError in field.keys
@@ -128,7 +126,7 @@ proc parseField(field: Field): NimNode =
         io,
         newCall(ident"int", field.pos.toNim)))
 
-  if fkSize in field.keys or fkSizeEos in field.keys:
+  if needRaw(field):
     var data: NimNode
     if fkSize in field.keys:
       let size = newCall(ident"int", field.size.toNim)

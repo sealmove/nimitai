@@ -196,6 +196,8 @@ proc inferType(node: KsNode): KsType =
         result = lefttype
       else:
         result = inferType(node.sons[1])
+    of knkCast:
+      result = node.sons[1].kstype
     else: discard # XXX
   of knkUnary:
     result = inferType(node.sons[1])
@@ -216,6 +218,7 @@ proc inferType(node: KsNode): KsType =
     #of ktkStr
     #of ktkArr
     #of ktkUser
+    #of ktkSwitch
   of knkTernary:
     let (c, t, f) = (inferType(node.sons[0]),
                      inferType(node.sons[1]),
